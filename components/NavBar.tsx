@@ -12,8 +12,8 @@ const NavBar = () => (
         <a href="#faq" className="text-gray-700 hover:text-blue-700 font-medium">FAQs</a>
       </div>
       <div className="flex gap-4">
-        <Link href="/login" className="px-6 py-2 bg-white text-blue-700 border border-blue-600 rounded-lg shadow hover:bg-blue-50 transition font-semibold">Login</Link>
-        <Link href="/get-started" className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition font-semibold">Get Started</Link>
+        <Link href="/sign-in" className="px-6 py-2 bg-white text-blue-700 border border-blue-600 rounded-lg shadow hover:bg-blue-50 transition font-semibold">Login</Link>
+        <Link href="/sign-up" className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition font-semibold">Get Started</Link>
       </div>
     </div>
   </nav>
