@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { SignInButton, SignUpButton } from '@clerk/nextjs';
 
 const NavBar = () => (
   <nav className="w-full bg-white shadow sticky top-0 z-50">
@@ -12,8 +13,12 @@ const NavBar = () => (
         <a href="#faq" className="text-gray-700 hover:text-blue-700 font-medium">FAQs</a>
       </div>
       <div className="flex gap-4">
-        <Link href="/sign-in" className="px-6 py-2 bg-white text-blue-700 border border-blue-600 rounded-lg shadow hover:bg-blue-50 transition font-semibold">Login</Link>
-        <Link href="/sign-up" className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition font-semibold">Get Started</Link>
+        <SignInButton mode="modal">
+          <button className="px-6 py-2 bg-white text-blue-700 border border-blue-600 rounded-lg shadow hover:bg-blue-50 transition font-semibold">Login</button>
+        </SignInButton>
+        <SignUpButton mode="modal">
+          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition font-semibold">Get Started</button>
+        </SignUpButton>
       </div>
     </div>
   </nav>
