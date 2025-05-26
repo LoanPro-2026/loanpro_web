@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
 
 const Footer = () => (
   <footer className="bg-gray-900 text-gray-200 py-12 mt-16">
