@@ -12,6 +12,7 @@
     "@clerk/clerk-sdk-node": "^5.1.6",
     "@clerk/nextjs": "^6.20.0",
     "@heroicons/react": "^2.2.0",
+    "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
     "mongodb": "^6.16.0",
