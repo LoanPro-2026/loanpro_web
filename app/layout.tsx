@@ -27,4 +27,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </html>
     </ClerkProvider>
   );
+<<<<<<< HEAD
 } 
+=======
+} 
+>>>>>>> bf4952c084c624fdc7fed85428769f806a8d323e
