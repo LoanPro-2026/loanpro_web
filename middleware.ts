@@ -29,36 +29,42 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Extract host and subdomain
-  const host = req.headers.get('host') || '';
-  const cleanHost = host.split(':')[0]; // remove port if present
-  const parts = cleanHost.split('.');
+  const host = req.headers.get("host") || "";
+  const cleanHost = host.split(":")[0];
+  const parts = cleanHost.split(".");
 
-  // Detect localhost or 127.0.0.1 for dev environment
-  const isLocalhost = cleanHost === 'localhost' || cleanHost === '127.0.0.1' || cleanHost.endsWith('.localhost');
+  const isLocalhost =
+    cleanHost === "localhost" ||
+    cleanHost === "127.0.0.1" ||
+    cleanHost.endsWith(".localhost");
 
-  // Define subdomain (only if NOT localhost and parts length > 2)
-  const subdomain = (!isLocalhost && parts.length > 2) ? parts[0] : null;
+  const subdomain =
+    !isLocalhost && parts.length > 2 ? parts[0] : null;
+
+  const response = NextResponse.next();
+
+  // Mark /app/app/* routes with custom header
+  if (pathname.startsWith("/app/app")) {
+    response.headers.set("x-app-route", "true");
+  }
 
   // Handle /app/* route access
-  if (pathname.startsWith('/app/')) {
-    // In production, require subdomain. In dev (localhost), allow access without subdomain.
-    if ((!subdomain || subdomain === 'www' || subdomain === 'loanpro') && !isLocalhost) {
+  if (pathname.startsWith("/app/")) {
+    if ((!subdomain || subdomain === "www" || subdomain === "loanpro") && !isLocalhost) {
       console.log("Blocked /app/* access due to missing subdomain");
       const url = req.nextUrl.clone();
-      url.hostname = cleanHost.replace(/^.*?\./, ''); // remove subdomain if any
-      url.pathname = '/';
+      url.hostname = cleanHost.replace(/^.*?\./, "");
+      url.pathname = "/";
       return NextResponse.redirect(url);
     }
 
     // Add tenant header if subdomain exists
-    const response = NextResponse.next();
     if (subdomain) {
-      response.headers.set('x-tenant', subdomain);
+      response.headers.set("x-tenant", subdomain);
     }
-    return response;
   }
 
-  return NextResponse.next();
+  return response;
 });
 
 export const config = {
