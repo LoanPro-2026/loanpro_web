@@ -59,50 +59,11 @@ const NavBar = () => {
             </SignUpButton>
           </SignedOut>
           <SignedIn>
-            <Suspense fallback={<Loader message="Loading profile..." />}>
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setDropdownOpen((open) => !open)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-full shadow hover:bg-blue-50 transition font-semibold focus:outline-none"
-                >
-                  {user?.imageUrl ? (
-                    <img src={user.imageUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
-                  ) : (
-                    <UserCircleIcon className="w-8 h-8 text-blue-600" />
-                  )}
-                  <span className="hidden sm:block font-medium text-gray-800">{username}</span>
-                  <svg className={`w-4 h-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                </button>
-                {dropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-50">
-                    <div className="flex flex-col py-2">
-                      <button
-                        onClick={() => openUserProfile()}
-                        className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-50 transition"
-                      >
-                        {user?.imageUrl ? (
-                          <img
-                            src={user.imageUrl}
-                            alt="avatar"
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <UserCircleIcon className="w-8 h-8 text-blue-600" />
-                        )}
-                        <span className="text-gray-800 font-medium">Profile</span>               </button>
-                      <Link href="/subscribe" className="flex items-center gap-2 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                        <CreditCardIcon className="w-5 h-5 text-blue-500" />
-                        <span>Choose Plan</span>
-                      </Link>
-                      <Link href="/subscription" className="flex items-center gap-2 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition">
-                        <ReceiptRefundIcon className="w-5 h-5 text-blue-500" />
-                        <span>My Subscription</span>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Suspense>
+            <Link href="/profile">
+              <button className="px-6 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition font-semibold">
+                Manage Profile
+              </button>
+            </Link>
           </SignedIn>
         </div>
       </div>

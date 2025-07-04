@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { SubscriptionService } from '@/services/subscriptionService';
 import clientPromise from '@/lib/mongodb';
 import { createUserDatabase } from '@/lib/RailwayDbprovision';
+import crypto from 'crypto';
 
 export async function POST(req: Request) {
   try {
@@ -45,6 +46,8 @@ export async function POST(req: Request) {
 
     // Upsert user in users collection
     const db = (await clientPromise).db('AdminDB');
+    // Generate a secure access token (random 48-byte hex string)
+    const accessToken = crypto.randomBytes(48).toString('hex');
     await db.collection('users').updateOne(
       { userId },
       {
@@ -53,6 +56,7 @@ export async function POST(req: Request) {
           username: generatedUsername,
           email: username, // using username as email if that's the case
           lastSubscribedAt: new Date(),
+          accessToken, // store the generated access token
         },
         $setOnInsert: {
           createdAt: new Date(),
@@ -84,7 +88,7 @@ export async function POST(req: Request) {
       success: true,
       message: 'Payment processed and subscription created successfully',
       subscription,
-      redirectUrl: '/app/dashboard'
+      redirectUrl: '/profile'
     });
   } catch (error) {
     console.error('Error processing payment:', error);

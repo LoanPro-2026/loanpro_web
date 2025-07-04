@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 
 const publicRoutes = [
   "/",
-  "/api/create-order",
   "/api/payment-success",
   "/pricing",
   "/features",
@@ -17,10 +16,16 @@ export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
 
   const pathname = req.nextUrl.pathname;
+  const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true"; // [ELECTRON]
 
   const isPublicRoute = publicRoutes.some(route =>
     pathname.match(new RegExp(`^${route.replace("*", ".*")}$`))
   );
+
+  // [ELECTRON] Block website-only routes in desktop app
+  if (isElectron && ["/sign-in", "/sign-up", "/subscribe"].includes(pathname)) {
+    return NextResponse.redirect(new URL("/app/dashboard", req.url));
+  }
 
   // Auth check for private routes
   if (!userId && !isPublicRoute) {
@@ -28,47 +33,13 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  // Extract host and subdomain
-  const host = req.headers.get("host") || "";
-  const cleanHost = host.split(":")[0];
-  const parts = cleanHost.split(".");
-
-  const isLocalhost =
-    cleanHost === "localhost" ||
-    cleanHost === "127.0.0.1" ||
-    cleanHost.endsWith(".localhost");
-
-  const subdomain =
-    !isLocalhost && parts.length > 2 ? parts[0] : null;
-
-  const response = NextResponse.next();
-
-  // Mark /app/app/* routes with custom header
-  if (pathname.startsWith("/app/app")) {
-    response.headers.set("x-app-route", "true");
-  }
-
-  // Handle /app/* route access
-  if (pathname.startsWith("/app/")) {
-    if ((!subdomain || subdomain === "www" || subdomain === "loanpro") && !isLocalhost) {
-      console.log("Blocked /app/* access due to missing subdomain");
-      const url = req.nextUrl.clone();
-      url.hostname = cleanHost.replace(/^.*?\./, "");
-      url.pathname = "/";
-      return NextResponse.redirect(url);
-    }
-
-    // Add tenant header if subdomain exists
-    if (subdomain) {
-      response.headers.set("x-tenant", subdomain);
-    }
-  }
-
-  return response;
+  // No subdomain logic needed anymore
+  return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/api/(.*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
