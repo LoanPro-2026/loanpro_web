@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { handleCors } from './cors';
+import { handleCors } from '../cors/cors';
 
 export async function OPTIONS(req: Request) {
   return handleCors(req);
@@ -21,29 +21,21 @@ export async function POST(req: Request) {
     const user = await db.collection('users').findOne({ accessToken });
     if (!user) return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
 
-    const existingDevice = (user.devices || []).find((d: any) => d.deviceId === deviceId && d.status === 'active');
-    if (existingDevice) {
-      return NextResponse.json({ success: true, message: 'Device already bound', device: existingDevice }, { headers: corsHeaders });
-    }
-
-    // Add device to devices array
+    // Add device as pending
     const deviceEntry = {
       deviceId,
       deviceName: deviceName || 'Unnamed Device',
-      status: 'active',
+      status: 'pending',
       lastActive: new Date(),
     };
     await db.collection('users').updateOne(
       { accessToken },
-      {
-        $push: { devices: deviceEntry },
-        $setOnInsert: { devices: [] }
-      } as any
+      { $push: { devices: deviceEntry } } as any
     );
 
-    return NextResponse.json({ success: true, message: 'Device bound successfully', device: deviceEntry }, { headers: corsHeaders });
+    return NextResponse.json({ success: true, message: 'Device switch requested', device: deviceEntry }, { headers: corsHeaders });
   } catch (error) {
-    console.error('Device bind API error:', error);
-    return NextResponse.json({ error: 'Failed to bind device' }, { status: 500, headers: corsHeaders });
+    console.error('Device switch request API error:', error);
+    return NextResponse.json({ error: 'Failed to request device switch' }, { status: 500, headers: corsHeaders });
   }
 } 

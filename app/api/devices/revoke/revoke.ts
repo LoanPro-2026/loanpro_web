@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { handleCors } from './cors';
+import { handleCors } from '../cors/cors';
 
 export async function OPTIONS(req: Request) {
   return handleCors(req);
