@@ -10,22 +10,29 @@ const publicRoutes = [
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/subscribe",
+  "/api/devices/bind",       // Explicitly allow device API
+  "/api/devices/revoke",     // Allow device revocation
+  "/api/devices/request-switch" // Allow switch requests
 ];
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
-
   const pathname = req.nextUrl.pathname;
-  const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true"; // [ELECTRON]
+  const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true";
 
-  const isPublicRoute = publicRoutes.some(route =>
-    pathname.match(new RegExp(`^${route.replace("*", ".*")}$`))
-  );
+  // [FIX] Allow OPTIONS requests (CORS preflight)
+  if (req.method === "OPTIONS") {
+    return NextResponse.json({}, { status: 204 });
+  }
 
   // [ELECTRON] Block website-only routes in desktop app
   if (isElectron && ["/sign-in", "/sign-up", "/subscribe"].includes(pathname)) {
     return NextResponse.redirect(new URL("/app/dashboard", req.url));
   }
+
+  const isPublicRoute = publicRoutes.some(route =>
+    pathname.match(new RegExp(`^${route.replace("*", ".*")}$`))
+  );
 
   // Auth check for private routes
   if (!userId && !isPublicRoute) {
@@ -33,7 +40,6 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  // No subdomain logic needed anymore
   return NextResponse.next();
 });
 

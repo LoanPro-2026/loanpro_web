@@ -16,7 +16,7 @@ const HeroSection = () => {
               Download Now
             </button>
           </Link>
-          <Link href="/app/profile">
+          <Link href="/profile">
             <button className="px-8 py-4 bg-white text-blue-700 border border-blue-600 rounded-xl shadow-lg hover:bg-blue-700 hover:text-white transition font-bold text-lg focus:outline-none focus:ring-2 focus:ring-blue-300">
               Manage Profile
             </button>
