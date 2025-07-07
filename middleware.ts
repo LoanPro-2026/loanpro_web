@@ -10,9 +10,7 @@ const publicRoutes = [
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/subscribe",
-  "/api/devices/bind",       // Explicitly allow device API
-  "/api/devices/revoke",     // Allow device revocation
-  "/api/devices/request-switch" // Allow switch requests
+  "/api/devices/(.*)" // NEW: Allow all device API endpoints
 ];
 
 export default clerkMiddleware(async (auth, req) => {
@@ -20,12 +18,24 @@ export default clerkMiddleware(async (auth, req) => {
   const pathname = req.nextUrl.pathname;
   const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true";
 
-  // [FIX] Allow OPTIONS requests (CORS preflight)
-  if (req.method === "OPTIONS") {
-    return NextResponse.json({}, { status: 204 });
-  }
+  // ======== NEW: CORS HANDLING ======== //
+  const origin = req.headers.get('origin');
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
 
-  // [ELECTRON] Block website-only routes in desktop app
+  // Handle OPTIONS (preflight) requests
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, { 
+      status: 204, 
+      headers: corsHeaders 
+    });
+  }
+  // ======== END CORS HANDLING ======== //
+
+  // [Existing Electron logic...]
   if (isElectron && ["/sign-in", "/sign-up", "/subscribe"].includes(pathname)) {
     return NextResponse.redirect(new URL("/app/dashboard", req.url));
   }
@@ -34,13 +44,17 @@ export default clerkMiddleware(async (auth, req) => {
     pathname.match(new RegExp(`^${route.replace("*", ".*")}$`))
   );
 
-  // Auth check for private routes
   if (!userId && !isPublicRoute) {
-    console.log("auth.userId in middleware:", userId);
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  return NextResponse.next();
+  // Apply CORS headers to all responses
+  const response = NextResponse.next();
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+
+  return response;
 });
 
 export const config = {
