@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const corsHeaders = await handleCors(req);
   if (corsHeaders instanceof Response) return corsHeaders;
   try {
-    const { accessToken, deviceId, deviceName } = await req.json();
+    const { accessToken, deviceId } = await req.json();
     if (!accessToken) return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
     if (!deviceId) return NextResponse.json({ error: 'Missing deviceId' }, { status: 400, headers: corsHeaders });
 
@@ -19,20 +19,14 @@ export async function POST(req: Request) {
     const user = await db.collection('users').findOne({ accessToken });
     if (!user) return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
 
-    const deviceEntry = {
-      deviceId,
-      deviceName: deviceName || 'Unnamed Device',
-      status: 'pending',
-      lastActive: new Date(),
-    };
     await db.collection('users').updateOne(
-      { accessToken },
-      { $push: { devices: deviceEntry } } as any
+      { accessToken, 'devices.deviceId': deviceId },
+      { $set: { 'devices.$.status': 'revoked' } } as any
     );
 
-    return NextResponse.json({ success: true, message: 'Device switch requested', device: deviceEntry }, { headers: corsHeaders });
+    return NextResponse.json({ success: true, message: 'Device revoked' }, { headers: corsHeaders });
   } catch (error) {
-    console.error('Device switch request API error:', error);
-    return NextResponse.json({ error: 'Failed to request device switch' }, { status: 500, headers: corsHeaders });
+    console.error('Device revoke API error:', error);
+    return NextResponse.json({ error: 'Failed to revoke device' }, { status: 500, headers: corsHeaders });
   }
 } 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { handleCors } from '../cors/cors';
+import { handleCors } from '../cors';
 
 export async function OPTIONS(req: Request) {
   return handleCors(req);
@@ -16,8 +16,6 @@ export async function POST(req: Request) {
 
     const client = await clientPromise;
     const db = client.db('AdminDB');
-
-    // Find user by accessToken
     const user = await db.collection('users').findOne({ accessToken });
     if (!user) return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
 
@@ -26,7 +24,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: 'Device already bound', device: existingDevice }, { headers: corsHeaders });
     }
 
-    // Add device to devices array
     const deviceEntry = {
       deviceId,
       deviceName: deviceName || 'Unnamed Device',
