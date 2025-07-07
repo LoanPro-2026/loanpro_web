@@ -60,6 +60,7 @@ export async function POST(req: Request) {
         },
         $setOnInsert: {
           createdAt: new Date(),
+          devices: []
         }
       },
       { upsert: true }
