@@ -33,13 +33,18 @@ export async function POST(req: Request) {
       lastActive: new Date(),
     };
 
-    await db.collection('users').updateOne(
-      { accessToken },
-      {
-        $push: { devices: deviceEntry },
-        $setOnInsert: { devices: [] },
-      } as any
-    );
+      if (!user) {
+        await db.collection('users').insertOne({
+          accessToken,
+          devices: [deviceEntry],
+          createdAt: new Date(),
+        });
+      } else {
+        await db.collection('users').updateOne(
+          { accessToken },
+          { $push: { devices: deviceEntry } } as any
+        );
+      }
 
     return NextResponse.json({ success: true, message: 'Device bound successfully', device: deviceEntry }, { headers: corsHeaders });
 

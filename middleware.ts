@@ -59,7 +59,14 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Only run middleware on these paths (exclude /api)
+    "/api/create-order",
+    "/api/payment-success",
+    "/api/devices/bind",
+    "/api/devices/request-switch",
+    "/api/devices/revoke",
+    "/api/devices/cors",
+    "/api/user-profile",
+    "/api/cancel-subscription",
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };

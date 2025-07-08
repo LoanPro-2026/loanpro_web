@@ -66,17 +66,6 @@ export async function POST(req: Request) {
       { upsert: true }
     );
 
-    // Create Azure SQL database for the user
-    try {
-      await createUserDatabase(generatedUsername);
-      // Mark dbProvisioned true in subscription
-      await subscriptionService.updateSubscription(userId, { dbProvisioned: true });
-    } catch (dbError) {
-      console.error('Azure DB provisioning failed:', dbError);
-      // Optionally, update subscription with error info
-      await subscriptionService.updateSubscription(userId, { dbProvisioned: false });
-    }
-
     console.log('Payment successful and subscription created:', {
       orderId: razorpay_order_id,
       paymentId: razorpay_payment_id,
