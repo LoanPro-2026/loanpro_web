@@ -1,24 +1,21 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const publicRoutes = [
-  "/",
-  "/api/payment-success",
-  "/pricing",
-  "/features",
-  "/get-started",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/subscribe",
-  "/api/devices/(.*)" // NEW: Allow all device API endpoints
+// Only protect these specific routes - everything else is public
+const protectedRoutes = [
+  "/profile",
+  "/subscription", 
+  "/api/user-profile",
+  "/api/create-order",
+  "/api/cancel-subscription",
+  "/api/upgrade-plan"
 ];
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   const pathname = req.nextUrl.pathname;
-  const isElectron = process.env.NEXT_PUBLIC_ELECTRON === "true";
 
-  // ======== NEW: CORS HANDLING ======== //
+  // ======== CORS HANDLING FOR ALL ROUTES ======== //
   const origin = req.headers.get('origin');
   const corsHeaders = {
     'Access-Control-Allow-Origin': origin || '*',
@@ -35,16 +32,11 @@ export default clerkMiddleware(async (auth, req) => {
   }
   // ======== END CORS HANDLING ======== //
 
-  // [Existing Electron logic...]
-  if (isElectron && ["/sign-in", "/sign-up", "/subscribe"].includes(pathname)) {
-    return NextResponse.redirect(new URL("/app/dashboard", req.url));
-  }
+  // Check if current route requires authentication
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
 
-  const isPublicRoute = publicRoutes.some(route =>
-    pathname.match(new RegExp(`^${route.replace("*", ".*")}$`))
-  );
-
-  if (!userId && !isPublicRoute) {
+  // Only redirect to sign-in if accessing a protected route without authentication
+  if (isProtectedRoute && !userId) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
@@ -59,14 +51,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/api/create-order",
-    "/api/payment-success",
-    "/api/devices/bind",
-    "/api/devices/request-switch",
-    "/api/devices/revoke",
-    "/api/devices/cors",
-    "/api/user-profile",
-    "/api/cancel-subscription",
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    // Apply middleware to all routes except static files
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

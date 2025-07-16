@@ -15,28 +15,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { plan } = await req.json();
+    const { plan, billingPeriod = 'monthly', amount } = await req.json();
     
-    // Define plan prices
+    // Define plan prices (monthly rates)
     const planPrices: { [key: string]: number } = {
-      'Monthly': 1249,
-      '6 Months': 5999,
-      'Yearly': 10799,
+      'Basic': 499,
+      'Pro': 999,
+      'Enterprise': 1499,
     };
 
-    const amount = planPrices[plan];
-    if (!amount) {
+    const monthlyPrice = planPrices[plan];
+    if (!monthlyPrice) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
+    // Calculate final amount based on billing period
+    let finalAmount = monthlyPrice;
+    if (billingPeriod === 'annually') {
+      // Annual billing with 15% discount
+      finalAmount = Math.round(monthlyPrice * 12 * 0.85);
+    }
+
+    // Use the amount passed from frontend if provided (for consistency)
+    const orderAmount = amount || finalAmount;
+
+    console.log('Order calculation:', { 
+      plan, 
+      billingPeriod, 
+      monthlyPrice, 
+      finalAmount, 
+      orderAmount 
+    });
+
     // Create Razorpay order
     const order = await razorpay.orders.create({
-      amount: amount * 100, // Razorpay expects amount in paise
+      amount: orderAmount * 100, // Razorpay expects amount in paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
         userId,
         plan,
+        billingPeriod,
       },
     });
 

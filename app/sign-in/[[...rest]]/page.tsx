@@ -7,7 +7,7 @@ export default function SignInPage() {
     <div className="flex justify-center mt-10">
       <SignedIn>
         {/* Redirect signed-in users to dashboard */}
-        {redirect("/app/dashboard")}
+        {redirect("/profile")}
       </SignedIn>
       <SignedOut>
         <SignIn />
