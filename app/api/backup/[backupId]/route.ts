@@ -4,12 +4,15 @@ import { getCorsHeaders } from '../../devices/cors';
 import { ObjectId } from 'mongodb';
 
 // Restore specific backup
-export async function POST(req: Request, { params }: { params: { backupId: string } }) {
+export async function POST(
+  req: Request, 
+  { params }: { params: Promise<{ backupId: string }> }
+) {
   const corsHeaders = getCorsHeaders(req);
   
   try {
     const { accessToken } = await req.json();
-    const { backupId } = params;
+    const { backupId } = await params; // Await the params promise
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -62,13 +65,16 @@ export async function POST(req: Request, { params }: { params: { backupId: strin
 }
 
 // Delete specific backup
-export async function DELETE(req: Request, { params }: { params: { backupId: string } }) {
+export async function DELETE(
+  req: Request, 
+  { params }: { params: Promise<{ backupId: string }> }
+) {
   const corsHeaders = getCorsHeaders(req);
   
   try {
     const { searchParams } = new URL(req.url);
     const accessToken = searchParams.get('accessToken');
-    const { backupId } = params;
+    const { backupId } = await params; // Await the params promise
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
