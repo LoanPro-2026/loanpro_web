@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req); // ✅ Returns headers only
 
   try {
-    const { accessToken, deviceId, deviceName } = await req.json();
+    const { accessToken, deviceId, deviceName, organizationName } = await req.json();
 
     if (!accessToken) return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
     if (!deviceId) return NextResponse.json({ error: 'Missing deviceId' }, { status: 400, headers: corsHeaders });
@@ -21,30 +21,73 @@ export async function POST(req: Request) {
 
     if (!user) return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
 
-    const existingDevice = (user.devices || []).find((d: any) => d.deviceId === deviceId && d.status === 'active');
+    // Check device limits based on subscription plan
+    const getDeviceLimit = (plan: string) => {
+      switch (plan?.toLowerCase()) {
+        case 'basic':
+        case 'pro':
+          return 1;
+        case 'enterprise':
+          return 2;
+        default:
+          return 1; // Default to 1 for safety
+      }
+    };
+
+    const subscriptionPlan = user.subscriptionPlan || 'basic';
+    const deviceLimit = getDeviceLimit(subscriptionPlan);
+    const activeDevices = (user.devices || []).filter((d: any) => d.status === 'active');
+
+    // Check if device already exists
+    const existingDevice = activeDevices.find((d: any) => d.deviceId === deviceId);
     if (existingDevice) {
-      return NextResponse.json({ success: true, message: 'Device already bound', device: existingDevice }, { headers: corsHeaders });
+      // Update existing device info
+      await db.collection('users').updateOne(
+        { accessToken, 'devices.deviceId': deviceId },
+        { 
+          $set: { 
+            'devices.$.deviceName': deviceName || existingDevice.deviceName,
+            'devices.$.organizationName': organizationName || existingDevice.organizationName,
+            'devices.$.lastActive': new Date()
+          } 
+        }
+      );
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Device information updated', 
+        device: { ...existingDevice, deviceName, organizationName }
+      }, { headers: corsHeaders });
+    }
+
+    // Check if user has reached device limit
+    if (activeDevices.length >= deviceLimit) {
+      return NextResponse.json({ 
+        error: 'DEVICE_LIMIT_EXCEEDED',
+        message: `Your ${subscriptionPlan} plan allows only ${deviceLimit} device(s). You currently have ${activeDevices.length} active device(s).`,
+        currentDevices: activeDevices.length,
+        deviceLimit: deviceLimit,
+        subscriptionPlan: subscriptionPlan,
+        devices: activeDevices.map((d: any) => ({
+          deviceId: d.deviceId,
+          deviceName: d.deviceName,
+          lastActive: d.lastActive
+        }))
+      }, { status: 403, headers: corsHeaders });
     }
 
     const deviceEntry = {
       deviceId,
       deviceName: deviceName || 'Unnamed Device',
+      organizationName: organizationName || '',
       status: 'active',
       lastActive: new Date(),
     };
 
-      if (!user) {
-        await db.collection('users').insertOne({
-          accessToken,
-          devices: [deviceEntry],
-          createdAt: new Date(),
-        });
-      } else {
-        await db.collection('users').updateOne(
-          { accessToken },
-          { $push: { devices: deviceEntry } } as any
-        );
-      }
+    // Add device to existing user
+    await db.collection('users').updateOne(
+      { accessToken },
+      { $push: { devices: deviceEntry } } as any
+    );
 
     return NextResponse.json({ success: true, message: 'Device bound successfully', device: deviceEntry }, { headers: corsHeaders });
 
