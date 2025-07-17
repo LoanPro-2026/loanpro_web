@@ -1,10 +1,7 @@
-// Script to clean up duplicate devices and test device limit enforcement
-// This should be run from the Next.js api context
-
-import clientPromise from '@/lib/mongodb';
 import { NextResponse } from 'next/server';
+import clientPromise from '@/lib/mongodb';
 
-export async function cleanupDevices(accessToken: string) {
+async function cleanupDevices(accessToken: string) {
   try {
     const client = await clientPromise;
     const db = client.db('AdminDB');
@@ -50,8 +47,7 @@ export async function cleanupDevices(accessToken: string) {
   }
 }
 
-// Test device limit functionality
-export async function testDeviceLimit(accessToken: string) {
+async function testDeviceLimit(accessToken: string) {
   try {
     const client = await clientPromise;
     const db = client.db('AdminDB');
