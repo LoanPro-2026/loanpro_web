@@ -6,8 +6,8 @@ import { CheckIcon, StarIcon, ArrowRightIcon } from '@heroicons/react/24/outline
 const plans = [
   {
     name: 'Basic',
-    price: '₹499',
-    originalPrice: '₹699',
+    price: '₹699',
+    originalPrice: '₹899',
     period: '/month',
     description: 'Essential features for small loan businesses',
     features: [
@@ -88,9 +88,29 @@ const PricingSection = () => (
         </p>
         
         {/* Free Trial Banner */}
-        <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-100 to-blue-100 border border-green-200 rounded-full px-6 py-2">
+        <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-100 to-blue-100 border border-green-200 rounded-full px-6 py-2 mb-8">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-green-700 font-medium">🎉 Start with 14-day FREE Pro trial - No credit card required!</span>
+        </div>
+        
+        {/* Free Trial Button */}
+        <div className="mb-12 flex justify-center">
+          <SignedOut>
+            <Link href="/subscribe">
+              <button className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center space-x-2">
+                <span>Start 14 days free trial Now</span>
+                <ArrowRightIcon className="w-5 h-5" />
+              </button>
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <Link href="/subscribe">
+              <button className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center space-x-2">
+                <span>Start 14 days free trial Now</span>
+                <ArrowRightIcon className="w-5 h-5" />
+              </button>
+            </Link>
+          </SignedIn>
         </div>
       </div>
 

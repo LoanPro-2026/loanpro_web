@@ -13,68 +13,47 @@ import {
 
 const features = [
   {
-    title: 'Lightning Fast Setup',
-    description: 'Get your loan management system up and running in under 5 minutes with our streamlined onboarding process.',
-    icon: RocketLaunchIcon,
+    title: 'Advanced Dashboard',
+    description: 'Comprehensive analytics and reporting with real-time insights into your lending operations and portfolio performance.',
+    icon: ChartBarIcon,
     gradient: 'from-blue-500 to-purple-500',
     bgGradient: 'from-blue-50 to-purple-50'
   },
   {
-    title: 'Bank-Grade Security',
-    description: 'Military-grade encryption with biometric authentication and multi-factor security protocols.',
-    icon: LockClosedIcon,
+    title: 'Biometric Authentication',
+    description: 'Secure fingerprint authentication using Mantra MFS100 scanner for enhanced security and user verification.',
+    icon: FingerPrintIcon,
     gradient: 'from-purple-500 to-pink-500',
     bgGradient: 'from-purple-50 to-pink-50'
   },
   {
-    title: 'Smart Payment Gateway',
-    description: 'Integrated with cutting-edge payment systems for automated collections and real-time processing.',
-    icon: CreditCardIcon,
+    title: 'Cloud Integration',
+    description: 'Seamless synchronization between local database and cloud storage for data backup and accessibility.',
+    icon: CloudIcon,
     gradient: 'from-pink-500 to-red-500',
     bgGradient: 'from-pink-50 to-red-50'
   },
   {
-    title: 'Personalized Subdomain',
-    description: 'Your own branded dashboard with custom domain, giving you a professional presence.',
-    icon: GlobeAltIcon,
+    title: 'Cash Management',
+    description: 'Track daily cash flow, deposits, withdrawals, and maintain accurate financial records with automated reporting.',
+    icon: CreditCardIcon,
     gradient: 'from-red-500 to-orange-500',
     bgGradient: 'from-red-50 to-orange-50'
   },
   {
-    title: 'Hybrid Cloud Database',
-    description: 'Best of both worlds - local storage for speed and cloud backup for security and accessibility.',
+    title: 'Secure Database',
+    description: 'Local SQLite database with encryption for sensitive data storage and fast query performance.',
     icon: ServerIcon,
     gradient: 'from-orange-500 to-yellow-500',
     bgGradient: 'from-orange-50 to-yellow-50'
   },
   {
-    title: 'Biometric Authentication',
-    description: 'Advanced fingerprint integration for seamless and secure access to your sensitive data.',
-    icon: FingerPrintIcon,
+    title: 'Investment Tracking',
+    description: 'Monitor loan portfolios, track returns, and analyze investment performance with detailed reporting.',
+    icon: ShieldCheckIcon,
     gradient: 'from-yellow-500 to-green-500',
     bgGradient: 'from-yellow-50 to-green-50'
-  },
-  {
-    title: 'Advanced Analytics',
-    description: 'Comprehensive reporting and insights with AI-powered predictions for better decision making.',
-    icon: ChartBarIcon,
-    gradient: 'from-green-500 to-teal-500',
-    bgGradient: 'from-green-50 to-teal-50'
-  },
-  {
-    title: 'Compliance Ready',
-    description: 'Built-in compliance tools ensuring your operations meet all regulatory requirements.',
-    icon: ShieldCheckIcon,
-    gradient: 'from-teal-500 to-cyan-500',
-    bgGradient: 'from-teal-50 to-cyan-50'
-  },
-  {
-    title: 'Cloud Integration',
-    description: 'Seamless synchronization across all devices with real-time cloud backup and restore.',
-    icon: CloudIcon,
-    gradient: 'from-cyan-500 to-blue-500',
-    bgGradient: 'from-cyan-50 to-blue-50'
-  },
+  }
 ];
 
 const FeaturesSection = () => (
@@ -134,21 +113,6 @@ const FeaturesSection = () => (
             </div>
           );
         })}
-      </div>
-
-      {/* Bottom CTA */}
-      <div className="text-center mt-20">
-        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 max-w-2xl mx-auto">
-          <h3 className="text-2xl font-bold text-gray-900 mb-4">
-            Ready to Experience the Future of Loan Management?
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Join thousands of satisfied users who have transformed their loan operations with LoanPro.
-          </p>
-          <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-            Start Your Free Trial
-          </button>
-        </div>
       </div>
     </div>
   </section>

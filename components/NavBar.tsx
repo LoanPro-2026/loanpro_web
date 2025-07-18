@@ -45,8 +45,8 @@ const NavBar = () => {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-xl border-b border-white/20 shadow-xl">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-blue-600/5"></div>
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-xl">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10"></div>
       
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
@@ -105,12 +105,12 @@ const NavBar = () => {
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-64 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50"></div>
+                    <div className="absolute right-0 mt-2 w-64 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/70 to-purple-50/70"></div>
                       <div className="relative p-2">
                         <Link
                           href="/profile"
-                          className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-white/20 rounded-xl transition-all duration-300 group"
+                          className="flex items-center space-x-3 px-4 py-3 text-gray-800 hover:bg-white/30 rounded-xl transition-all duration-300 group"
                           onClick={() => setDropdownOpen(false)}
                         >
                           <UserCircleIcon className="w-5 h-5 text-blue-600" />
@@ -122,7 +122,7 @@ const NavBar = () => {
                             signOut();
                             setDropdownOpen(false);
                           }}
-                          className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50/50 rounded-xl transition-all duration-300 group"
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50/70 rounded-xl transition-all duration-300 group"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -152,14 +152,14 @@ const NavBar = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-white/10 backdrop-blur-xl border-t border-white/20 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-purple-50/50"></div>
+          <div className="md:hidden absolute top-full left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/40 shadow-xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/70 to-purple-50/70"></div>
             <div className="relative px-4 py-6 space-y-4">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block text-gray-700 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/20 transition-all duration-300"
+                  className="block text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {link.label}
@@ -167,9 +167,9 @@ const NavBar = () => {
               ))}
               
               <SignedOut>
-                <div className="pt-4 border-t border-white/20 space-y-3">
+                <div className="pt-4 border-t border-white/30 space-y-3">
                   <SignInButton mode="modal">
-                    <button className="w-full text-left text-gray-700 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/20 transition-all duration-300">
+                    <button className="w-full text-left text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300">
                       Sign In
                     </button>
                   </SignInButton>
@@ -182,10 +182,10 @@ const NavBar = () => {
               </SignedOut>
 
               <SignedIn>
-                <div className="pt-4 border-t border-white/20 space-y-3">
+                <div className="pt-4 border-t border-white/30 space-y-3">
                   <Link
                     href="/profile"
-                    className="flex items-center space-x-3 text-gray-700 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/20 transition-all duration-300"
+                    className="flex items-center space-x-3 text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <UserCircleIcon className="w-5 h-5" />
@@ -196,7 +196,7 @@ const NavBar = () => {
                       signOut();
                       setMobileMenuOpen(false);
                     }}
-                    className="flex items-center space-x-3 text-red-600 font-medium py-2 px-4 rounded-xl hover:bg-red-50/50 transition-all duration-300"
+                    className="flex items-center space-x-3 text-red-600 font-medium py-2 px-4 rounded-xl hover:bg-red-50/70 transition-all duration-300"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

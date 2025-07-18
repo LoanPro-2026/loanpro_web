@@ -21,7 +21,7 @@ const HeroSection = () => {
         <div className="mb-8">
           <div className="inline-flex items-center space-x-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-6 py-3 mb-8">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-gray-700 font-medium">Trusted by 10,000+ loan professionals</span>
+            <span className="text-gray-700 font-medium">Professional Loan Management Solution</span>
           </div>
         </div>
 
@@ -35,8 +35,8 @@ const HeroSection = () => {
         
         <p className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
           Streamline your lending operations with our powerful desktop application featuring 
-          <span className="text-blue-600 font-semibold"> advanced analytics</span>, 
-          <span className="text-purple-600 font-semibold"> secure data management</span>, and 
+          <span className="text-blue-600 font-semibold"> advanced dashboard</span>, 
+          <span className="text-purple-600 font-semibold"> biometric authentication</span>, and 
           <span className="text-blue-600 font-semibold"> seamless cloud integration</span>.
         </p>
 
@@ -76,60 +76,6 @@ const HeroSection = () => {
               </span>
             </button>
           </Link>
-        </div>
-
-        {/* Feature Highlights */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-16">
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mb-4 mx-auto">
-              <ChartBarIcon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Advanced Analytics</h3>
-            <p className="text-gray-600">Real-time insights and comprehensive reporting for better decision making</p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center mb-4 mx-auto">
-              <ShieldCheckIcon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Bank-Level Security</h3>
-            <p className="text-gray-600">Military-grade encryption and biometric authentication for your data</p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition-all duration-300">
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mb-4 mx-auto">
-              <CpuChipIcon className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">AI-Powered</h3>
-            <p className="text-gray-600">Smart automation and predictive analytics to streamline workflows</p>
-          </div>
-        </div>
-
-        {/* Demo Screenshot Container */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl blur-2xl"></div>
-          <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-3xl p-8 shadow-2xl">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 shadow-2xl">
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              </div>
-              <div className="space-y-3">
-                <div className="h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-600 rounded w-1/2"></div>
-                <div className="h-4 bg-gray-600 rounded w-2/3"></div>
-                <div className="grid grid-cols-3 gap-4 mt-6">
-                  <div className="h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg"></div>
-                  <div className="h-20 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg"></div>
-                  <div className="h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg"></div>
-                </div>
-              </div>
-            </div>
-            <p className="text-center text-gray-600 mt-6 font-medium">
-              Experience the future of loan management with our intuitive interface
-            </p>
-          </div>
         </div>
 
         {/* Scroll Indicator */}

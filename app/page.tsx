@@ -1,7 +1,8 @@
 import HeroSection from '../components/HeroSection';
 import FeaturesSection from '../components/FeaturesSection';
+import RequirementsSection from '../components/RequirementsSection';
+import HowToSetup from '../components/HowToSetup';
 import PricingSection from '../components/PricingSection';
-import CustomerReviewsSection from '../components/CustomerReviewsSection';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 
@@ -10,9 +11,10 @@ export default function Home() {
     <main>
       <HeroSection />
       <FeaturesSection />
+      <RequirementsSection />
+      <HowToSetup />
       <PricingSection />
       <FAQSection />
-      <CustomerReviewsSection />
       <Footer />
     </main>
   );

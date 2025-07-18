@@ -21,7 +21,7 @@ interface SubscriptionPlan {
 const plans: SubscriptionPlan[] = [
   {
     name: 'Basic',
-    price: 499,
+    price: 699,
     period: 'month',
     description: 'Essential features for small loan businesses',
     features: [
