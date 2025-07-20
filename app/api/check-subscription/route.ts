@@ -4,7 +4,7 @@ import clientPromise from '@/lib/mongodb';
 
 export async function POST(req: Request) {
   try {
-    const { accessToken } = await req.json();
+    const { accessToken, deviceId } = await req.json();
 
     if (!accessToken) {
       return NextResponse.json({ error: 'Access token required' }, { status: 400 });
@@ -18,6 +18,39 @@ export async function POST(req: Request) {
         error: 'Invalid access token',
         status: 'invalid_token'
       }, { status: 401 });
+    }
+
+    // Check device binding if deviceId is provided
+    if (deviceId) {
+      type Device = {
+        deviceId: string;
+        status: string;
+        lastActive?: Date;
+        // add other properties if needed
+      };
+      const userDevices: Device[] = user.devices || [];
+      const deviceFound = userDevices.find((device: Device) => 
+        device.deviceId === deviceId && device.status === 'active'
+      );
+
+      if (!deviceFound) {
+        return NextResponse.json({
+          error: 'Device not authorized',
+          status: 'device_not_authorized',
+          message: 'This device is not authorized to access your account. Please log in and authorize this device.',
+          requiresDeviceBinding: true
+        }, { status: 403 });
+      }
+
+      // Update device last active time
+      await db.collection('users').updateOne(
+        { accessToken, 'devices.deviceId': deviceId },
+        { 
+          $set: { 
+            'devices.$.lastActive': new Date()
+          } 
+        }
+      );
     }
 
     const now = new Date();
