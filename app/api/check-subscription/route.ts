@@ -4,7 +4,7 @@ import clientPromise from '@/lib/mongodb';
 
 export async function POST(req: Request) {
   try {
-    const { accessToken, deviceId } = await req.json();
+    const { accessToken, deviceId, skipDeviceCheck = false } = await req.json();
 
     if (!accessToken) {
       return NextResponse.json({ error: 'Access token required' }, { status: 400 });
@@ -20,8 +20,10 @@ export async function POST(req: Request) {
       }, { status: 401 });
     }
 
-    // Check device binding if deviceId is provided
-    if (deviceId) {
+    // Check device binding if deviceId is provided AND we're not skipping device check
+    // skipDeviceCheck = true for initial login (before device binding)
+    // skipDeviceCheck = false for auto-login (after device should be bound)
+    if (deviceId && !skipDeviceCheck) {
       type Device = {
         deviceId: string;
         status: string;
