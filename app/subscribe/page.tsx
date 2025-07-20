@@ -16,6 +16,7 @@ interface SubscriptionPlan {
   limitations?: string[];
   recommended?: boolean;
   gradient: string;
+  comingSoon?: boolean;
 }
 
 const plans: SubscriptionPlan[] = [
@@ -74,7 +75,8 @@ const plans: SubscriptionPlan[] = [
       '24/7 phone support',
       'Dedicated Analytics manager'
     ],
-    gradient: 'from-pink-500 to-pink-600'
+    gradient: 'from-pink-500 to-pink-600',
+    comingSoon: true
   }
 ];
 
@@ -362,6 +364,15 @@ export default function SubscribePage() {
                   </div>
                 )}
 
+                {/* Coming Soon Badge */}
+                {plan.comingSoon && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
+                    <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg animate-pulse">
+                      Coming Soon
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative bg-white/20 backdrop-blur-xl border border-white/30 rounded-3xl p-8 hover:bg-white/30 transition-all duration-500 hover:scale-105 shadow-2xl">
                   {/* Background Gradient */}
                   <div className={`absolute inset-0 bg-gradient-to-br ${plan.gradient.replace('from-', 'from-').replace('to-', 'to-')}/10 opacity-0 group-hover:opacity-20 rounded-3xl transition-opacity duration-500`}></div>
@@ -422,14 +433,27 @@ export default function SubscribePage() {
 
                     {/* CTA Button */}
                     <button
-                      onClick={() => handleSubscribe(plan.name, billingPeriod)}
-                      disabled={loading === plan.name}
-                      className={`w-full bg-gradient-to-r ${plan.gradient} text-white font-bold py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2 ${
+                      onClick={() => !plan.comingSoon && handleSubscribe(plan.name, billingPeriod)}
+                      disabled={loading === plan.name || plan.comingSoon}
+                      className={`w-full ${plan.comingSoon 
+                        ? 'bg-gray-400 cursor-not-allowed opacity-70' 
+                        : `bg-gradient-to-r ${plan.gradient}`
+                      } text-white font-bold py-4 px-6 rounded-2xl shadow-lg ${plan.comingSoon 
+                        ? '' 
+                        : 'hover:shadow-xl transform hover:scale-105'
+                      } transition-all duration-300 flex items-center justify-center space-x-2 ${
                         loading === plan.name ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
-                      <span>{loading === plan.name ? 'Processing...' : `Choose ${plan.name}`}</span>
-                      {loading !== plan.name && (
+                      <span>
+                        {plan.comingSoon 
+                          ? 'Coming Soon' 
+                          : loading === plan.name 
+                            ? 'Processing...' 
+                            : `Choose ${plan.name}`
+                        }
+                      </span>
+                      {!plan.comingSoon && loading !== plan.name && (
                         <ArrowRightIcon className="w-5 h-5" />
                       )}
                     </button>

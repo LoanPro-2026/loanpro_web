@@ -1,41 +1,97 @@
-// app/api/devices/revoke/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { connectToDatabase } from '@/lib/mongodb';
 
-import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders, handlePreflight } from '../cors';
-
-export function OPTIONS(req: Request) {
-  return handlePreflight(req);
-}
-
-export async function POST(req: Request) {
-  const corsHeaders = getCorsHeaders(req);
-
+export async function POST(request: NextRequest) {
   try {
-    const { accessToken, deviceId } = await req.json();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (!accessToken)
-      return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
+    const { deviceId, reason = 'User revoked' } = await request.json();
+    if (!deviceId) {
+      return NextResponse.json({ error: 'Missing deviceId' }, { status: 400 });
+    }
 
-    if (!deviceId)
-      return NextResponse.json({ error: 'Missing deviceId' }, { status: 400, headers: corsHeaders });
+    const { db } = await connectToDatabase();
+    
+    // Check monthly revoke limit
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const revokesThisMonth = await db.collection('device_revokes').countDocuments({
+      userId,
+      revokedAt: { $gte: currentMonthStart }
+    });
+    
+    if (revokesThisMonth >= 3) {
+      return NextResponse.json({
+        error: 'Monthly revoke limit exceeded',
+        message: 'You can only revoke 3 devices per month. Limit resets at the beginning of each month.',
+        revokesThisMonth,
+        maxRevokesPerMonth: 3
+      }, { status: 429 });
+    }
 
-    const client = await clientPromise;
-    const db = client.db('AdminDB');
+    // Get current user with access token from Clerk user
+    const userWithToken = await db.collection('users').findOne({ 
+      $or: [
+        { userId },
+        { email: (await auth()).sessionClaims?.email }
+      ]
+    });
 
-    const user = await db.collection('users').findOne({ accessToken });
-    if (!user)
-      return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
+    if (!userWithToken?.accessToken) {
+      return NextResponse.json({ error: 'User access token not found' }, { status: 404 });
+    }
 
+    // Find the device to get its details before revoking
+    const deviceToRevoke = userWithToken.devices?.find((d: any) => d.deviceId === deviceId);
+    if (!deviceToRevoke) {
+      return NextResponse.json({ error: 'Device not found' }, { status: 404 });
+    }
+
+    // Check if device is active (we only allow revoking active devices)
+    if (deviceToRevoke.status !== 'active') {
+      return NextResponse.json({ error: 'Device is not active or already revoked' }, { status: 400 });
+    }
+
+    // Revoke the device by completely removing it from the devices array
     await db.collection('users').updateOne(
-      { accessToken, 'devices.deviceId': deviceId },
-      { $set: { 'devices.$.status': 'revoked' } } as any
+      { accessToken: userWithToken.accessToken },
+      { 
+        $pull: { devices: { deviceId: deviceId } } as any,
+        $set: { updatedAt: now }
+      }
     );
 
-    return NextResponse.json({ success: true, message: 'Device revoked' }, { headers: corsHeaders });
+    // Record the revoke action for tracking
+    await db.collection('device_revokes').insertOne({
+      userId,
+      deviceId,
+      deviceName: deviceToRevoke.deviceName || 'Unknown Device',
+      deviceInfo: deviceToRevoke.deviceInfo || {},
+      reason,
+      revokedAt: now,
+      createdAt: now
+    });
+
+    const remainingRevokes = Math.max(0, 2 - revokesThisMonth); // 2 because we just used one
+
+    return NextResponse.json({
+      success: true,
+      message: 'Device revoked successfully',
+      revokesThisMonth: revokesThisMonth + 1,
+      remainingRevokes,
+      maxRevokesPerMonth: 3
+    });
 
   } catch (error) {
     console.error('Device revoke API error:', error);
-    return NextResponse.json({ error: 'Failed to revoke device' }, { status: 500, headers: corsHeaders });
+    return NextResponse.json(
+      { error: 'Failed to revoke device' },
+      { status: 500 }
+    );
   }
 }
