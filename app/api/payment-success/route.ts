@@ -328,7 +328,7 @@ export async function POST(req: Request) {
       success: true,
       message: 'Payment processed and subscription created successfully',
       subscription,
-      redirectUrl: '/download'
+      redirectUrl: '/profile'
     });
   } catch (error) {
     console.error('Error processing payment:', error);
