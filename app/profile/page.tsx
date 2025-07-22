@@ -643,26 +643,39 @@ const ProfilePage = () => {
         order_id: orderData.orderId,
         handler: async function (response: any) {
           try {
+            console.log('Razorpay upgrade payment response:', response);
+            
+            // Prepare user data for upgrade
+            const upgradeData = {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              userId: user?.id || user?.primaryEmailAddress?.emailAddress,
+              username: user?.fullName || user?.username || user?.primaryEmailAddress?.emailAddress,
+              plan: newPlan,
+              billingPeriod: billingPeriod,
+              isUpgrade: true
+            };
+            
+            console.log('Sending upgrade payment data to backend:', upgradeData);
+
             const paymentResponse = await fetch('/api/payment-success', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                userId: user?.id,
-                username: user?.fullName || user?.username,
-                plan: newPlan,
-                billingPeriod: billingPeriod, // Add billing period to upgrade payment success
-                isUpgrade: true
-              }),
+              body: JSON.stringify(upgradeData),
             });
             
+            console.log('Upgrade payment response status:', paymentResponse.status);
+            
             if (paymentResponse.ok) {
+              const result = await paymentResponse.json();
+              console.log('Upgrade payment verification successful:', result);
               alert('Plan upgraded successfully!');
               window.location.reload();
             } else {
-              throw new Error('Payment verification failed');
+              const errorData = await paymentResponse.json();
+              console.error('Upgrade payment verification failed:', errorData);
+              throw new Error(`Payment verification failed: ${errorData.error || 'Unknown error'}`);
             }
           } catch (error) {
             console.error('Payment verification error:', error);

@@ -32,15 +32,30 @@ export async function POST(req: Request) {
 
     // Validate required fields
     if (!razorpay_payment_id || !razorpay_order_id || !userId || !username || !plan) {
-      console.error('Missing required fields:', { razorpay_payment_id, razorpay_order_id, userId, username, plan });
+      console.error('Missing required fields:', { 
+        razorpay_payment_id: !!razorpay_payment_id, 
+        razorpay_order_id: !!razorpay_order_id, 
+        userId: !!userId, 
+        username: !!username, 
+        plan: !!plan 
+      });
+      console.error('Received body:', body);
       return NextResponse.json({ 
         error: 'Missing required fields',
+        details: 'One or more required fields are missing from the payment request',
         missing: {
           razorpay_payment_id: !razorpay_payment_id,
           razorpay_order_id: !razorpay_order_id,
           userId: !userId,
           username: !username,
           plan: !plan
+        },
+        received: {
+          razorpay_payment_id: !!razorpay_payment_id,
+          razorpay_order_id: !!razorpay_order_id,
+          userId: !!userId,
+          username: !!username,
+          plan: !!plan
         }
       }, { status: 400 });
     }
@@ -297,8 +312,20 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error processing payment:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+    
+    // Provide more specific error information
+    let errorMessage = 'Error processing payment';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
-      { error: 'Error processing payment' },
+      { 
+        error: 'Error processing payment',
+        details: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

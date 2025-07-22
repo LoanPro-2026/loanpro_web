@@ -195,26 +195,40 @@ export default function SubscribePage() {
         order_id: data.orderId,
         handler: async function (response: any) {
           try {
+            console.log('Razorpay payment response:', response);
+            
+            // Prepare user data
+            const userData = {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              userId: user?.id || user?.primaryEmailAddress?.emailAddress,
+              username: user?.fullName || user?.username || user?.primaryEmailAddress?.emailAddress,
+              plan: planName,
+              billingPeriod: billingPeriod,
+            };
+            
+            console.log('Sending payment data to backend:', userData);
+
             // Send payment details to our backend
             const paymentResponse = await fetch('/api/payment-success', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                userId: user?.id,
-                username: user?.fullName || user?.username || user?.primaryEmailAddress?.emailAddress,
-                plan: planName,
-                billingPeriod: billingPeriod, // Add billing period to payment success
-              }),
+              body: JSON.stringify(userData),
             });
 
+            console.log('Payment response status:', paymentResponse.status);
+            
             if (!paymentResponse.ok) {
-              throw new Error('Payment verification failed');
+              const errorData = await paymentResponse.json();
+              console.error('Payment verification failed:', errorData);
+              throw new Error(`Payment verification failed: ${errorData.error || 'Unknown error'}`);
             }
+
+            const result = await paymentResponse.json();
+            console.log('Payment verification successful:', result);
 
             // Show toast before redirect
             showToast('Subscription activated successfully!', 'success');
