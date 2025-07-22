@@ -3,12 +3,15 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { SubscriptionService } from '@/services/subscriptionService';
 import clientPromise from '@/lib/mongodb';
-import { createUserDatabase } from '@/lib/RailwayDbprovision';
 import crypto from 'crypto';
 
 export async function POST(req: Request) {
+  console.log('Payment success webhook received');
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  
   try {
     const body = await req.json();
+    console.log('Payment webhook body:', body);
     
     // During testing, we'll handle the payment success directly
     // In production, you should verify the webhook signature
@@ -19,10 +22,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'No signature' }, { status: 400 });
       }
       // TODO: Add webhook signature verification in production
+    } else {
+      // Development mode - more lenient validation
+      console.log('Running in development mode - skipping strict signature validation');
     }
 
     // Handle payment success
     const { razorpay_payment_id, razorpay_order_id, razorpay_signature, userId, username, plan, billingPeriod = 'monthly', isUpgrade = false, isRenewal = false } = body;
+
+    // Validate required fields
+    if (!razorpay_payment_id || !razorpay_order_id || !userId || !username || !plan) {
+      console.error('Missing required fields:', { razorpay_payment_id, razorpay_order_id, userId, username, plan });
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+        missing: {
+          razorpay_payment_id: !razorpay_payment_id,
+          razorpay_order_id: !razorpay_order_id,
+          userId: !userId,
+          username: !username,
+          plan: !plan
+        }
+      }, { status: 400 });
+    }
+
+    console.log('Processing payment for:', { userId, username, plan, billingPeriod, isUpgrade, isRenewal });
 
     // Normalize plan name and set features
     let subscriptionPlan = plan;
