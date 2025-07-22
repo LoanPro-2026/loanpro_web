@@ -32,14 +32,12 @@ const DeviceManagement = () => {
   const { user } = useUser();
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceUsage, setDeviceUsage] = useState<DeviceUsage[]>([]);
-  const [revokeInfo, setRevokeInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDevices();
     fetchDeviceUsage();
-    fetchRevokeHistory();
   }, []);
 
   const fetchDevices = async () => {
@@ -66,26 +64,10 @@ const DeviceManagement = () => {
     }
   };
 
-  const fetchRevokeHistory = async () => {
-    try {
-      const response = await fetch('/api/devices/revoke-history');
-      if (!response.ok) throw new Error('Failed to fetch revoke history');
-      const data = await response.json();
-      setRevokeInfo(data);
-    } catch (err) {
-      console.error('Error fetching revoke history:', err);
-    }
-  };
-
   const revokeDevice = async (deviceId: string) => {
-    if (!revokeInfo?.canRevoke) {
-      alert(`Monthly revoke limit exceeded. You have already revoked ${revokeInfo?.revokesThisMonth || 0} devices this month. Limit resets next month.`);
-      return;
-    }
-
     const reason = prompt('Reason for revoking this device (optional):') || 'User revoked';
     
-    if (!confirm(`Are you sure you want to revoke this device?\n\nReason: ${reason}\n\nThis will:\n• Completely remove the device from your account\n• Prevent it from accessing your data\n• Require re-authorization if you want to use it again\n\nYou have ${revokeInfo?.remainingRevokes || 0} revoke(s) remaining this month.`)) {
+    if (!confirm(`Are you sure you want to revoke this device?\n\nReason: ${reason}\n\nThis will:\n• Completely remove the device from your account\n• Prevent it from accessing your data\n• Require re-authorization if you want to use it again`)) {
       return;
     }
 
@@ -112,7 +94,6 @@ const DeviceManagement = () => {
       
       // Refresh data
       fetchDevices();
-      fetchRevokeHistory();
     } catch (err) {
       alert(`Error revoking device: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
@@ -171,38 +152,6 @@ const DeviceManagement = () => {
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Device Management</h2>
       </div>
 
-      {/* Revoke Limits Info */}
-      {revokeInfo && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100">Monthly Revoke Limits</h3>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-              revokeInfo.canRevoke 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
-                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-            }`}>
-              {revokeInfo.revokesThisMonth}/{revokeInfo.maxRevokesPerMonth} Used
-            </span>
-          </div>
-          <div className="text-sm text-blue-800 dark:text-blue-200">
-            <p className="mb-1">
-              • You can revoke up to 3 devices per month for security
-            </p>
-            <p className="mb-1">
-              • Remaining revokes this month: <strong>{revokeInfo.remainingRevokes}</strong>
-            </p>
-            <p>
-              • Limit resets on the 1st of each month
-            </p>
-            {!revokeInfo.canRevoke && (
-              <p className="mt-2 font-medium text-red-600 dark:text-red-400">
-                ⚠️ Monthly limit reached. Please wait until next month to revoke more devices.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
       {devices.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           No devices registered yet. Install and sign in to the desktop app to see devices here.
@@ -260,13 +209,8 @@ const DeviceManagement = () => {
                     {device.status === 'active' && (
                       <button
                         onClick={() => revokeDevice(device.deviceId)}
-                        disabled={!revokeInfo?.canRevoke}
-                        className={`px-3 py-1 rounded hover:bg-red-200 transition text-sm font-medium flex items-center gap-1 ${
-                          revokeInfo?.canRevoke
-                            ? 'bg-red-100 text-red-700 cursor-pointer'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
-                        }`}
-                        title={!revokeInfo?.canRevoke ? 'Monthly revoke limit reached' : 'Revoke this device'}
+                        className="px-3 py-1 rounded hover:bg-red-200 transition text-sm font-medium flex items-center gap-1 bg-red-100 text-red-700 cursor-pointer"
+                        title="Revoke this device"
                       >
                         <DeleteIcon className="text-sm" />
                         Revoke
