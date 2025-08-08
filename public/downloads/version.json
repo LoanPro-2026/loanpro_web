@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2025-01-08",
+  "downloadUrl": "/downloads/LoanPro-Setup-1.0.0.exe",
+  "fileSize": "96.3 MB",
+  "changelog": [
+    "Initial release with complete loan management system",
+    "Secure authentication and database encryption",
+    "Fingerprint integration support",
+    "Data import/export capabilities",
+    "Comprehensive reporting dashboard"
+  ],
+  "systemRequirements": {
+    "os": "Windows 10/11 (64-bit)",
+    "ram": "4GB minimum, 8GB recommended",
+    "storage": "500MB available space",
+    "additional": "Administrative privileges for installation"
+  },
+  "checksum": {
+    "sha256": "D7853B8296E2073A2B6F741FF4FE662B5750C8E047A66EA91A8C7C52AFD45227",
+    "md5": "TO_BE_GENERATED"
+  }
+}
