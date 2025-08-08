@@ -74,7 +74,7 @@ const DownloadPage = () => {
 					{/* Download Button */}
 					<div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12">
 						<a
-							href="/downloads/LoanPro-Setup-1.0.0.exe"
+							href="/downloads/LoanPro-Setup-1.0.1.exe"
 							download
 							className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-4 rounded-2xl shadow-2xl hover:shadow-blue-500/25 transform hover:scale-105 transition-all duration-300 flex items-center space-x-3"
 						>
@@ -84,7 +84,7 @@ const DownloadPage = () => {
 						</a>
 
 						<div className="text-center">
-							<div className="text-sm text-gray-500">Version 1.0.0 • 96.3 MB</div>
+							<div className="text-sm text-gray-500">Version 1.0.1 • 96.3 MB</div>
 							<div className="text-sm text-green-600 font-medium">✓ Virus-free & Digitally Signed</div>
 						</div>
 					</div>
@@ -219,7 +219,7 @@ const DownloadPage = () => {
 									2
 								</div>
 								<span className="text-gray-700">
-									Run the downloaded <strong>LoanPro-Setup-1.0.0.exe</strong> file
+									Run the downloaded <strong>LoanPro-Setup-1.0.1.exe</strong> file
 								</span>
 							</li>
 							<li className="flex items-start space-x-3">
