@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useRef, useEffect, ReactNode, Suspense } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, UserButton, useUser, useClerk, SignInButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, UserButton, useUser, useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { UserCircleIcon, CreditCardIcon, ReceiptRefundIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import Loader from './Loader';
 
