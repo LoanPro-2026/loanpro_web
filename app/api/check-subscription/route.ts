@@ -84,7 +84,7 @@ export async function POST(req: Request) {
           canEdit: false,
           canDelete: false
         };
-      } else if (subscription.daysRemaining <= 0) {
+      } else if ((subscription.daysRemaining || 0) <= 0) {
         // Grace period expired - schedule for deletion
         subscriptionStatus = 'expired';
         
