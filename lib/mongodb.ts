@@ -1,14 +1,20 @@
 import { MongoClient } from 'mongodb';
+import { logger } from './logger';
 
 if (!process.env.MONGODB_URI) {
-  throw new Error('Please add your Mongo URI to .env.local');
+  const error = 'MONGODB_URI environment variable is not set. Please add it to .env.local';
+  logger.error(error, new Error(error));
+  throw new Error(error);
 }
 
 const uri = process.env.MONGODB_URI;
-console.log("Mongo URI (from env):", process.env.MONGODB_URI);
-const options = {};
+const options = {
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  maxIdleTimeMS: 45000,
+};
 
-let client;
+let client: MongoClient | null = null;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === 'development') {
@@ -20,22 +26,47 @@ if (process.env.NODE_ENV === 'development') {
 
   if (!globalWithMongo._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    globalWithMongo._mongoClientPromise = client.connect();
+    globalWithMongo._mongoClientPromise = client
+      .connect()
+      .then(() => {
+        logger.info('MongoDB connected in development', 'DB_CONNECTION');
+        return client!;
+      })
+      .catch((error) => {
+        logger.error('MongoDB connection failed', error, 'DB_CONNECTION');
+        throw error;
+      });
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  // In production mode, it's best to not use a global variable.
+  // In production mode, create a new connection
   client = new MongoClient(uri, options);
-  clientPromise = client.connect();
+  clientPromise = client
+    .connect()
+    .then(() => {
+      logger.info('MongoDB connected in production', 'DB_CONNECTION');
+      return client!;
+    })
+    .catch((error) => {
+      logger.error('MongoDB connection failed', error, 'DB_CONNECTION');
+      throw error;
+    });
 }
 
 export default clientPromise;
 
-// Helper function for getting database connection
+/**
+ * Helper function for getting database connection
+ */
 export async function connectToDatabase() {
-  const client = await clientPromise;
-  return {
-    client,
-    db: client.db('AdminDB')
-  };
+  try {
+    const client = await clientPromise;
+    return {
+      client,
+      db: client.db('AdminDB'),
+    };
+  } catch (error) {
+    logger.error('Failed to connect to database', error, 'DB_CONNECTION');
+    throw error;
+  }
 }

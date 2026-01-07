@@ -21,7 +21,7 @@ const features = [
   },
   {
     title: 'Biometric Authentication',
-    description: 'Secure fingerprint authentication using Mantra MFS100 scanner for enhanced security and user verification.',
+    description: 'Secure fingerprint authentication using Secu-Hamster Pro 20-AP scanner for enhanced security and user verification.',
     icon: FingerPrintIcon,
     gradient: 'from-purple-500 to-pink-500',
     bgGradient: 'from-purple-50 to-pink-50'

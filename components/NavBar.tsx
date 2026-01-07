@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useRef, useEffect, ReactNode, Suspense } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton, useUser, useClerk } from '@clerk/nextjs';
+import { SignedIn, SignedOut, UserButton, useUser, useClerk } from '@clerk/nextjs';
 import { UserCircleIcon, CreditCardIcon, ReceiptRefundIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import Loader from './Loader';
 
@@ -78,16 +78,16 @@ const NavBar = () => {
           <div className="flex items-center space-x-4">
             <SignedOut>
               <div className="hidden sm:flex items-center space-x-3">
-                <SignInButton mode="modal">
+                <Link href="/sign-in">
                   <button className="text-gray-700 hover:text-blue-600 font-medium px-4 py-2 rounded-xl transition-all duration-300 hover:bg-white/30 backdrop-blur-sm">
                     Sign In
                   </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
+                </Link>
+                <Link href="/sign-up">
                   <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
                     Get Started
                   </button>
-                </SignUpButton>
+                </Link>
               </div>
             </SignedOut>
 

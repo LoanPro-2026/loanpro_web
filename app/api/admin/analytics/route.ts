@@ -1,0 +1,212 @@
+import { auth } from '@clerk/nextjs/server';
+import { connectToDatabase } from '@/lib/mongodb';
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
+
+async function verifyAdmin() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const userResponse = await fetch(
+    `https://api.clerk.com/v1/users/${userId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+      },
+    }
+  );
+
+  const user = await userResponse.json();
+  const userEmail = user.email_addresses[0]?.email_address;
+
+  if (userEmail !== ADMIN_EMAIL) {
+    throw new Error('Access denied');
+  }
+
+  return userEmail;
+}
+
+export async function GET(request: Request) {
+  try {
+    await verifyAdmin();
+
+    const { db } = await connectToDatabase();
+
+    // Calculate date ranges
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - 7);
+    const dayStart = new Date(today);
+    dayStart.setHours(0, 0, 0, 0);
+
+    // Fetch all data in parallel
+    const [
+      totalUsers,
+      newUsersThisMonth,
+      totalSubscriptions,
+      activeSubscriptions,
+      trialSubscriptions,
+      expiredSubscriptions,
+      cancelledSubscriptions,
+      totalRevenue,
+      monthlyRevenue,
+      weeklyRevenue,
+      dailyRevenue,
+      paymentRecords,
+      subscriptionsByPlan,
+      usersByPlan
+    ] = await Promise.all([
+      // User counts
+      db.collection('users').countDocuments(),
+      db.collection('users').countDocuments({ createdAt: { $gte: monthStart } }),
+
+      // Subscription counts
+      db.collection('subscriptions').countDocuments(),
+      db.collection('subscriptions').countDocuments({ status: 'active' }),
+      db.collection('subscriptions').countDocuments({ status: 'trial' }),
+      db.collection('subscriptions').countDocuments({ status: 'expired' }),
+      db.collection('subscriptions').countDocuments({ status: 'cancelled' }),
+
+      // Revenue calculations
+      db.collection('payments')
+        .aggregate([
+          { $match: { status: 'completed' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+        .toArray(),
+      db.collection('payments')
+        .aggregate([
+          { $match: { status: 'completed', createdAt: { $gte: monthStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+        .toArray(),
+      db.collection('payments')
+        .aggregate([
+          { $match: { status: 'completed', createdAt: { $gte: weekStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+        .toArray(),
+      db.collection('payments')
+        .aggregate([
+          { $match: { status: 'completed', createdAt: { $gte: dayStart } } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
+        .toArray(),
+
+      // Revenue by month for trend
+      db.collection('payments')
+        .aggregate([
+          { $match: { status: 'completed' } },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+              revenue: { $sum: '$amount' },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { _id: -1 } },
+          { $limit: 12 }
+        ])
+        .toArray(),
+
+      // Subscriptions by plan
+      db.collection('subscriptions')
+        .aggregate([
+          { $match: { status: 'active' } },
+          { $group: { _id: '$plan', count: { $sum: 1 } } }
+        ])
+        .toArray(),
+
+      // Users by plan
+      db.collection('users')
+        .aggregate([
+          {
+            $lookup: {
+              from: 'subscriptions',
+              let: { userId: '$_id' },
+              pipeline: [
+                { $match: { $expr: { $eq: ['$userId', '$$userId'] }, status: 'active' } },
+                { $limit: 1 }
+              ],
+              as: 'currentSubscription'
+            }
+          },
+          {
+            $group: {
+              _id: { $arrayElemAt: ['$currentSubscription.plan', 0] },
+              count: { $sum: 1 }
+            }
+          }
+        ])
+        .toArray()
+    ]);
+
+    // Calculate metrics
+    const totalRevenueAmount = (totalRevenue[0]?.total || 0) as number;
+    const avgSubscriptionValue = totalRevenueAmount > 0
+      ? Math.round(totalRevenueAmount / activeSubscriptions * 100) / 100
+      : 0;
+
+    const churnRate = activeSubscriptions + cancelledSubscriptions > 0
+      ? Math.round((cancelledSubscriptions / (activeSubscriptions + cancelledSubscriptions)) * 100 * 100) / 100
+      : 0;
+
+    const monthlyRecurringRevenue = activeSubscriptions * (avgSubscriptionValue);
+
+    // Most popular plan
+    const mostPopularPlan = subscriptionsByPlan.length > 0
+      ? subscriptionsByPlan.reduce((max: any, plan: any) =>
+          plan.count > (max.count || 0) ? plan : max
+        )
+      : null;
+
+    return new Response(JSON.stringify({
+      revenue: {
+        total: totalRevenue[0]?.total || 0,
+        monthly: monthlyRevenue[0]?.total || 0,
+        weekly: weeklyRevenue[0]?.total || 0,
+        daily: dailyRevenue[0]?.total || 0,
+        mrr: monthlyRecurringRevenue,
+        cltv: activeSubscriptions > 0
+          ? Math.round(((monthlyRevenue[0]?.total || 0) * 36) / activeSubscriptions * 100) / 100
+          : 0,
+        trend: paymentRecords.reverse().map((r: any) => ({
+          month: r._id,
+          revenue: r.revenue,
+          transactions: r.count
+        }))
+      },
+      users: {
+        total: totalUsers,
+        newThisMonth: newUsersThisMonth,
+        active30d: activeSubscriptions,
+        byPlan: usersByPlan
+      },
+      subscriptions: {
+        total: totalSubscriptions,
+        active: activeSubscriptions,
+        trial: trialSubscriptions,
+        expired: expiredSubscriptions,
+        cancelled: cancelledSubscriptions,
+        byPlan: subscriptionsByPlan,
+        avgValue: avgSubscriptionValue,
+        churnRate: churnRate
+      },
+      insights: {
+        mostPopularPlan: mostPopularPlan?._id || 'N/A',
+        conversionRate: totalUsers > 0
+          ? Math.round((activeSubscriptions / totalUsers) * 100 * 100) / 100
+          : 0,
+        retentionRate: 100 - churnRate,
+        weeklyRevenueTrend: weeklyRevenue[0]?.total || 0 > 0 ? 'positive' : 'stable'
+      }
+    }), { status: 200 });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch analytics' }), { status: 500 });
+  }
+}

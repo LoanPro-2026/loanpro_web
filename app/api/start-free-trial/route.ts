@@ -17,10 +17,31 @@ export async function POST(req: Request) {
     const db = (await clientPromise).db('AdminDB');
     const existingUser = await db.collection('users').findOne({ userId });
     
-    if (existingUser && (existingUser.trialExpiresAt > new Date() || existingUser.subscriptionExpiresAt > new Date())) {
-      return NextResponse.json({ 
-        error: 'User already has an active trial or subscription' 
-      }, { status: 400 });
+    // Prevent duplicate trials - check if user has EVER used trial before
+    if (existingUser) {
+      // Check if currently has active trial/subscription
+      const now = new Date();
+      if (existingUser.trialExpiresAt && new Date(existingUser.trialExpiresAt) > now) {
+        return NextResponse.json({ 
+          error: 'You already have an active trial period',
+          expiresAt: existingUser.trialExpiresAt
+        }, { status: 400 });
+      }
+      if (existingUser.subscriptionExpiresAt && new Date(existingUser.subscriptionExpiresAt) > now) {
+        return NextResponse.json({ 
+          error: 'You already have an active subscription',
+          expiresAt: existingUser.subscriptionExpiresAt
+        }, { status: 400 });
+      }
+      
+      // IMPORTANT: Check if user has used trial before (historical check)
+      if (existingUser.hasUsedTrial === true || existingUser.trialStartedAt) {
+        return NextResponse.json({ 
+          error: 'Trial period can only be used once per account',
+          message: 'You have already used your free trial. Please subscribe to continue using the service.',
+          previousTrialDate: existingUser.trialStartedAt
+        }, { status: 403 });
+      }
     }
 
     // Generate username from email
@@ -37,7 +58,7 @@ export async function POST(req: Request) {
     const gracePeriodExpiresAt = new Date(trialExpiresAt);
     gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 10);
 
-    // Upsert user in users collection (keep user-specific fields only)
+    // Upsert user in users collection (only user-specific data, no subscription data)
     await db.collection('users').updateOne(
       { userId },
       {
@@ -45,10 +66,9 @@ export async function POST(req: Request) {
           userId,
           username: generatedUsername,
           email,
-          subscriptionType: 'Pro', // The plan they'll get after trial
-          subscriptionPlan: 'trial', // Indicates this is a trial subscription
           accessToken,
-          status: 'trial'
+          hasUsedTrial: true, // Mark that user has used their trial
+          trialStartedAt: new Date() // Track when trial started
         },
         $setOnInsert: {
           createdAt: new Date(),
@@ -59,36 +79,18 @@ export async function POST(req: Request) {
       { upsert: true }
     );
 
-    // Create trial record in subscriptions collection (keep subscription-specific fields)
+    // Create trial record in subscriptions collection (single source of truth for subscription data)
     await db.collection('subscriptions').insertOne({
       userId,
-      username: generatedUsername,
-      subscriptionType: 'Pro', // The plan they'll get after trial
-      subscriptionPlan: 'trial', // Indicates this is a trial subscription
+      plan: 'trial',
+      billingPeriod: 'monthly', // trials are considered monthly
       status: 'trial',
       startDate: new Date(),
       endDate: trialExpiresAt,
-      expiryDate: trialExpiresAt, // Keep for backward compatibility
-      trialStartedAt: new Date(),
-      trialExpiresAt,
-      gracePeriodExpiresAt,
+      gracePeriodEndsAt: gracePeriodExpiresAt,
       paymentId: null,
-      receiptUrl: null,
       createdAt: new Date(),
-      updatedAt: new Date(),
-      maxDevices: 1,
-      cloudStorageLimit: 0,
-      features: {
-        biometrics: true,
-        autoSync: false,
-        cloudDatabase: false,
-        analytics: true,
-        prioritySupport: true,
-        customSubdomain: true,
-        apiAccess: true,
-        maxDevices: 1,
-        cloudStorageLimit: 'None'
-      }
+      updatedAt: new Date()
     });
 
     return NextResponse.json({ 
@@ -96,17 +98,6 @@ export async function POST(req: Request) {
       message: '14-day Pro trial started successfully!',
       trialExpiresAt,
       accessToken,
-      features: {
-        biometrics: true,
-        autoSync: false,
-        cloudDatabase: false,
-        analytics: true,
-        prioritySupport: true,
-        customSubdomain: true,
-        apiAccess: true,
-        maxDevices: 1,
-        cloudStorageLimit: 'None'
-      },
       redirectUrl: '/download'
     });
 

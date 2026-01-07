@@ -1,6 +1,8 @@
 export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { getUserWithSubscription, getSubscriptionStatus } from '@/lib/subscriptionHelpers';
+import { getPlanFeatures } from '@/lib/planFeatures';
 
 export async function POST(req: Request) {
   try {
@@ -55,36 +57,37 @@ export async function POST(req: Request) {
       );
     }
 
-    const now = new Date();
+    // Get user with enriched subscription data
+    const { subscription } = await getUserWithSubscription(user.userId, db);
 
-    // Check subscription status
+    const now = new Date();
     let subscriptionStatus = 'expired';
     let daysRemaining = 0;
     let features = {};
     let isInGracePeriod = false;
 
-    if (user.trialExpiresAt && new Date(user.trialExpiresAt) > now) {
-      // Active trial
-      subscriptionStatus = 'active_trial';
-      daysRemaining = Math.ceil((new Date(user.trialExpiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      features = user.features || {};
-    } else if (user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) > now) {
-      // Active subscription
-      subscriptionStatus = 'active_subscription';
-      daysRemaining = Math.ceil((new Date(user.subscriptionExpiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      features = user.features || {};
-    } else if (user.gracePeriodExpiresAt && new Date(user.gracePeriodExpiresAt) > now) {
-      // In grace period
-      subscriptionStatus = 'grace_period';
-      isInGracePeriod = true;
-      daysRemaining = Math.ceil((new Date(user.gracePeriodExpiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      features = {}; // No features during grace period
-    } else {
-      // Expired - schedule for deletion
-      subscriptionStatus = 'expired';
-      
-      // Schedule user data deletion if grace period has ended
-      if (user.gracePeriodExpiresAt && new Date(user.gracePeriodExpiresAt) <= now) {
+    if (subscription) {
+      subscriptionStatus = getSubscriptionStatus(subscription);
+      daysRemaining = subscription.daysRemaining || 0;
+      isInGracePeriod = subscription.isInGracePeriod || false;
+
+      // Get features from plan configuration
+      const planFeatures = getPlanFeatures(subscription.plan);
+      features = planFeatures.features;
+
+      // During grace period, provide read-only access
+      if (isInGracePeriod) {
+        features = {
+          ...features,
+          readOnly: true,
+          canCreateNew: false,
+          canEdit: false,
+          canDelete: false
+        };
+      } else if (subscription.daysRemaining <= 0) {
+        // Grace period expired - schedule for deletion
+        subscriptionStatus = 'expired';
+        
         await db.collection('users').updateOne(
           { accessToken },
           { 
@@ -110,12 +113,12 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       subscriptionStatus,
-      subscriptionPlan: user.subscriptionPlan || 'none',
+      subscriptionPlan: subscription?.plan || 'none',
       daysRemaining,
       isInGracePeriod,
       features,
-      maxDevices: user.maxDevices || 0,
-      cloudStorageLimit: user.cloudStorageLimit || 0,
+      maxDevices: subscription ? getPlanFeatures(subscription.plan).maxDevices : 0,
+      cloudStorageLimit: subscription ? getPlanFeatures(subscription.plan).cloudStorageGB : 0,
       dataUsage: user.dataUsage || 0,
       devices: user.devices || [],
       user: {

@@ -2,24 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import Razorpay from 'razorpay';
+import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
+import { validateUpgradeRequest } from '@/lib/validation';
+import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
+import { logger } from '@/lib/logger';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
-// Plan pricing (monthly rates) - matching database format
+// Plan pricing (monthly rates in rupees) - matching create-order API
 const PLAN_PRICES = {
-  Basic: 499,    // Note: Capital 'B' to match database
-  Pro: 999,      // Note: Capital 'P' to match database  
-  Enterprise: 1499 // Note: Capital 'E' to match database
+  Basic: 699,       // ₹699/month
+  Pro: 833,         // ₹833/month
+  Enterprise: 979   // ₹979/month
 };
 
-// Payment gateway fee (typically 2-3% + fixed amount)
+// Payment gateway fee (2.5% + fixed amount) - matches actual Razorpay charges
 const GATEWAY_FEE_PERCENTAGE = 0.025; // 2.5%
-const GATEWAY_FIXED_FEE = 5; // ₹5 fixed fee
+const GATEWAY_FIXED_FEE = 3; // ₹3 fixed fee (Razorpay standard)
 
 function calculateGatewayFee(amount: number): number {
+  // Amount is in rupees, return gateway fee in rupees
   return Math.round((amount * GATEWAY_FEE_PERCENTAGE) + GATEWAY_FIXED_FEE);
 }
 
@@ -27,7 +32,8 @@ function calculateUpgradeAmount(
   currentPlan: string,
   newPlan: string,
   daysRemaining: number,
-  billingPeriod: 'monthly' | 'annually' = 'monthly'
+  billingPeriod: 'monthly' | 'annually' = 'monthly',
+  subscriptionStartDate?: Date // Add parameter to calculate actual billing period
 ): {
   currentPlanValue: number;
   newPlanValue: number;
@@ -61,8 +67,26 @@ function calculateUpgradeAmount(
   const currentPlanValue = currentPlan === 'trial' ? 0 : Math.round(currentMonthlyPrice * periodMultiplier * discountMultiplier);
   const newPlanValue = Math.round(newMonthlyPrice * periodMultiplier * discountMultiplier);
   
-  // Calculate prorated amounts (assuming 30 days in a month)
-  const totalDays = billingPeriod === 'annually' ? 365 : 30;
+  // Calculate total days in current billing period (actual days, not hardcoded)
+  let totalDays: number;
+  if (billingPeriod === 'annually') {
+    totalDays = 365; // Annual subscription
+  } else {
+    // For monthly, calculate days in the actual billing month
+    if (subscriptionStartDate) {
+      const startDate = new Date(subscriptionStartDate);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 1); // Add one month
+      totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    } else {
+      // Fallback: Use actual days in current month
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      totalDays = daysInMonth;
+    }
+  }
+  
+  // Calculate prorated amounts based on actual days
   const proratedCurrent = Math.round((currentPlanValue * daysRemaining) / totalDays);
   const proratedNew = Math.round((newPlanValue * daysRemaining) / totalDays);
   
@@ -70,6 +94,8 @@ function calculateUpgradeAmount(
   const upgradeAmount = Math.max(0, proratedNew - proratedCurrent);
   const gatewayFee = calculateGatewayFee(upgradeAmount);
   const totalAmount = upgradeAmount + gatewayFee;
+  
+  console.log('Prorated calculation:', { totalDays, daysRemaining, proratedCurrent, proratedNew, upgradeAmount });
   
   return {
     currentPlanValue,
@@ -83,24 +109,64 @@ function calculateUpgradeAmount(
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
+  console.log('[UPGRADE-PLAN POST] Request received');
+  
   try {
-    console.log('Upgrade plan POST request started');
-    
+    // Authentication check
     const { userId } = await auth();
+    console.log('[UPGRADE-PLAN POST] User authenticated:', userId);
+    
     if (!userId) {
-      console.log('Upgrade plan error: No userId found');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      logger.warn('Unauthorized upgrade attempt', 'UPGRADE_PLAN');
+      return errorResponse(ApiErrors.UNAUTHORIZED);
     }
 
-    const body = await request.json();
-    console.log('Upgrade plan request body:', body);
+    // Rate limiting
+    const rateLimitKey = `upgrade-plan:${userId}`;
+    if (!checkRateLimit(rateLimitKey, RateLimitPresets.PAYMENT.limit, RateLimitPresets.PAYMENT.windowMs)) {
+      console.log('[UPGRADE-PLAN POST] Rate limit exceeded');
+      logger.warn('Rate limit exceeded for upgrade', 'UPGRADE_PLAN', { userId });
+      return errorResponse(ApiErrors.RATE_LIMIT);
+    }
     
+    console.log('[UPGRADE-PLAN POST] Rate limit check passed');
+
+    // Validate request body
+    let body;
+    try {
+      body = await request.json();
+      console.log('[UPGRADE-PLAN POST] Request body:', body);
+    } catch (parseError) {
+      console.log('[UPGRADE-PLAN POST] JSON parse error:', parseError);
+      return errorResponse({
+        code: 'INVALID_JSON',
+        message: 'Invalid JSON in request body',
+        statusCode: 400,
+      });
+    }
+
+    const validation = validateUpgradeRequest(body);
+    console.log('[UPGRADE-PLAN POST] Validation result:', { 
+      isValid: validation.isValid(),
+      firstError: validation.isValid() ? null : validation.getFirstError()
+    });
+    
+    if (!validation.isValid()) {
+      console.log('[UPGRADE-PLAN POST] Validation failed:', validation.getFirstError());
+      return errorResponse({
+        code: 'VALIDATION_ERROR',
+        message: validation.getFirstError()?.message || 'Validation failed',
+        statusCode: 400,
+      });
+    }
+
     const { newPlan, billingPeriod = 'monthly' } = body;
     
-    if (!newPlan || !['basic', 'pro', 'enterprise'].includes(newPlan)) {
-      console.log('Upgrade plan error: Invalid plan selected:', newPlan);
-      return NextResponse.json({ error: 'Invalid plan selected' }, { status: 400 });
-    }
+    console.log('[UPGRADE-PLAN POST] Validated data:', { newPlan, billingPeriod });
+    
+    logger.info('Processing plan upgrade', 'UPGRADE_PLAN', { userId, newPlan, billingPeriod });
 
     const { db } = await connectToDatabase();
     console.log('Database connected successfully');
@@ -118,17 +184,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No active or trial subscription found' }, { status: 404 });
     }
     
-    // Extract current plan from subscriptionPlan field (this contains the actual plan name)
-    const currentPlan = currentSubscription.subscriptionPlan;
-    console.log('Current plan from subscriptionPlan field:', currentPlan);
+    // Extract current plan - check multiple possible field names
+    const currentPlan = currentSubscription.subscriptionPlan 
+                       || currentSubscription.plan 
+                       || currentSubscription.subscriptionType
+                       || currentSubscription.planName;
+    
+    console.log('Current plan extraction:', {
+      subscriptionPlan: currentSubscription.subscriptionPlan,
+      plan: currentSubscription.plan,
+      subscriptionType: currentSubscription.subscriptionType,
+      extracted: currentPlan
+    });
     
     if (!currentPlan) {
-      console.log('Upgrade plan error: No plan found in subscriptionPlan field');
-      return NextResponse.json({ error: 'Unable to determine current plan' }, { status: 400 });
+      console.log('Upgrade plan error: No plan found in any field');
+      return NextResponse.json({ 
+        error: 'Unable to determine current plan',
+        debug: { availableFields: Object.keys(currentSubscription) }
+      }, { status: 400 });
     }
     
-    // Check subscription plan to determine if trial user (subscriptionPlan = 'trial' for trial users)
-    const isTrialUser = currentSubscription.subscriptionPlan === 'trial';
+    // Check subscription plan to determine if trial user
+    const isTrialUser = currentPlan.toLowerCase() === 'trial';
     console.log('Is trial user:', isTrialUser);
     
     // Normalize plan names (capitalize first letter to match PLAN_PRICES)
@@ -204,20 +282,26 @@ export async function POST(request: NextRequest) {
     }
     
     // Calculate days remaining
+    const startDate = new Date(currentSubscription.startDate);
     const endDate = new Date(currentSubscription.subscriptionExpiresAt || currentSubscription.endDate || currentSubscription.expiryDate);
     const today = new Date();
     const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    console.log('Date calculation:', { endDate, today, daysRemaining });
+    console.log('Date calculation:', { startDate, endDate, today, daysRemaining });
     
     if (daysRemaining <= 0) {
       console.log('Upgrade plan error: Subscription expired');
-      return NextResponse.json({ error: 'Current subscription has expired' }, { status: 400 });
+      logger.error('Attempted upgrade with expired subscription', new Error('Subscription expired'), 'UPGRADE_PLAN', { userId, daysRemaining });
+      return errorResponse({
+        code: 'SUBSCRIPTION_EXPIRED',
+        message: 'Current subscription has expired. Please renew first.',
+        statusCode: 400,
+      });
     }
     
-    // Calculate upgrade costs
+    // Calculate upgrade costs with actual billing period start date
     console.log('Calculating upgrade amount...');
-    const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, billingPeriod);
+    const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, billingPeriod, startDate);
     console.log('Upgrade calculation result:', calculation);
     
     // If no payment required (should not happen in upgrade, but safety check)
@@ -227,6 +311,14 @@ export async function POST(request: NextRequest) {
     
     // Create Razorpay order
     const shortReceiptId = `upg_${Date.now().toString().slice(-8)}`;
+    
+    console.log('[UPGRADE-PLAN POST] Creating Razorpay order:', {
+      amount: calculation.totalAmount * 100,
+      totalAmount: calculation.totalAmount,
+      upgradeAmount: calculation.upgradeAmount,
+      gatewayFee: calculation.gatewayFee
+    });
+    
     const order = await razorpay.orders.create({
       amount: calculation.totalAmount * 100, // Convert to paise
       currency: 'INR',
@@ -243,6 +335,8 @@ export async function POST(request: NextRequest) {
       }
     });
     
+    console.log('[UPGRADE-PLAN POST] Order created successfully:', { orderId: order.id, amount: order.amount });
+    
     return NextResponse.json({
       orderId: order.id,
       amount: order.amount, // Return Razorpay order amount (already in paise)
@@ -255,16 +349,22 @@ export async function POST(request: NextRequest) {
       }
     });
     
-  } catch (error) {
-    console.error('Upgrade plan error:', error);
+  } catch (error: any) {
+    console.error('[UPGRADE-PLAN POST] Error:', error);
+    console.error('[UPGRADE-PLAN POST] Error stack:', error.stack);
     return NextResponse.json(
-      { error: 'Failed to process upgrade request' },
+      { 
+        error: error.message || 'Failed to process upgrade request',
+        details: error.toString()
+      },
       { status: 500 }
     );
   }
 }
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -275,7 +375,10 @@ export async function GET(request: NextRequest) {
     const newPlan = searchParams.get('newPlan');
     const billingPeriod = searchParams.get('billingPeriod') as 'monthly' | 'annually' || 'monthly';
     
-    if (!newPlan || !['basic', 'pro', 'enterprise'].includes(newPlan)) {
+    console.log('[UPGRADE-PLAN GET] Request params:', { newPlan, billingPeriod, userId });
+    
+    if (!newPlan || !['basic', 'pro', 'enterprise', 'Basic', 'Pro', 'Enterprise'].includes(newPlan)) {
+      console.log('[UPGRADE-PLAN GET] Invalid plan:', newPlan);
       return NextResponse.json({ error: 'Invalid plan specified' }, { status: 400 });
     }
 
@@ -287,24 +390,51 @@ export async function GET(request: NextRequest) {
       status: { $in: ['active', 'active_subscription', 'trial'] } // Include trial status
     });
     
+    console.log('[UPGRADE-PLAN GET] Current subscription raw:', currentSubscription);
+    
     if (!currentSubscription) {
       return NextResponse.json({ error: 'No active or trial subscription found' }, { status: 404 });
     }
     
-    // Extract current plan from subscriptionPlan field (this contains the actual plan name)
-    const currentPlan = currentSubscription.subscriptionPlan;
+    // Extract current plan - check multiple possible field names
+    const currentPlan = currentSubscription.subscriptionPlan 
+                       || currentSubscription.plan 
+                       || currentSubscription.subscriptionType
+                       || currentSubscription.planName;
+    
+    console.log('[UPGRADE-PLAN GET] Plan extraction:', {
+      subscriptionPlan: currentSubscription.subscriptionPlan,
+      plan: currentSubscription.plan,
+      subscriptionType: currentSubscription.subscriptionType,
+      planName: currentSubscription.planName,
+      extracted: currentPlan
+    });
     
     if (!currentPlan) {
-      return NextResponse.json({ error: 'Unable to determine current plan' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Unable to determine current plan. Please contact support.',
+        debug: {
+          availableFields: Object.keys(currentSubscription)
+        }
+      }, { status: 400 });
     }
     
-    // Check subscription plan to determine if trial user (subscriptionPlan = 'trial' for trial users)
-    const isTrialUser = currentSubscription.subscriptionPlan === 'trial';
+    // Check subscription plan to determine if trial user
+    const isTrialUser = currentPlan.toLowerCase() === 'trial';
+    
+    console.log('[UPGRADE-PLAN GET] Current subscription:', {
+      plan: currentPlan,
+      status: currentSubscription.status,
+      expiresAt: currentSubscription.subscriptionExpiresAt || currentSubscription.endDate,
+      isTrialUser
+    });
     
     // Normalize plan names (capitalize first letter to match PLAN_PRICES)
     // For trial users, use their subscriptionType as the target plan, not subscriptionPlan
     const normalizedCurrentPlan = isTrialUser ? 'trial' : currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1).toLowerCase();
     const normalizedNewPlan = newPlan.charAt(0).toUpperCase() + newPlan.slice(1).toLowerCase();
+    
+    console.log('[UPGRADE-PLAN GET] Normalized plans:', { normalizedCurrentPlan, normalizedNewPlan, isTrialUser });
     
     // Handle trial users - simple full plan pricing
     if (isTrialUser) {
@@ -342,26 +472,61 @@ export async function GET(request: NextRequest) {
     const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
     if (daysRemaining <= 0) {
-      return NextResponse.json({ error: 'Current subscription has expired' }, { status: 400 });
+      logger.warn('Upgrade attempted on expired subscription', 'UPGRADE_PLAN', { userId });
+      return errorResponse({
+        code: 'SUBSCRIPTION_EXPIRED',
+        message: 'Current subscription has expired',
+        statusCode: 400,
+      });
     }
     
-    // Calculate upgrade costs
-    const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, billingPeriod);
+    // Get current subscription's billing period (not the target billing period)
+    const currentBillingPeriod = currentSubscription.billingPeriod || 'monthly';
     
-    return NextResponse.json({
-      calculation: {
-        ...calculation,
-        daysRemaining,
-        currentPlan: normalizedCurrentPlan,
-        newPlan: normalizedNewPlan
-      }
+    console.log('[UPGRADE-PLAN GET] Billing periods:', { 
+      currentBillingPeriod, 
+      targetBillingPeriod: billingPeriod,
+      willUseForCalculation: currentBillingPeriod 
     });
     
-  } catch (error) {
-    console.error('Upgrade calculation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to calculate upgrade cost' },
-      { status: 500 }
-    );
+    // Calculate upgrade costs using CURRENT billing period for prorated values
+    try {
+      const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, currentBillingPeriod);
+      
+      const duration = Date.now() - startTime;
+      logger.info('Upgrade calculation completed', 'UPGRADE_PLAN', { 
+        userId, 
+        duration, 
+        upgradeAmount: calculation.upgradeAmount 
+      });
+
+      return successResponse({
+        calculation: {
+          ...calculation,
+          daysRemaining,
+          currentPlan: normalizedCurrentPlan,
+          newPlan: normalizedNewPlan,
+          currentBillingPeriod,
+          targetBillingPeriod: billingPeriod
+        }
+      });
+    } catch (calcError: any) {
+      console.error('[UPGRADE-PLAN GET] Calculation error:', calcError);
+      return NextResponse.json({ 
+        error: calcError.message || 'Failed to calculate upgrade amount',
+        details: {
+          currentPlan: normalizedCurrentPlan,
+          newPlan: normalizedNewPlan,
+          availablePlans: Object.keys(PLAN_PRICES)
+        }
+      }, { status: 400 });
+    }
+    
+  } catch (error: any) {
+    console.error('[UPGRADE-PLAN GET] Error:', error);
+    logger.error('Upgrade calculation failed', error, 'UPGRADE_PLAN');
+    return NextResponse.json({ 
+      error: error.message || 'Internal server error' 
+    }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   UserCircleIcon, 
   CreditCardIcon, 
@@ -21,6 +22,7 @@ import Link from 'next/link';
 import Script from 'next/script';
 import DeviceManagement from '@/components/DeviceManagement';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard';
+import LoadingSkeleton from '@/components/LoadingSkeleton';
 
 interface PaymentHistoryEntry {
   paymentId: string;
@@ -53,6 +55,7 @@ interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentPlan: string;
+  currentBillingPeriod: 'monthly' | 'annually';
   onUpgrade: (plan: string, billingPeriod?: 'monthly' | 'annually') => void;
 }
 
@@ -79,16 +82,17 @@ const TABS = [
 ];
 
 // Upgrade Modal Component
-const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPlan, onUpgrade }) => {
+const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPlan, currentBillingPeriod, onUpgrade }) => {
   const [selectedPlan, setSelectedPlan] = useState('');
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annually'>('monthly');
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annually'>(currentBillingPeriod);
   const [upgradeCalculation, setUpgradeCalculation] = useState<any>(null);
   const [loadingCalculation, setLoadingCalculation] = useState(false);
   
+  // Updated prices to match backend pricing
   const plans = [
-    { name: 'basic', price: 499, description: 'Perfect for small businesses' },
-    { name: 'pro', price: 999, description: 'Great for growing companies' },
-    { name: 'enterprise', price: 1499, description: 'For large organizations' }
+    { name: 'basic', price: 699, description: 'Perfect for small businesses' },
+    { name: 'pro', price: 833, description: 'Great for growing companies' },
+    { name: 'enterprise', price: 979, description: 'For large organizations' }
   ];
   
   const availableUpgrades = plans.filter(plan => {
@@ -111,16 +115,26 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
     
     setLoadingCalculation(true);
     try {
-      const response = await fetch(`/api/upgrade-plan?newPlan=${selectedPlan}&billingPeriod=${billingPeriod}`);
+      // Capitalize plan name to match backend validation
+      const capitalizedPlan = selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1).toLowerCase();
+      console.log('[fetchUpgradeCalculation] Fetching for:', capitalizedPlan, billingPeriod);
+      const response = await fetch(`/api/upgrade-plan?newPlan=${capitalizedPlan}&billingPeriod=${billingPeriod}`);
+      console.log('[fetchUpgradeCalculation] Response status:', response.status, response.ok);
+      
       if (response.ok) {
         const data = await response.json();
-        setUpgradeCalculation(data.calculation);
+        console.log('[fetchUpgradeCalculation] Full response data:', data);
+        // API returns { success: true, data: { calculation: {...} } }
+        const calculation = data.data?.calculation || data.calculation;
+        console.log('[fetchUpgradeCalculation] Calculation object:', calculation);
+        setUpgradeCalculation(calculation);
       } else {
-        console.error('Failed to fetch upgrade calculation');
+        const errorData = await response.text();
+        console.error('[fetchUpgradeCalculation] Failed to fetch:', response.status, errorData);
         setUpgradeCalculation(null);
       }
     } catch (error) {
-      console.error('Error fetching upgrade calculation:', error);
+      console.error('[fetchUpgradeCalculation] Error:', error);
       setUpgradeCalculation(null);
     } finally {
       setLoadingCalculation(false);
@@ -166,12 +180,22 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
           <>
             {/* Billing Period Toggle */}
             <div className="mb-6">
+              {currentBillingPeriod === 'annually' && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-medium">ℹ️ Note:</span> Annual plans can only be upgraded to annual billing. You cannot switch to monthly billing during an upgrade.
+                  </p>
+                </div>
+              )}
               <div className="flex bg-gray-100 rounded-xl p-1">
                 <button
-                  onClick={() => setBillingPeriod('monthly')}
+                  onClick={() => currentBillingPeriod !== 'annually' && setBillingPeriod('monthly')}
+                  disabled={currentBillingPeriod === 'annually'}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                     billingPeriod === 'monthly' 
                       ? 'bg-white text-gray-900 shadow-sm' 
+                      : currentBillingPeriod === 'annually'
+                      ? 'text-gray-400 cursor-not-allowed opacity-50'
                       : 'text-gray-600'
                   }`}
                 >
@@ -235,15 +259,15 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
                         <>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Trial Upgrade to {upgradeCalculation.newPlan}:</span>
-                            <span className="font-medium">₹{upgradeCalculation.upgradeAmount}</span>
+                            <span className="font-medium text-gray-900">₹{upgradeCalculation.upgradeAmount}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Gateway Fee:</span>
-                            <span className="font-medium">₹{upgradeCalculation.gatewayFee}</span>
+                            <span className="font-medium text-gray-900">₹{upgradeCalculation.gatewayFee}</span>
                           </div>
                           <div className="border-t pt-2 mt-2">
                             <div className="flex justify-between font-bold">
-                              <span>Total Amount:</span>
+                              <span className="text-gray-900">Total Amount:</span>
                               <span className="text-blue-600">₹{upgradeCalculation.totalAmount}</span>
                             </div>
                           </div>
@@ -251,24 +275,24 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
                       ) : (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Current Plan Value (Remaining {upgradeCalculation.daysRemaining} days):</span>
-                            <span className="font-medium">₹{upgradeCalculation.proratedCurrent}</span>
-                          </div>
-                          <div className="flex justify-between">
                             <span className="text-gray-600">New Plan Value (Remaining {upgradeCalculation.daysRemaining} days):</span>
-                            <span className="font-medium">₹{upgradeCalculation.proratedNew}</span>
+                            <span className="font-medium text-green-600">₹{upgradeCalculation.proratedNew}</span>
                           </div>
                           <div className="flex justify-between">
+                            <span className="text-gray-600">Current Plan Value (Remaining {upgradeCalculation.daysRemaining} days):</span>
+                            <span className="font-medium text-red-600">(-₹{upgradeCalculation.proratedCurrent})</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-2 mt-2">
                             <span className="text-gray-600">Upgrade Amount:</span>
-                            <span className="font-medium">₹{upgradeCalculation.upgradeAmount}</span>
+                            <span className="font-medium text-gray-900">₹{upgradeCalculation.upgradeAmount}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">Gateway Fee:</span>
-                            <span className="font-medium">₹{upgradeCalculation.gatewayFee}</span>
+                            <span className="font-medium text-gray-900">₹{upgradeCalculation.gatewayFee}</span>
                           </div>
                           <div className="border-t pt-2 mt-2">
                             <div className="flex justify-between font-bold">
-                              <span>Total Amount:</span>
+                              <span className="text-gray-900">Total Amount:</span>
                               <span className="text-blue-600">₹{upgradeCalculation.totalAmount}</span>
                             </div>
                           </div>
@@ -288,7 +312,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
                   </p>
                 )}
               </div>
-            )}
+            )}  
           </>
         )}
         
@@ -302,10 +326,10 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
           {availableUpgrades.length > 0 && (
             <button
               onClick={() => selectedPlan && onUpgrade(selectedPlan, billingPeriod)}
-              disabled={!selectedPlan}
+              disabled={!selectedPlan || loadingCalculation}
               className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upgrade Now
+              {loadingCalculation ? 'Calculating...' : 'Upgrade Now'}
             </button>
           )}
         </div>
@@ -579,6 +603,14 @@ const ProfilePage = () => {
   const [processing, setProcessing] = useState(false);
   const { user, isLoaded: clerkLoaded } = useUser();
   const { openUserProfile } = useClerk();
+  const router = useRouter();
+
+  // Protect route - redirect if not authenticated
+  useEffect(() => {
+    if (clerkLoaded && !user) {
+      router.push('/sign-in');
+    }
+  }, [clerkLoaded, user, router]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -588,7 +620,8 @@ const ProfilePage = () => {
         const res = await fetch('/api/user-profile');
         if (!res.ok) throw new Error('Failed to fetch profile');
         const json = await res.json();
-        setData(json);
+        // Extract data from the API response wrapper
+        setData(json.data || json);
       } catch (err) {
         if (err instanceof Error) setError(err.message);
         else setError('Error fetching profile');
@@ -616,8 +649,11 @@ const ProfilePage = () => {
     try {
       setProcessing(true);
       
+      // Capitalize plan name to match backend validation (Basic, Pro, Enterprise)
+      const capitalizedPlan = newPlan.charAt(0).toUpperCase() + newPlan.slice(1).toLowerCase();
+      
       // Get upgrade calculation
-      const calcResponse = await fetch(`/api/upgrade-plan?newPlan=${newPlan}&billingPeriod=${billingPeriod}`);
+      const calcResponse = await fetch(`/api/upgrade-plan?newPlan=${capitalizedPlan}&billingPeriod=${billingPeriod}`);
       if (!calcResponse.ok) throw new Error('Failed to calculate upgrade cost');
       
       const { calculation } = await calcResponse.json();
@@ -626,7 +662,7 @@ const ProfilePage = () => {
       const orderResponse = await fetch('/api/upgrade-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPlan, billingPeriod }),
+        body: JSON.stringify({ newPlan: capitalizedPlan, billingPeriod }),
       });
       
       if (!orderResponse.ok) throw new Error('Failed to create upgrade order');
@@ -709,8 +745,11 @@ const ProfilePage = () => {
       
       const data = await response.json();
       console.log('Cancel modal - Received data:', data);
-      console.log('Cancel modal - Refund calculation:', data.refundCalculation);
-      setRefundInfo(data.refundCalculation);
+      console.log('Cancel modal - Refund calculation:', data.data?.refundCalculation || data.refundCalculation);
+      
+      // Handle both response structures (with and without success wrapper)
+      const refundCalculation = data.data?.refundCalculation || data.refundCalculation;
+      setRefundInfo(refundCalculation);
       setCancelModalOpen(true);
     } catch (error: any) {
       console.error('Cancel request error:', error);
@@ -867,20 +906,33 @@ const ProfilePage = () => {
 
   if (loading || !clerkLoaded) return (
     <div className="relative min-h-screen pt-20 bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading your profile...</p>
-        </div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-0 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-pink-400/10 rounded-full blur-3xl"></div>
+      </div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <LoadingSkeleton type="profile" count={4} />
       </div>
     </div>
   );
   
   if (error) return (
     <div className="relative min-h-screen pt-20 bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 text-center">
-          <div className="text-red-600 font-semibold">{error}</div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-0 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-pink-400/10 rounded-full blur-3xl"></div>
+      </div>
+      <div className="relative max-w-md mx-auto px-4 flex justify-center items-center min-h-[60vh]">
+        <div className="bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-200 rounded-2xl p-8 text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">Unable to Load Profile</h3>
+          <p className="text-red-600 font-semibold mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-2 px-6 rounded-xl hover:shadow-lg transition-shadow"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     </div>
@@ -949,8 +1001,8 @@ const ProfilePage = () => {
                 </button>
               </Link>
               
-              <p className="text-sm text-gray-500">
-                💡 Start with a 14-day free trial - no credit card required
+              <p className="text-sm text-slate-500">
+                14-day free trial available - no credit card required
               </p>
             </div>
 
@@ -974,6 +1026,7 @@ const ProfilePage = () => {
     );
   }
 
+  // Main return for subscribed users
   return (
     <>
       <Script
@@ -1023,68 +1076,101 @@ const ProfilePage = () => {
           {activeTab === 0 && (
             <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                {/* Subscription Details */}
-                <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 hover:bg-white/30 transition-all duration-300 shadow-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                      <CreditCardIcon className="w-6 h-6 text-white" />
+                {/* Subscription Details - Enhanced */}
+                <div className={`${data?.subscription?.status === 'active' ? 'bg-gradient-to-br from-green-50 to-blue-50 border-green-200' : 'bg-gradient-to-br from-red-50 to-orange-50 border-red-200'} border-2 backdrop-blur-sm rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-300`}>
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                        data?.subscription?.status === 'active' 
+                          ? 'bg-gradient-to-r from-green-500 to-blue-500' 
+                          : 'bg-gradient-to-r from-red-500 to-orange-500'
+                      } shadow-lg`}>
+                        <CreditCardIcon className="w-7 h-7 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-gray-900">Your Plan</h2>
+                        <p className="text-gray-600 text-sm">Subscription Status & Details</p>
+                      </div>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">Subscription Details</h2>
+                    {data?.subscription && (
+                      <div className={`px-4 py-2 rounded-full font-bold text-sm ${
+                        data.subscription.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : data.subscription.status === 'trial'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {data.subscription.status === 'active' ? '✓ Active' : data.subscription.status === 'trial' ? '⭐ Trial' : '⚠ Expired'}
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-3 items-center">
-                      {data?.subscription?.billingPeriod && (
-                        <Badge text={data.subscription.billingPeriod} color="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border border-purple-200" />
-                      )}
-                      {data?.subscription && (
-                        <Badge text={data.subscription.status} color={data.subscription.status === 'active' ? 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200' : 'bg-gradient-to-r from-red-100 to-pink-100 text-red-800 border border-red-200'} />
-                      )}
-                    </div>
-                    
-                    <div className="text-xl font-bold text-gray-900 mb-4">
+                  {/* Plan Name & Period */}
+                  <div className="mb-6">
+                    <div className="text-3xl font-bold text-gray-900 mb-2">
                       {data?.subscription ? (data.subscription.plan.charAt(0).toUpperCase() + data.subscription.plan.slice(1) + ' Plan') : 'No Plan'}
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                      <div className="bg-white/30 rounded-xl p-4">
-                        <div className="text-sm text-gray-600 font-medium">Start Date</div>
-                        <div className="text-lg font-bold text-gray-900">
-                          {data?.subscription?.startDate ? new Date(data.subscription.startDate).toLocaleDateString() : '-'}
-                        </div>
+                    {data?.subscription?.billingPeriod && (
+                      <div className="inline-block px-3 py-1 bg-white/40 rounded-lg text-sm font-semibold text-gray-700">
+                        {data.subscription.billingPeriod === 'annually' ? '📅 Billed Annually (Save 15%)' : '📅 Billed Monthly'}
                       </div>
-                      <div className="bg-white/30 rounded-xl p-4">
-                        <div className="text-sm text-gray-600 font-medium">End Date</div>
-                        <div className="text-lg font-bold text-gray-900">
-                          {data?.subscription?.endDate && data.subscription.endDate !== 'Invalid Date' 
-                            ? new Date(data.subscription.endDate).toLocaleDateString() 
-                            : data?.subscription?.status === 'trial' ? 'Trial Period' : '-'
-                          }
-                        </div>
+                    )}
+                  </div>
+                  
+                  {/* Key Dates Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    <div className="bg-white/50 rounded-xl p-4 backdrop-blur-sm">
+                      <div className="text-xs text-gray-600 font-semibold uppercase tracking-wide mb-1">Started</div>
+                      <div className="text-sm font-bold text-gray-900">
+                        {data?.subscription?.startDate ? new Date(data.subscription.startDate).toLocaleDateString() : '-'}
                       </div>
                     </div>
-                    
-                    <div className="text-gray-600 text-sm mb-6 bg-blue-50/50 rounded-lg p-3">
-                      <span className="font-medium">Next renewal:</span> {
-                        data?.subscription?.endDate && data.subscription.endDate !== 'Invalid Date' 
+                    <div className={`${isExpired() ? 'bg-red-100/50' : 'bg-white/50'} rounded-xl p-4 backdrop-blur-sm`}>
+                      <div className="text-xs text-gray-600 font-semibold uppercase tracking-wide mb-1">
+                        {data?.subscription?.status === 'trial' ? 'Trial Ends' : 'Renews'}
+                      </div>
+                      <div className={`text-sm font-bold ${isExpired() ? 'text-red-800' : 'text-gray-900'}`}>
+                        {data?.subscription?.endDate && data.subscription.endDate !== 'Invalid Date' 
                           ? new Date(data.subscription.endDate).toLocaleDateString() 
-                          : data?.subscription?.status === 'trial' ? 'Upgrade to set renewal date' : '-'
-                      }
+                          : '-'
+                        }
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Renewal Countdown */}
+                  {data?.subscription?.endDate && data.subscription.endDate !== 'Invalid Date' && !needsRenewal() && (
+                    <div className="bg-white/40 rounded-xl p-4 mb-6 border border-white/60">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-gray-600 font-semibold mb-1">Time Remaining</p>
+                          <p className="text-lg font-bold text-gray-900">
+                            {(() => {
+                              const now = new Date();
+                              const endDate = new Date(data.subscription.endDate);
+                              const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                              return daysLeft > 0 ? `${daysLeft} days` : 'Expiring today';
+                            })()}
+                          </p>
+                        </div>
+                        <div className="text-3xl">⏱️</div>
+                      </div>
+                    </div>
+                  )}
                     
                     {/* Renewal Alert */}
                     {needsRenewal() && (
-                      <div className={`${isExpired() ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'} border-2 rounded-xl p-4 mb-6`}>
-                        <div className="flex items-center gap-3">
-                          <ExclamationTriangleIcon className={`w-6 h-6 ${isExpired() ? 'text-red-600' : 'text-yellow-600'}`} />
+                      <div className={`${isExpired() ? 'bg-red-100 border-red-300' : 'bg-yellow-100 border-yellow-300'} border-2 rounded-xl p-4 mb-6`}>
+                        <div className="flex items-start gap-3">
+                          <ExclamationTriangleIcon className={`w-6 h-6 flex-shrink-0 ${isExpired() ? 'text-red-600' : 'text-yellow-600'} mt-0.5`} />
                           <div>
-                            <h4 className={`font-bold ${isExpired() ? 'text-red-900' : 'text-yellow-900'}`}>
-                              {isExpired() ? 'Subscription Expired' : 'Subscription Expiring Soon'}
+                            <h4 className={`font-bold text-sm ${isExpired() ? 'text-red-900' : 'text-yellow-900'}`}>
+                              {isExpired() ? '🚨 Subscription Expired' : '⏰ Expiring Soon'}
                             </h4>
-                            <p className={`text-sm ${isExpired() ? 'text-red-700' : 'text-yellow-700'}`}>
+                            <p className={`text-xs ${isExpired() ? 'text-red-800' : 'text-yellow-800'} mt-1`}>
                               {isExpired() 
-                                ? 'Your subscription has expired. Renew now to restore access to all features.'
-                                : `Your subscription expires on ${new Date(data?.subscription?.endDate || '').toLocaleDateString()}. Renew now to avoid interruption.`
+                                ? 'Your subscription has expired. Renew now to restore full access.'
+                                : `Your subscription expires on ${new Date(data?.subscription?.endDate || '').toLocaleDateString()}. Renew soon.`
                               }
                             </p>
                           </div>
@@ -1127,11 +1213,16 @@ const ProfilePage = () => {
                           >
                             {processing ? 'Processing...' : 'Cancel'}
                           </button>
+                          <button
+                            onClick={() => setActiveTab(2)}
+                            className="flex-1 bg-white text-blue-700 font-bold py-3 px-6 rounded-xl border border-blue-200 hover:bg-blue-50 transition-all duration-300"
+                          >
+                            Manage Devices
+                          </button>
                         </>
                       )}
                     </div>
                   </div>
-                </div>
 
                 {/* Download Section */}
                 <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 hover:bg-white/30 transition-all duration-300 shadow-xl text-center">
@@ -1142,13 +1233,36 @@ const ProfilePage = () => {
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">Download LoanPro Desktop</h2>
                     <p className="text-gray-600 mb-6 leading-relaxed">
                       Get the official LoanPro desktop application for Windows. Experience lightning-fast performance with offline capabilities.
-                    </p>
+                    </p> 
                     <Link href="/download">
                       <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center space-x-2">
                         <ArrowDownTrayIcon className="w-5 h-5" />
                         <span>Download for Windows</span>
                       </button>
                     </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Stats Section */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="bg-gradient-to-br from-blue-100 to-blue-100 border border-blue-200 rounded-2xl p-6 text-center hover:shadow-lg transition-shadow">
+                  <div className="text-sm font-semibold text-blue-700 mb-2">CLOUD STORAGE</div>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {data?.subscription?.plan === 'Pro' || data?.subscription?.plan === 'pro' ? '1 GB' : '200 MB'}
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-purple-100 to-purple-100 border border-purple-200 rounded-2xl p-6 text-center hover:shadow-lg transition-shadow">
+                  <div className="text-sm font-semibold text-purple-700 mb-2">DEVICES ALLOWED</div>
+                  <div className="text-2xl font-bold text-purple-900">
+                    {data?.subscription?.plan === 'Enterprise' || data?.subscription?.plan === 'enterprise' ? '∞' : 
+                     data?.subscription?.plan === 'Pro' || data?.subscription?.plan === 'pro' ? '2' : '1'}
+                  </div>
+                </div>
+                <div className="bg-gradient-to-br from-green-100 to-green-100 border border-green-200 rounded-2xl p-6 text-center hover:shadow-lg transition-shadow">
+                  <div className="text-sm font-semibold text-green-700 mb-2">STATUS</div>
+                  <div className="text-2xl font-bold text-green-900">
+                    {data?.subscription?.status === 'active' ? 'Active' : data?.subscription?.status === 'trial' ? 'Trial' : 'Expired'}
                   </div>
                 </div>
               </div>
@@ -1284,6 +1398,7 @@ const ProfilePage = () => {
             isOpen={upgradeModalOpen} 
             onClose={handleUpgradeModalClose} 
             currentPlan={data.subscription?.plan || 'basic'} 
+            currentBillingPeriod={data.subscription?.billingPeriod || 'monthly'}
             onUpgrade={handleUpgrade} 
           />
         )}

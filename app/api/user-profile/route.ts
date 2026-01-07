@@ -1,18 +1,61 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
+import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
+import { logger } from '@/lib/logger';
 
 export async function GET() {
+  const startTime = Date.now();
+  let userId: string | null = null;
+  
   try {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Authentication check
+    const authResult = await auth();
+    userId = authResult.userId;
+    if (!userId) {
+      logger.warn('Unauthorized access attempt', 'USER_PROFILE');
+      return errorResponse(ApiErrors.UNAUTHORIZED);
+    }
+
+    // Rate limiting
+    const rateLimitKey = `user-profile:${userId}`;
+    if (!checkRateLimit(rateLimitKey, RateLimitPresets.API.limit, RateLimitPresets.API.windowMs)) {
+      logger.warn('Rate limit exceeded', 'USER_PROFILE', { userId });
+      return errorResponse(ApiErrors.RATE_LIMIT);
+    }
+
+    logger.info('Fetching user profile', 'USER_PROFILE', { userId });
 
     const client = await clientPromise;
     const db = client.db('AdminDB');
 
-    // Fetch user info
-    const user = await db.collection('users').findOne({ userId });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Fetch user info or create new user
+    let user = await db.collection('users').findOne({ userId });
+    
+    if (!user) {
+      // User doesn't exist in MongoDB - create new user record
+      logger.info('New Clerk user, creating MongoDB user record', 'USER_PROFILE', { userId });
+      
+      const crypto = await import('crypto');
+      const accessToken = crypto.randomBytes(48).toString('hex');
+      
+      const newUser = {
+        userId,
+        username: typeof authResult.sessionClaims?.email === 'string' ? authResult.sessionClaims.email.split('@')[0] : userId,
+        email: typeof authResult.sessionClaims?.email === 'string' ? authResult.sessionClaims.email : '',
+        accessToken,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        devices: [],
+        dataUsage: 0
+      };
+      
+      const insertResult = await db.collection('users').insertOne(newUser);
+      user = { ...newUser, _id: insertResult.insertedId };
+      
+      logger.info('New user created successfully', 'USER_PROFILE', { userId });
+    }
 
     // Fetch current subscription info (including trials)
     const subscriptions = await db.collection('subscriptions').find({
@@ -24,7 +67,10 @@ export async function GET() {
     
     // Handle multiple active subscriptions (cleanup)
     if (subscriptions.length > 1) {
-      console.log(`Found ${subscriptions.length} active subscriptions for user ${userId}, cleaning up...`);
+      logger.warn(`Found multiple active subscriptions`, 'USER_PROFILE', { 
+        userId, 
+        count: subscriptions.length 
+      });
       
       // Keep the most recent subscription
       subscription = subscriptions[0];
@@ -42,6 +88,11 @@ export async function GET() {
         }
       );
       
+      logger.info(`Cleaned up duplicate subscriptions`, 'USER_PROFILE', { 
+        userId, 
+        cleaned: olderSubscriptionIds.length 
+      });
+      
       console.log(`Cleaned up ${olderSubscriptionIds.length} duplicate active subscriptions`);
     } else if (subscriptions.length === 1) {
       subscription = subscriptions[0];
@@ -49,57 +100,55 @@ export async function GET() {
     
     // Fetch all subscriptions for payment history
     const paymentHistory = await db.collection('subscriptions')
-      .find({ userId })
-      .sort({ startDate: -1 })
-      .toArray();
+      .find({ userId }).toArray();
+    const duration = Date.now() - startTime;
 
     // Handle non-subscribed users gracefully
     if (!subscription && paymentHistory.length === 0) {
-      return NextResponse.json({
+      logger.info('Non-subscribed user profile fetched', 'USER_PROFILE', { userId, duration });
+      return successResponse({
         user: {
           userId: user.userId,
           username: user.username,
           email: user.email,
-          createdAt: user.createdAt,
-          lastSubscribedAt: user.lastSubscribedAt,
-          accessToken: null, // No access token for non-subscribed users
+          accessToken: null,
         },
-        subscription: null, // No active subscription
+        subscription: null,
         paymentHistory: [],
         isSubscribed: false
       });
     }
 
     // Return combined info for subscribed users
-    return NextResponse.json({
+    logger.info('User profile fetched successfully', 'USER_PROFILE', { userId, duration });
+    return successResponse({
       user: {
         userId: user.userId,
         username: user.username,
         email: user.email,
-        createdAt: user.createdAt,
-        lastSubscribedAt: user.lastSubscribedAt,
         accessToken: user.accessToken,
       },
       subscription: subscription ? {
-        plan: user.subscriptionPlan || subscription.subscriptionPlan || subscription.plan || subscription.subscriptionType,
-        subscriptionType: subscription.subscriptionType, // billing period (monthly/yearly)
-        billingPeriod: user.billingPeriod || subscription.billingPeriod || 'monthly',
+        plan: subscription.plan || 'basic',
+        billingPeriod: subscription.billingPeriod || 'monthly',
         status: subscription.status,
         startDate: subscription.startDate,
-        endDate: subscription.endDate || subscription.expiryDate,
+        endDate: subscription.endDate,
       } : null,
-      paymentHistory: paymentHistory.map((sub) => ({
-        paymentId: sub.paymentId,
-        plan: sub.subscriptionType || sub.plan || sub.subscriptionPlan,
-        startDate: sub.startDate,
-        endDate: sub.endDate || sub.expiryDate,
-        status: sub.status,
-        receiptUrl: sub.receiptUrl,
-      })),
+      paymentHistory: paymentHistory
+        .filter(sub => sub.status !== 'superseded') // Filter out superseded subscriptions from payment history
+        .map((sub) => ({
+          paymentId: sub.paymentId,
+          plan: sub.plan || 'unknown',
+          startDate: sub.startDate,
+          endDate: sub.endDate,
+          status: sub.status,
+          receiptUrl: sub.receiptUrl,
+        })),
       isSubscribed: true
     });
   } catch (error) {
-    console.error('User profile API error:', error);
-    return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+    logger.error('User profile API failed', error, 'USER_PROFILE', { userId });
+    return errorResponse(ApiErrors.INTERNAL_ERROR);
   }
 } 

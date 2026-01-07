@@ -1,32 +1,121 @@
-export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { auth } from '@clerk/nextjs/server';
+import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
+import { validateOrderRequest } from '@/lib/validation';
+import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+// Initialize Razorpay with environment variables
+let razorpay: Razorpay;
+try {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    console.error('[CREATE-ORDER] Missing Razorpay credentials in environment variables');
+  }
+  razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || '',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '',
+  });
+  console.log('[CREATE-ORDER] Razorpay initialized successfully');
+} catch (error) {
+  console.error('[CREATE-ORDER] Failed to initialize Razorpay:', error);
+}
+
+// Plan pricing configuration (monthly price in paise)
+// Note: For Razorpay test mode, yearly plans should not exceed ₹10,000 total
+const PLAN_PRICES: Record<string, number> = {
+  'Basic': 69900,      // ₹699/month (yearly with 15% discount: ₹7,134)
+  'Pro': 83300,        // ₹833/month (yearly with 15% discount: ₹8,496)
+  'Enterprise': 97900, // ₹979/month (yearly with 15% discount: ₹9,983)
+};
 
 export async function POST(req: Request) {
+  console.log('[CREATE-ORDER] API route called');
+  
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check if Razorpay is initialized
+    if (!razorpay) {
+      console.error('[CREATE-ORDER] Razorpay not initialized');
+      return errorResponse({
+        code: 'PAYMENT_CONFIG_ERROR',
+        message: 'Payment system is not configured',
+        statusCode: 500,
+      });
     }
 
-    const { plan, billingPeriod = 'monthly', amount } = await req.json();
+    // Check authentication
+    const { userId } = await auth();
+    console.log('[CREATE-ORDER] User ID:', userId);
     
-    // Define plan prices (monthly rates)
-    const planPrices: { [key: string]: number } = {
-      'Basic': 499,
-      'Pro': 999,
-      'Enterprise': 1499,
-    };
+    if (!userId) {
+      console.log('[CREATE-ORDER] Unauthorized - no user ID');
+      return errorResponse(ApiErrors.UNAUTHORIZED);
+    }
 
-    const monthlyPrice = planPrices[plan];
+    // Rate limiting - prevent abuse
+    const rateLimitKey = `create-order:${userId}`;
+    if (!checkRateLimit(rateLimitKey, RateLimitPresets.PAYMENT.limit, RateLimitPresets.PAYMENT.windowMs)) {
+      return errorResponse(ApiErrors.RATE_LIMIT);
+    }
+
+    // Parse and validate request body
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return errorResponse({
+        code: 'INVALID_JSON',
+        message: 'Invalid JSON in request body',
+        statusCode: 400,
+      });
+    }
+
+    // Validate input
+    const validation = validateOrderRequest(body);
+    if (!validation.isValid()) {
+      const error = validation.getFirstError();
+      return errorResponse({
+        code: 'VALIDATION_ERROR',
+        message: error?.message || 'Validation failed',
+        statusCode: 400,
+        details: validation.errors,
+      });
+    }
+
+    const { plan, billingPeriod = 'monthly', amount } = body;
+
+    // IDEMPOTENCY: Check for existing pending order (prevent duplicate orders)
+    const { connectToDatabase } = await import('@/lib/mongodb');
+    const { db } = await connectToDatabase();
+    
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingOrder = await db.collection('order_intents').findOne({
+      userId,
+      plan,
+      billingPeriod,
+      status: 'pending',
+      createdAt: { $gt: fiveMinutesAgo }
+    });
+
+    if (existingOrder) {
+      console.log('[CREATE-ORDER] Reusing existing order:', existingOrder.orderId);
+      return successResponse({
+        orderId: existingOrder.orderId,
+        amount: existingOrder.amount,
+        currency: 'INR',
+        plan,
+        billingPeriod,
+        reused: true
+      }, 'Existing order found', 200);
+    }
+
+    // Get monthly price from configuration
+    const monthlyPrice = PLAN_PRICES[plan];
     if (!monthlyPrice) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+      return errorResponse({
+        code: 'INVALID_PLAN',
+        message: `Plan '${plan}' is not available`,
+        statusCode: 400,
+      });
     }
 
     // Calculate final amount based on billing period
@@ -36,10 +125,39 @@ export async function POST(req: Request) {
       finalAmount = Math.round(monthlyPrice * 12 * 0.85);
     }
 
-    // Use the amount passed from frontend if provided (for consistency)
-    const orderAmount = amount || finalAmount;
+    // SECURITY: NEVER trust frontend pricing - always use server-calculated amount
+    const orderAmount = finalAmount;
 
-    console.log('Order calculation:', { 
+    // If frontend sent an amount, validate it matches (within 1% tolerance for rounding)
+    if (amount && Math.abs(amount - finalAmount) > finalAmount * 0.01) {
+      return errorResponse({
+        code: 'AMOUNT_MISMATCH',
+        message: 'Price mismatch detected. Please refresh and try again.',
+        statusCode: 400,
+      });
+    }
+
+    // Validate amount is reasonable (₹1 to ₹150,000)
+    // Note: Razorpay test mode has a limit of ₹10,000 per transaction
+    const minAmount = 100; // ₹1
+    const maxAmount = 15000000; // ₹150,000 (production limit)
+    const testModeMaxAmount = 1000000; // ₹10,000 (test mode limit)
+    
+    if (orderAmount < minAmount || orderAmount > maxAmount) {
+      return errorResponse({
+        code: 'INVALID_AMOUNT',
+        message: `Order amount must be between ₹${minAmount/100} and ₹${maxAmount/100}`,
+        statusCode: 400,
+      });
+    }
+
+    // Warn if exceeding test mode limit (but allow it for production)
+    if (orderAmount > testModeMaxAmount && process.env.NODE_ENV !== 'production') {
+      console.warn(`[CREATE-ORDER] Amount ₹${orderAmount/100} exceeds Razorpay test mode limit of ₹10,000`);
+    }
+
+    console.log('[CREATE-ORDER] Processing order:', { 
+      userId,
       plan, 
       billingPeriod, 
       monthlyPrice, 
@@ -47,28 +165,90 @@ export async function POST(req: Request) {
       orderAmount 
     });
 
+    // Create Razorpay order with short receipt ID (max 40 chars)
+    // Format: rcpt_<timestamp>_<first 8 chars of userId>
+    const timestamp = Date.now().toString().slice(-10); // Last 10 digits
+    const userIdShort = userId.slice(-8); // Last 8 chars of userId
+    const receiptId = `rcpt_${timestamp}_${userIdShort}`; // Max 28 chars
+    
+    console.log('[CREATE-ORDER] Receipt ID:', receiptId, 'Length:', receiptId.length);
+
     // Create Razorpay order
-    const order = await razorpay.orders.create({
-      amount: orderAmount * 100, // Razorpay expects amount in paise
-      currency: 'INR',
-      receipt: `receipt_${Date.now()}`,
-      notes: {
-        userId,
-        plan,
-        billingPeriod,
-      },
+    let order;
+    try {
+      console.log('[CREATE-ORDER] Creating Razorpay order...');
+      order = await razorpay.orders.create({
+        amount: orderAmount,
+        currency: 'INR',
+        receipt: receiptId,
+        notes: {
+          userId,
+          plan,
+          billingPeriod,
+        },
+      });
+      console.log('[CREATE-ORDER] Razorpay order created:', order.id);
+    } catch (rzpError: any) {
+      console.error('[CREATE-ORDER] Razorpay order creation failed:', rzpError);
+      throw rzpError; // Re-throw to be caught by outer catch
+    }
+
+    console.log('[CREATE-ORDER] Order created successfully:', order.id);
+
+    // Store order intent for idempotency and abandoned cart tracking
+    await db.collection('order_intents').insertOne({
+      userId,
+      orderId: order.id,
+      plan,
+      billingPeriod,
+      amount: orderAmount,
+      status: 'pending',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      reminderSent: false
     });
 
-    return NextResponse.json({
+    return successResponse({
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-    });
-  } catch (error) {
-    console.error('Error creating order:', error);
-    return NextResponse.json(
-      { error: 'Error creating order' },
-      { status: 500 }
-    );
+      plan,
+      billingPeriod,
+      breakdown: {
+        basePrice: orderAmount / 100,
+        gatewayFee: Math.round(orderAmount / 100 * 0.025 + 3),
+        total: orderAmount / 100,
+        currency: 'INR'
+      }
+    }, 'Order created successfully', 201);
+
+  } catch (error: any) {
+    console.error('[CREATE-ORDER] Error caught:', error);
+    console.error('[CREATE-ORDER] Error type:', typeof error);
+    console.error('[CREATE-ORDER] Error details:', JSON.stringify(error, null, 2));
+
+    // Handle Razorpay API errors
+    if (error?.error?.code) {
+      console.error('[CREATE-ORDER] Razorpay API error:', error.error);
+      return errorResponse({
+        code: error.error.code || 'PAYMENT_ERROR',
+        message: error.error.description || 'Failed to create payment order',
+        statusCode: error.statusCode || 500,
+      });
+    }
+
+    // Handle standard errors
+    if (error instanceof Error) {
+      console.error('[CREATE-ORDER] Standard error:', error.message);
+      return errorResponse({
+        code: 'INTERNAL_ERROR',
+        message: error.message || 'Failed to process order',
+        statusCode: 500,
+      });
+    }
+
+    // Fallback error
+    console.error('[CREATE-ORDER] Unknown error type');
+    return errorResponse(ApiErrors.INTERNAL_ERROR);
   }
 }

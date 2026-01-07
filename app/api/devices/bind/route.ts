@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const deviceLimit = getDeviceLimit(subscriptionPlan);
     const activeDevices = (user.devices || []).filter((d: any) => d.status === 'active');
 
-    // Check if device already exists
+    // Check if device already exists (update case)
     const existingDevice = activeDevices.find((d: any) => d.deviceId === deviceId);
     if (existingDevice) {
       // Update existing device info
@@ -59,22 +59,6 @@ export async function POST(req: Request) {
       }, { headers: corsHeaders });
     }
 
-    // Check if user has reached device limit
-    if (activeDevices.length >= deviceLimit) {
-      return NextResponse.json({ 
-        error: 'DEVICE_LIMIT_EXCEEDED',
-        message: `Your ${subscriptionPlan} plan allows only ${deviceLimit} device(s). You currently have ${activeDevices.length} active device(s).`,
-        currentDevices: activeDevices.length,
-        deviceLimit: deviceLimit,
-        subscriptionPlan: subscriptionPlan,
-        devices: activeDevices.map((d: any) => ({
-          deviceId: d.deviceId,
-          deviceName: d.deviceName,
-          lastActive: d.lastActive
-        }))
-      }, { status: 403, headers: corsHeaders });
-    }
-
     const deviceEntry = {
       deviceId,
       deviceName: deviceName || 'Unnamed Device',
@@ -83,11 +67,48 @@ export async function POST(req: Request) {
       lastActive: new Date(),
     };
 
-    // Add device to existing user
-    await db.collection('users').updateOne(
-      { accessToken },
+    // ATOMIC OPERATION: Add device only if under limit
+    // This prevents race condition where two devices bind simultaneously
+    const result = await db.collection('users').updateOne(
+      { 
+        accessToken,
+        $expr: { 
+          $lt: [
+            { 
+              $size: { 
+                $filter: {
+                  input: { $ifNull: ['$devices', []] },
+                  as: 'device',
+                  cond: { $eq: ['$$device.status', 'active'] }
+                }
+              }
+            },
+            deviceLimit
+          ]
+        }
+      },
       { $push: { devices: deviceEntry } } as any
     );
+
+    // If update failed, device limit was exceeded
+    if (result.matchedCount === 0) {
+      // Re-fetch to get current count for error message
+      const updatedUser = await db.collection('users').findOne({ accessToken });
+      const currentActiveDevices = (updatedUser?.devices || []).filter((d: any) => d.status === 'active');
+      
+      return NextResponse.json({ 
+        error: 'DEVICE_LIMIT_EXCEEDED',
+        message: `Your ${subscriptionPlan} plan allows only ${deviceLimit} device(s). You currently have ${currentActiveDevices.length} active device(s).`,
+        currentDevices: currentActiveDevices.length,
+        deviceLimit: deviceLimit,
+        subscriptionPlan: subscriptionPlan,
+        devices: currentActiveDevices.map((d: any) => ({
+          deviceId: d.deviceId,
+          deviceName: d.deviceName,
+          lastActive: d.lastActive
+        }))
+      }, { status: 403, headers: corsHeaders });
+    }
 
     return NextResponse.json({ success: true, message: 'Device bound successfully', device: deviceEntry }, { headers: corsHeaders });
 

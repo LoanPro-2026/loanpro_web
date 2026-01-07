@@ -124,7 +124,7 @@ const HowToSetup: React.FC<HowToSetupProps> = ({ showTitle = true, variant = 'de
             Biometric Setup Required
           </h3>
           <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-            For Pro and Enterprise users, ensure your <strong>Mantra MFS100 Fingerprint Scanner</strong> is 
+            For Pro and Enterprise users, ensure your <strong>Secu-Hamster Pro 20-AP Fingerprint Scanner</strong> is 
             connected before proceeding with Step 4. This is essential for accessing biometric authentication features.
           </p>
         </div>

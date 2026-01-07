@@ -58,3 +58,18 @@ CREATE TABLE cash_transactions (
     amount DECIMAL(10, 2) NOT NULL,
     reason VARCHAR(255) NOT NULL
 );
+
+CREATE TABLE activity_log (
+  id bigint unsigned NOT NULL AUTO_INCREMENT,
+  type varchar(50) NOT NULL,
+  description text NOT NULL,
+  time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  amount decimal(12,2) DEFAULT NULL,
+  color varchar(20) DEFAULT NULL,
+  icon varchar(100) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY id (id)
+);
+
+
+

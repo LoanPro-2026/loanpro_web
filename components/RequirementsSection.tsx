@@ -16,7 +16,7 @@ const requirements = [
     required: true
   },
   {
-    title: 'Mantra MFS100 Fingerprint Scanner',
+    title: 'Secu-Hamster Pro 20-AP Fingerprint Scanner',
     description: 'Essential for Pro and Enterprise users to enable biometric authentication features',
     icon: FingerPrintIcon,
     gradient: 'from-purple-500 to-pink-500',
@@ -94,7 +94,7 @@ const RequirementsSection = () => {
             Important Notice for Pro & Enterprise Users
           </h3>
           <p className="text-lg text-gray-700 max-w-3xl mx-auto">
-            <strong>Mantra MFS100 Fingerprint Scanner</strong> is mandatory for Pro and Enterprise plan users 
+            <strong>Secu-Hamster Pro 20-AP Fingerprint Scanner</strong> is mandatory for Pro and Enterprise plan users 
             to access biometric authentication features. This hardware ensures secure user verification and 
             enhanced data protection for your loan management operations.
           </p>

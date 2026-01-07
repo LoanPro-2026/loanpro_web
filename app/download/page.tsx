@@ -1,5 +1,6 @@
-import React from 'react';
-import { ArrowDownTrayIcon, CheckCircleIcon, ComputerDesktopIcon, ShieldCheckIcon, RocketLaunchIcon, ClockIcon, FingerPrintIcon } from '@heroicons/react/24/outline';
+'use client';
+import React, { useState } from 'react';
+import { ArrowDownTrayIcon, CheckCircleIcon, ComputerDesktopIcon, ShieldCheckIcon, RocketLaunchIcon, ClockIcon, FingerPrintIcon, ChevronDownIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import HowToSetup from '../../components/HowToSetup';
 
 const features = [
@@ -10,7 +11,7 @@ const features = [
 	},
 	{
 		title: 'Biometric Security',
-		description: 'Fingerprint authentication with Mantra MFS100 scanner',
+		description: 'Fingerprint authentication with Secu-Hamster Pro 20-AP scanner',
 		icon: FingerPrintIcon,
 	},
 	{
@@ -40,11 +41,44 @@ const systemRequirements = [
 	'4 GB RAM minimum (8 GB recommended)',
 	'500 MB free disk space',
 	'Internet connection for cloud sync',
-	'Mantra MFS100 Fingerprint Scanner (Pro/Enterprise)',
+	'Secu-Hamster Pro 20-AP Fingerprint Scanner (Pro/Enterprise)',
 	'Active subscription plan',
 ];
 
 const DownloadPage = () => {
+	const [checkedRequirements, setCheckedRequirements] = useState<{[key: number]: boolean}>({});
+	const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+
+	const faqs = [
+		{
+			question: 'What if I get a security warning during installation?',
+			answer: 'LoanPro is digitally signed by our developers. If you see a Windows SmartScreen warning, click "More info" then "Run anyway". This is normal for newly released apps.'
+		},
+		{
+			question: 'Can I use LoanPro on Mac or Linux?',
+			answer: 'Currently, LoanPro is only available for Windows (10 and later). We are working on Mac and Linux versions - check back soon!'
+		},
+		{
+			question: 'Do I need a fingerprint scanner?',
+			answer: 'The Secu-Hamster Pro 20-AP fingerprint scanner is required only for the Pro and Enterprise plans for biometric authentication. The Basic plan uses password authentication.'
+		},
+		{
+			question: 'What if I lose my internet connection?',
+			answer: 'LoanPro works offline! Your data is stored locally in SQLite database. Once you reconnect, changes automatically sync with the cloud.'
+		},
+		{
+			question: 'How much data can I store?',
+			answer: 'Basic: 200 MB cloud storage, Pro: 1 GB cloud storage, Enterprise: Unlimited. Local storage depends on your PC.'
+		}
+	];
+
+	const toggleRequirementCheck = (index: number) => {
+		setCheckedRequirements(prev => ({
+			...prev,
+			[index]: !prev[index]
+		}));
+	};
+
 	return (
 		<div className="relative min-h-screen overflow-hidden pt-20">
 			{/* Background Elements */}
@@ -183,62 +217,164 @@ const DownloadPage = () => {
 
 				{/* System Requirements & Installation */}
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-					{/* System Requirements */}
-					<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
-						<h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-3">
+					{/* System Requirements - Interactive Checklist */}
+					<div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-3xl p-8 hover:shadow-lg transition-shadow">
+						<h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center space-x-3">
 							<ComputerDesktopIcon className="w-7 h-7 text-blue-600" />
 							<span>System Requirements</span>
 						</h3>
+						<p className="text-gray-600 text-sm mb-6">Check off your system capabilities before installing:</p>
 						<ul className="space-y-3">
 							{systemRequirements.map((req, idx) => (
-								<li key={idx} className="flex items-center space-x-3">
-									<CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-									<span className="text-gray-700">{req}</span>
+								<li 
+									key={idx}
+									onClick={() => toggleRequirementCheck(idx)}
+									className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all ${
+										checkedRequirements[idx] 
+											? 'bg-green-100 border border-green-300' 
+											: 'bg-white/50 border border-transparent hover:bg-white/80'
+									}`}
+								>
+									<div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+										checkedRequirements[idx]
+											? 'bg-green-500 border-green-500'
+											: 'border-gray-300'
+									}`}>
+										{checkedRequirements[idx] && <CheckIcon className="w-4 h-4 text-white" />}
+									</div>
+									<span className={`${checkedRequirements[idx] ? 'text-gray-900 font-medium line-through opacity-60' : 'text-gray-700'}`}>
+										{req}
+									</span>
 								</li>
 							))}
 						</ul>
+						<div className="mt-6 p-4 bg-green-100 border border-green-300 rounded-xl">
+							<p className="text-sm text-green-900">
+								<strong>✓ Ready to install?</strong> Once all items are checked, you're good to go!
+							</p>
+						</div>
 					</div>
 
 					{/* Installation Instructions */}
-					<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
-						<h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-3">
+					<div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-3xl p-8 hover:shadow-lg transition-shadow">
+						<h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center space-x-3">
 							<RocketLaunchIcon className="w-7 h-7 text-purple-600" />
 							<span>Installation Guide</span>
 						</h3>
+						<p className="text-gray-600 text-sm mb-6">Follow these 4 simple steps:</p>
 						<ol className="space-y-4">
 							<li className="flex items-start space-x-3">
-								<div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
 									1
 								</div>
-								<span className="text-gray-700">
-									Click the <strong>Download for Windows</strong> button above
-								</span>
+								<div>
+									<p className="text-gray-900 font-semibold">Download</p>
+									<p className="text-sm text-gray-600">Click the blue <strong>Download for Windows</strong> button above</p>
+								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
 									2
 								</div>
-								<span className="text-gray-700">
-									Run the downloaded <strong>LoanPro-Setup-1.0.1.exe</strong> file
-								</span>
+								<div>
+									<p className="text-gray-900 font-semibold">Run</p>
+									<p className="text-sm text-gray-600">Open the <strong>LoanPro-Setup-1.0.1.exe</strong> file from your Downloads folder</p>
+								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
 									3
 								</div>
-								<span className="text-gray-700">Follow the installation wizard prompts</span>
+								<div>
+									<p className="text-gray-900 font-semibold">Install</p>
+									<p className="text-sm text-gray-600">Follow the wizard, accept terms, and choose your installation location</p>
+								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
 									4
 								</div>
-								<span className="text-gray-700">Launch LoanPro and sign in with your account</span>
+								<div>
+									<p className="text-gray-900 font-semibold">Launch & Login</p>
+									<p className="text-sm text-gray-600">Open LoanPro and sign in with your account credentials</p>
+								</div>
 							</li>
 						</ol>
+						<div className="mt-6 p-4 bg-blue-100 border border-blue-300 rounded-xl flex items-start gap-3">
+							<ExclamationTriangleIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+							<p className="text-sm text-blue-900">
+								If you get a security warning, that's normal! Click "More info" then "Run anyway"
+							</p>
+						</div>
 					</div>
 				</div>
 
-				{/* Support Section */}
+				{/* Device Binding Walkthrough */}
+				<div className="mb-16">
+					<h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Next: Bind Your Device</h2>
+					<div className="bg-gradient-to-r from-green-100 to-blue-100 border-2 border-green-300 rounded-3xl p-8">
+						<div className="flex items-start gap-4 mb-6">
+							<div className="text-4xl">📱</div>
+							<div>
+								<h3 className="text-2xl font-bold text-gray-900">Device Binding Setup</h3>
+								<p className="text-gray-700">Secure your account with device binding (required for Pro/Enterprise plans)</p>
+							</div>
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+							<div className="bg-white/60 rounded-xl p-4">
+								<div className="text-3xl mb-2">🔧</div>
+								<p className="font-semibold text-gray-900 text-sm mb-1">Connect Scanner</p>
+								<p className="text-xs text-gray-600">Plug in your Secu-Hamster Pro 20-AP fingerprint scanner via USB</p>
+							</div>
+							<div className="bg-white/60 rounded-xl p-4">
+								<div className="text-3xl mb-2">🖐️</div>
+								<p className="font-semibold text-gray-900 text-sm mb-1">Enroll Fingers</p>
+								<p className="text-xs text-gray-600">Scan 4-5 fingers for biometric authentication setup</p>
+							</div>
+							<div className="bg-white/60 rounded-xl p-4">
+								<div className="text-3xl mb-2">🔐</div>
+								<p className="font-semibold text-gray-900 text-sm mb-1">Bind Device</p>
+								<p className="text-xs text-gray-600">Confirm device binding in LoanPro settings</p>
+							</div>
+							<div className="bg-white/60 rounded-xl p-4">
+								<div className="text-3xl mb-2">✅</div>
+								<p className="font-semibold text-gray-900 text-sm mb-1">Start Using</p>
+								<p className="text-xs text-gray-600">Use fingerprint to unlock and manage loans</p>
+							</div>
+						</div>
+						<div className="mt-6 bg-white/80 rounded-xl p-4 border border-green-200">
+							<p className="text-sm text-gray-900">
+								<strong>Need help with device binding?</strong> Go to Settings → Devices in LoanPro, or contact our support team.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				{/* Troubleshooting FAQ */}
+				<div className="mb-16">
+					<h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Troubleshooting & FAQs</h2>
+					<div className="max-w-3xl mx-auto space-y-4">
+						{faqs.map((faq, idx) => (
+							<div 
+								key={idx}
+								className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl overflow-hidden hover:border-white/50 transition-all"
+							>
+								<button
+									onClick={() => setExpandedFAQ(expandedFAQ === idx ? null : idx)}
+									className="w-full flex items-center justify-between p-6 hover:bg-white/10 transition-colors"
+								>
+									<h4 className="text-lg font-semibold text-gray-900 text-left">{faq.question}</h4>
+									<ChevronDownIcon className={`w-5 h-5 text-gray-600 flex-shrink-0 transition-transform ${expandedFAQ === idx ? 'rotate-180' : ''}`} />
+								</button>
+								{expandedFAQ === idx && (
+									<div className="px-6 pb-6 border-t border-white/20 bg-white/5">
+										<p className="text-gray-700">{faq.answer}</p>
+									</div>
+								)}
+							</div>
+						))}
+					</div>
+				</div>
 				<div className="text-center">
 					<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 max-w-2xl mx-auto">
 						<h3 className="text-2xl font-bold text-gray-900 mb-4">Need Help Getting Started?</h3>

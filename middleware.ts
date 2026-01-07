@@ -11,26 +11,91 @@ const protectedRoutes = [
   "/api/upgrade-plan"
 ];
 
+// Allowed origins for CORS (restrict in production)
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://www.loanpro.tech',
+  'https://loanpro.tech',
+];
+
+/**
+ * Check if origin is allowed
+ */
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+/**
+ * Get CORS headers based on origin
+ */
+function getCorsHeaders(origin: string | null) {
+  const isAllowed = isOriginAllowed(origin);
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : '',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Max-Age': '86400', // 24 hours
+  };
+}
+
+/**
+ * Security headers to prevent common vulnerabilities
+ */
+function getSecurityHeaders() {
+  return {
+    // Prevent clickjacking attacks
+    'X-Frame-Options': 'DENY',
+    
+    // Prevent MIME type sniffing
+    'X-Content-Type-Options': 'nosniff',
+    
+    // Enable XSS protection in older browsers
+    'X-XSS-Protection': '1; mode=block',
+    
+    // Control referrer information
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    
+    // Permissions Policy (formerly Feature Policy)
+    'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+    
+    // Content Security Policy - restrict resource loading
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech",
+      "worker-src 'self' blob: https://*.clerk.dev",
+      "style-src 'self' 'unsafe-inline' https://*.razorpay.com",
+      "img-src 'self' data: https: blob:",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https://api.clerk.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev",
+      "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  };
+}
+
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   const pathname = req.nextUrl.pathname;
-
-  // ======== CORS HANDLING FOR ALL ROUTES ======== //
   const origin = req.headers.get('origin');
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
 
-  // Handle OPTIONS (preflight) requests
+  // Get CORS and security headers
+  const corsHeaders = getCorsHeaders(origin);
+  const securityHeaders = getSecurityHeaders();
+
+  // ======== HANDLE PREFLIGHT REQUESTS ======== //
   if (req.method === 'OPTIONS') {
     return new NextResponse(null, { 
       status: 204, 
-      headers: corsHeaders 
+      headers: {
+        ...corsHeaders,
+        ...securityHeaders,
+      }
     });
   }
-  // ======== END CORS HANDLING ======== //
+  // ======== END PREFLIGHT ======== //
 
   // Check if current route requires authentication
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
@@ -40,9 +105,16 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 
-  // Apply CORS headers to all responses
+  // Create response and apply all headers
   const response = NextResponse.next();
+  
+  // Apply CORS headers
   Object.entries(corsHeaders).forEach(([key, value]) => {
+    if (value) response.headers.set(key, value);
+  });
+  
+  // Apply security headers
+  Object.entries(securityHeaders).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
 

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import Razorpay from 'razorpay';
+import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
+import { validateCancellationRequest } from '@/lib/validation';
+import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
+import { logger } from '@/lib/logger';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -10,16 +14,17 @@ const razorpay = new Razorpay({
 
 // Plan pricing (monthly rates)
 const PLAN_PRICES = {
-  basic: 499,
-  pro: 999,
-  enterprise: 1499
+  basic: 699,
+  pro: 833,
+  enterprise: 979
 };
 
-// Payment gateway fee (5% + fixed amount)
-const GATEWAY_FEE_PERCENTAGE = 0.05; // 5%
-const GATEWAY_FIXED_FEE = 5; // ₹5 fixed fee
+// Payment gateway fee (2.5% + fixed amount) - matches actual Razorpay charges
+const GATEWAY_FEE_PERCENTAGE = 0.025; // 2.5%
+const GATEWAY_FIXED_FEE = 3; // ₹3 fixed fee (Razorpay standard)
 
 function calculateGatewayFee(amount: number): number {
+  // Amount is in rupees, return gateway fee in rupees
   return Math.round((amount * GATEWAY_FEE_PERCENTAGE) + GATEWAY_FIXED_FEE);
 }
 
@@ -64,13 +69,47 @@ function calculateRefundAmount(
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
+    // Authentication check
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      logger.warn('Unauthorized cancellation attempt', 'CANCEL_SUBSCRIPTION');
+      return errorResponse(ApiErrors.UNAUTHORIZED);
     }
 
-    const { reason = 'user_requested' } = await request.json();
+    // Rate limiting - prevent rapid cancellation attempts
+    const rateLimitKey = `cancel-subscription:${userId}`;
+    if (!checkRateLimit(rateLimitKey, 5, 60000)) { // 5 per minute
+      logger.warn('Rate limit exceeded for cancellation', 'CANCEL_SUBSCRIPTION', { userId });
+      return errorResponse(ApiErrors.RATE_LIMIT);
+    }
+
+    // Validate request body
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse({
+        code: 'INVALID_JSON',
+        message: 'Invalid JSON in request body',
+        statusCode: 400,
+      });
+    }
+
+    const validation = validateCancellationRequest(body);
+    if (!validation.isValid()) {
+      return errorResponse({
+        code: 'VALIDATION_ERROR',
+        message: validation.getFirstError()?.message || 'Validation failed',
+        statusCode: 400,
+      });
+    }
+
+    const { reason = 'user_requested' } = body;
+    
+    logger.info('Processing subscription cancellation', 'CANCEL_SUBSCRIPTION', { userId, reason });
     
     const { db } = await connectToDatabase();
     
@@ -112,18 +151,48 @@ export async function POST(request: NextRequest) {
     const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     const daysUsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Get original payment amount from payment history
-    const paymentHistory = await db.collection('payments').findOne({
-      userId,
-      $or: [
-        { subscriptionId: currentSubscription._id.toString() },
-        { razorpayOrderId: { $exists: true } }
-      ],
-      status: 'completed'
-    }) || await db.collection('payments').findOne({
-      userId,
-      status: 'completed'
-    }, { sort: { _id: -1 } });
+    // Get original payment amount from subscription record or payment history
+    // Priority 1: Check if subscription has paymentId stored directly
+    let paymentHistory = null;
+    
+    if (currentSubscription.paymentId) {
+      // Direct lookup by payment ID stored in subscription
+      paymentHistory = await db.collection('payments').findOne({
+        paymentId: currentSubscription.paymentId,
+        status: 'completed'
+      });
+      logger.info('Payment found by subscription paymentId', 'CANCEL_SUBSCRIPTION', { 
+        paymentId: currentSubscription.paymentId 
+      });
+    }
+    
+    if (!paymentHistory) {
+      // Priority 2: Try to find by subscription ID
+      paymentHistory = await db.collection('payments').findOne({
+        userId,
+        subscriptionId: currentSubscription._id.toString(),
+        status: 'completed'
+      });
+      if (paymentHistory) {
+        logger.info('Payment found by subscriptionId', 'CANCEL_SUBSCRIPTION');
+      }
+    }
+    
+    if (!paymentHistory) {
+      // Priority 3: Fallback to most recent completed payment for this user
+      // (less reliable but better than nothing)
+      paymentHistory = await db.collection('payments').findOne({
+        userId,
+        status: 'completed'
+      }, { sort: { createdAt: -1, _id: -1 } });
+      
+      if (paymentHistory) {
+        logger.warn('Using most recent payment as fallback', 'CANCEL_SUBSCRIPTION', {
+          userId,
+          paymentId: paymentHistory.paymentId
+        });
+      }
+    }
     
     if (!paymentHistory) {
       // If no payment history found, handle as trial or free subscription
@@ -255,15 +324,39 @@ export async function POST(request: NextRequest) {
     
     // Determine refund message based on amount and test mode
     let refundMessage = 'Subscription cancelled successfully.';
-    if (refundCalculation.netRefund > 0) {
-      if (process.env.NODE_ENV === 'development' || process.env.RAZORPAY_KEY_ID?.includes('test')) {
-        refundMessage += ` Refund of ₹${refundCalculation.netRefund} will be processed manually within 3-5 business days (Test Mode).`;
-      } else {
-        refundMessage += ` Refund of ₹${refundCalculation.netRefund} has been initiated and will be processed within 3-5 business days.`;
-      }
+    const hasRefund = refundCalculation.netRefund > 0;
+    
+    if (hasRefund) {
+      const isTestMode = process.env.NODE_ENV === 'development' || process.env.RAZORPAY_KEY_ID?.includes('test');
+      
+      refundMessage = `Subscription Cancelled Successfully\n\n` +
+        `REFUND DETAILS:\n` +
+        `Total Paid: ₹${refundCalculation.totalPaid}\n` +
+        `Days Used: ${refundCalculation.daysUsed} of ${refundCalculation.daysUsed + refundCalculation.daysRemaining}\n` +
+        `Gross Refund: ₹${refundCalculation.grossRefund}\n` +
+        `Gateway Fee Deduction: ₹${refundCalculation.gatewayFeeDeduction}\n` +
+        `Net Refund Amount: ₹${refundCalculation.netRefund}\n\n` +
+        `Processing Time: 3-5 business days\n` +
+        `Cancellation ID: ${cancellationResult.insertedId.toString()}\n` +
+        (razorpayRefund?.id ? `Razorpay Refund ID: ${razorpayRefund.id}\n` : '') +
+        (isTestMode ? '\nTest Mode: Refund will be processed manually' : '');
     } else {
-      refundMessage += ' No refund applicable for this cancellation.';
+      refundMessage += ' No refund applicable (subscription used fully or trial period).';
     }
+    
+    // Log cancellation for admin review
+    console.log('\n========== CANCELLATION RECORD ==========');
+    console.log('Cancellation ID:', cancellationResult.insertedId.toString());
+    console.log('User ID:', userId);
+    console.log('Plan:', currentSubscription.subscriptionType || currentSubscription.plan || 'unknown');
+    console.log('Original Payment ID:', paymentHistory?.razorpayPaymentId || paymentHistory?.paymentId || 'unknown');
+    console.log('Total Paid:', refundCalculation.totalPaid);
+    console.log('Days Used:', refundCalculation.daysUsed);
+    console.log('Days Remaining:', refundCalculation.daysRemaining);
+    console.log('Net Refund Amount:', refundCalculation.netRefund);
+    console.log('Razorpay Refund ID:', razorpayRefund?.id || 'Not created');
+    console.log('Status: Pending Manual Review');
+    console.log('========================================\n');
 
     return NextResponse.json({
       success: true,
@@ -272,7 +365,14 @@ export async function POST(request: NextRequest) {
       refundCalculation,
       razorpayRefundId: razorpayRefund?.id || null,
       testMode: process.env.NODE_ENV === 'development' || process.env.RAZORPAY_KEY_ID?.includes('test'),
-      estimatedProcessingTime: refundCalculation.netRefund > 0 ? '3-5 business days' : 'N/A'
+      estimatedProcessingTime: hasRefund ? '3-5 business days' : 'N/A',
+      adminInfo: {
+        userId,
+        userEmail: 'Check Clerk Dashboard',
+        originalPaymentId: paymentHistory?.razorpayPaymentId || paymentHistory?.paymentId,
+        refundAmount: refundCalculation.netRefund,
+        cancellationDate: new Date().toISOString()
+      }
     });
     
   } catch (error) {
@@ -285,6 +385,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -366,42 +468,46 @@ export async function GET(request: NextRequest) {
       searchedFor: { userId, status: 'completed' }
     });
     
-    // If no payment in payments collection, check users collection for payment info
+    // If no payment in payments collection, estimate based on subscription data
     if (!paymentHistory) {
-      const userRecord = await db.collection('users').findOne({ userId });
-      console.log('Cancel GET - User record check:', {
-        found: !!userRecord,
-        subscriptionPlan: userRecord?.subscriptionPlan,
-        subscriptionType: userRecord?.subscriptionType,
-        billingPeriod: userRecord?.billingPeriod
+      console.log('Cancel GET - No payment found, estimating from subscription:', {
+        subscriptionPlan: currentSubscription?.subscriptionPlan,
+        plan: currentSubscription?.plan,
+        subscriptionType: currentSubscription?.subscriptionType,
+        billingPeriod: currentSubscription?.billingPeriod
       });
       
-      // For annual Pro plan, estimate payment amount based on plan and billing period
-      if (userRecord?.subscriptionPlan && userRecord?.billingPeriod) {
-        const planName = userRecord.subscriptionPlan.toLowerCase();
-        const monthlyPrice = (PLAN_PRICES as any)[planName] || PLAN_PRICES.pro; // default to pro if not found
-        const estimatedAmount = userRecord.billingPeriod === 'annually' 
-          ? Math.round(monthlyPrice * 12 * 0.85) // Annual with 15% discount
-          : monthlyPrice;
-          
-        console.log('Cancel GET - Estimated payment:', {
-          plan: planName,
-          billingPeriod: userRecord.billingPeriod,
-          monthlyPrice,
-          estimatedAmount
-        });
+      // Extract plan name from subscription record (check multiple possible field names)
+      const planName = (currentSubscription?.subscriptionPlan || 
+                       currentSubscription?.plan || 
+                       currentSubscription?.subscriptionType || 
+                       'pro').toLowerCase();
+      
+      // Extract billing period from subscription record
+      const subBillingPeriod = currentSubscription?.billingPeriod || 'annually';
+      
+      const monthlyPrice = (PLAN_PRICES as any)[planName] || PLAN_PRICES.pro;
+      const estimatedAmount = subBillingPeriod === 'annually' 
+        ? Math.round(monthlyPrice * 12 * 0.85) // Annual with 15% discount
+        : monthlyPrice;
         
-        // Create a synthetic payment record for calculation
-        paymentHistory = {
-          amount: estimatedAmount,
-          userId,
-          plan: userRecord.subscriptionPlan,
-          billingPeriod: userRecord.billingPeriod
-        } as any;
-      }
+      console.log('Cancel GET - Estimated payment from subscription:', {
+        plan: planName,
+        billingPeriod: subBillingPeriod,
+        monthlyPrice,
+        estimatedAmount
+      });
+      
+      // Create a synthetic payment record for calculation
+      paymentHistory = {
+        amount: estimatedAmount,
+        userId,
+        plan: planName,
+        billingPeriod: subBillingPeriod
+      } as any;
     }
     
-    if (!paymentHistory) {
+    if (!paymentHistory || !paymentHistory.amount) {
       // Calculate days for display even without payment
       const startDate = new Date(currentSubscription.startDate);
       const endDate = new Date(currentSubscription.endDate || currentSubscription.expiryDate);
@@ -431,18 +537,33 @@ export async function GET(request: NextRequest) {
     }
     
     const originalAmount = paymentHistory.amount;
-    const billingPeriod = currentSubscription.billingPeriod || 'monthly';
+    const billingPeriod = currentSubscription.billingPeriod || paymentHistory.billingPeriod || 'monthly';
+    
+    // Get plan name with fallback checks
+    const planName = currentSubscription.subscriptionType || 
+                     currentSubscription.plan || 
+                     currentSubscription.subscriptionPlan || 
+                     paymentHistory.plan || 
+                     'basic';
     
     // Calculate potential refund
     const refundCalculation = calculateRefundAmount(
-      currentSubscription.subscriptionType || currentSubscription.plan,
+      planName,
       daysUsed,
       totalDays,
       originalAmount,
       billingPeriod
     );
     
-    return NextResponse.json({
+    const duration = Date.now() - startTime;
+
+    logger.info('Cancellation details calculated', 'CANCEL_SUBSCRIPTION', { 
+      userId, 
+      duration,
+      hasRefund: refundCalculation.netRefund > 0 
+    });
+
+    return successResponse({
       subscription: {
         plan: currentSubscription.subscriptionType || currentSubscription.plan,
         startDate: currentSubscription.startDate,
@@ -453,10 +574,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Cancel calculation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to calculate cancellation details' },
-      { status: 500 }
-    );
+    logger.error('Cancel calculation failed', error, 'CANCEL_SUBSCRIPTION', { userId });
+    return errorResponse(ApiErrors.INTERNAL_ERROR);
   }
 } 

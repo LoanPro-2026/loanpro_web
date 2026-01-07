@@ -20,7 +20,7 @@ export class SubscriptionService {
     return endDate;
   }
 
-  async createSubscription(data: CreateSubscriptionDTO): Promise<Subscription> {
+  async createSubscription(data: CreateSubscriptionDTO, session?: any): Promise<Subscription> {
     const client = await clientPromise;
     const db = client.db('AdminDB');
     
@@ -35,7 +35,10 @@ export class SubscriptionService {
       updatedAt: new Date()
     };
 
-    const result = await db.collection(this.collection).insertOne(subscription);
+    const result = await db.collection(this.collection).insertOne(
+      subscription,
+      session ? { session } : {}
+    );
     return { ...subscription, _id: result.insertedId } as Subscription;
   }
 

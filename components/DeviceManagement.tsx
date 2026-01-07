@@ -34,6 +34,7 @@ const DeviceManagement = () => {
   const [deviceUsage, setDeviceUsage] = useState<DeviceUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revokesInfo, setRevokesInfo] = useState<{ used: number; remaining: number; max: number } | null>(null);
 
   useEffect(() => {
     fetchDevices();
@@ -91,6 +92,7 @@ const DeviceManagement = () => {
       
       // Show success message with remaining revokes
       alert(`Device revoked successfully!\n\nThe device has been completely removed from your account and will need to be re-authorized to access your data again.\n\nRevokes this month: ${data.revokesThisMonth}/${data.maxRevokesPerMonth}\nRemaining revokes: ${data.remainingRevokes}`);
+      setRevokesInfo({ used: data.revokesThisMonth, remaining: data.remainingRevokes, max: data.maxRevokesPerMonth });
       
       // Refresh data
       fetchDevices();
@@ -150,11 +152,23 @@ const DeviceManagement = () => {
       <div className="flex items-center gap-3 mb-6">
         <DevicesIcon className="text-2xl text-blue-600" />
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Device Management</h2>
+        {revokesInfo && (
+          <span className="ml-auto text-sm px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+            Revokes: {revokesInfo.used}/{revokesInfo.max} • Remaining {revokesInfo.remaining}
+          </span>
+        )}
       </div>
 
       {devices.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          No devices registered yet. Install and sign in to the desktop app to see devices here.
+          <p className="mb-3">No devices registered yet.</p>
+          <p className="text-sm text-gray-600 mb-4">Install and sign in to the desktop app to register your first device.</p>
+          <a
+            href="/download"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:shadow-md transition"
+          >
+            Download desktop app
+          </a>
         </div>
       ) : (
         <div className="space-y-4">

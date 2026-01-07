@@ -10,6 +10,8 @@ const plans = [
     originalPrice: '₹899',
     period: '/month',
     description: 'Essential features for small loan businesses',
+    deviceLimit: 1,
+    storage: 'Local only',
     features: [
       'All core features included',
       'Limited customer support',
@@ -30,6 +32,8 @@ const plans = [
     originalPrice: '₹1,299',
     period: '/month',
     description: 'Most popular choice for growing loan businesses',
+    deviceLimit: 1,
+    storage: '1 GB cloud',
     features: [
       'All features included',
       'Limited cloud database (1GB)',
@@ -49,6 +53,8 @@ const plans = [
     originalPrice: '₹1,999',
     period: '/month',
     description: 'Complete solution for large organizations',
+    deviceLimit: 2,
+    storage: 'Unlimited cloud',
     features: [
       'All features included',
       'Unlimited cloud support',
@@ -161,6 +167,10 @@ const PricingSection = () => (
                       <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-sm font-medium">
                         Save {Math.round((1 - parseInt(plan.price.replace('₹', '').replace(',', '')) / parseInt(plan.originalPrice.replace('₹', '').replace(',', ''))) * 100)}%
                       </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-center gap-3 text-xs text-gray-700">
+                      <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700">{plan.deviceLimit} device{plan.deviceLimit > 1 ? 's' : ''}</span>
+                      <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700">{plan.storage}</span>
                     </div>
                   </div>
                 </div>
