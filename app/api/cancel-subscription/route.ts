@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
-  let userId: string | undefined;
+  let userId: string | null = null;
   
   try {
     const authResult = await auth();
