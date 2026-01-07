@@ -32,12 +32,12 @@ async function verifyAdmin() {
 
 export async function POST(
   request: Request,
-  { params }: { params: { subscriptionId: string; action: string } }
+  { params }: { params: Promise<{ subscriptionId: string; action: string }> }
 ) {
   try {
     await verifyAdmin();
 
-    const { subscriptionId, action } = params;
+    const { subscriptionId, action } = await params;
     const { db } = await connectToDatabase();
 
     if (!ObjectId.isValid(subscriptionId)) {
