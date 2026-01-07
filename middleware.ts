@@ -89,10 +89,10 @@ export default clerkMiddleware(async (auth, req) => {
   if (req.method === 'OPTIONS') {
     return new NextResponse(null, { 
       status: 204, 
-      headers: {
+      headers: new Headers({
         ...corsHeaders,
         ...securityHeaders,
-      }
+      })
     });
   }
   // ======== END PREFLIGHT ======== //
