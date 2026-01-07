@@ -34,7 +34,7 @@ function getCorsHeaders(origin: string | null) {
   const isAllowed = isOriginAllowed(origin);
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : '',
+    'Access-Control-Allow-Origin': isAllowed && origin ? origin : 'null',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
     'Access-Control-Max-Age': '86400', // 24 hours
@@ -87,12 +87,10 @@ export default clerkMiddleware(async (auth, req) => {
 
   // ======== HANDLE PREFLIGHT REQUESTS ======== //
   if (req.method === 'OPTIONS') {
+    const allHeaders = { ...corsHeaders, ...securityHeaders };
     return new NextResponse(null, { 
       status: 204, 
-      headers: new Headers({
-        ...corsHeaders,
-        ...securityHeaders,
-      })
+      headers: allHeaders
     });
   }
   // ======== END PREFLIGHT ======== //
