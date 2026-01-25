@@ -36,9 +36,8 @@ yarn-error.log*
 # vercel
 .vercel
 
-# Electron app releases (large files)
+# Electron app releases (large .exe files only - yml is needed)
 /public/downloads/*.exe
-/public/downloads/latest.yml
 
 # typescript
 *.tsbuildinfo
