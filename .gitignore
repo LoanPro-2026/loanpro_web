@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Electron app releases (large files)
+/public/downloads/*.exe
+/public/downloads/latest.yml
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
