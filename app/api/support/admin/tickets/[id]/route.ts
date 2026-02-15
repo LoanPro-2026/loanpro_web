@@ -15,7 +15,7 @@ function isAdmin(req: NextRequest): boolean {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     if (!isAdmin(req)) {
@@ -25,7 +25,8 @@ export async function GET(
       );
     }
 
-    const ticketId = params.id;
+    const { id } = await params;
+    const ticketId = id;
     await clientPromise;
 
     const ticket = await SupportTicket.findOne({ ticketId }).lean();
@@ -63,7 +64,7 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     if (!isAdmin(req)) {
@@ -73,7 +74,8 @@ export async function PATCH(
       );
     }
 
-    const ticketId = params.id;
+    const { id } = await params;
+    const ticketId = id;
     const body = await req.json();
     const { status, priority, message, adminName, assignedTo, tags } = body;
 

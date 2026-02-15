@@ -9,10 +9,11 @@ import emailService from '@/services/emailService';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ticketId = params.id;
+    const { id } = await params;
+    const ticketId = id;
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
 
@@ -68,10 +69,11 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ticketId = params.id;
+    const { id } = await params;
+    const ticketId = id;
     const body = await req.json();
     const { userId, message } = body;
 

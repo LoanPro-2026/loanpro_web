@@ -126,7 +126,9 @@ class EmailService {
 
       const sendSmtpEmail = {
         sender: { email: 'support@loanpro.tech', name: 'LoanPro Support System' },
-        to: [{ email: process.env.ADMIN_EMAIL || 'admin@loanpro.tech' }],
+        to: (process.env.ADMIN_EMAILS || 'admin@loanpro.tech')
+          .split(',')
+          .map(email => ({ email: email.trim() })),
         subject: `🎫 New Support Ticket: ${ticket.ticketId} - ${ticket.subject}`,
         htmlContent
       };
@@ -267,7 +269,7 @@ class EmailService {
       const sendSmtpEmail = {
         sender: { email: 'support@loanpro.tech', name: 'LoanPro Support' },
         to: [{ email: data.userEmail, name: data.userName }],
-        replyTo: { email: process.env.ADMIN_EMAIL || 'support@loanpro.tech' },
+        replyTo: { email: (process.env.ADMIN_EMAILS || 'support@loanpro.tech').split(',')[0].trim() },
         subject: `Ticket ${data.ticketId} - Update on your support request`,
         htmlContent
       };

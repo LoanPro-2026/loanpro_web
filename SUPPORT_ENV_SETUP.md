@@ -6,8 +6,9 @@
 BREVO_API_KEY=
 
 # 2. Admin Configuration
-# Email address where you want to receive support ticket notifications
-ADMIN_EMAIL=
+# Email address(es) where you want to receive support ticket notifications
+# You can specify multiple emails separated by commas: email1@domain.com,email2@domain.com
+ADMIN_EMAILS=
 
 # 3. Admin API Security
 # Generate a random secure token for admin API authentication
