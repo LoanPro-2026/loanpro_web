@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
+import clientPromise from '@/lib/mongodb';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    await connectDB();
+    await clientPromise;
 
     // Build query
     const query: any = {};
