@@ -128,7 +128,7 @@ SupportTicketSchema.index({ status: 1, createdAt: -1 });
 SupportTicketSchema.index({ userId: 1, createdAt: -1 });
 
 // Generate unique ticket ID
-SupportTicketSchema.pre('save', async function() {
+SupportTicketSchema.pre('validate', async function() {
   if (this.isNew && !this.ticketId) {
     const date = new Date();
     const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
