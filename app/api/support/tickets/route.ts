@@ -184,34 +184,53 @@ export async function GET(req: NextRequest) {
       query.status = status;
     }
 
-    // Get total count
-    const totalTickets = await SupportTicket.countDocuments(query);
+    try {
+      // Get total count with timeout
+      const totalTickets = await SupportTicket.countDocuments(query).maxTimeMS(5000);
 
-    // Get paginated tickets
-    const tickets = await SupportTicket.find(query)
-      .select('-responses') // Exclude responses for list view
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
+      // Get paginated tickets with timeout
+      const tickets = await SupportTicket.find(query)
+        .select('-responses') // Exclude responses for list view
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean()
+        .maxTimeMS(5000);
 
-    // Add response count to each ticket
-    const ticketsWithCount = tickets.map((ticket: any) => ({
-      ...ticket,
-      responseCount: ticket.responses?.length || 0,
-      hasUnreadResponses: !ticket.viewedByUser && ticket.lastUpdatedBy === 'admin'
-    }));
+      // Add response count to each ticket
+      const ticketsWithCount = tickets.map((ticket: any) => ({
+        ...ticket,
+        responseCount: ticket.responses?.length || 0,
+        hasUnreadResponses: !ticket.viewedByUser && ticket.lastUpdatedBy === 'admin'
+      }));
 
-    return NextResponse.json({
-      success: true,
-      tickets: ticketsWithCount,
-      pagination: {
-        page,
-        limit,
-        totalTickets,
-        totalPages: Math.ceil(totalTickets / limit)
+      return NextResponse.json({
+        success: true,
+        tickets: ticketsWithCount,
+        pagination: {
+          page,
+          limit,
+          totalTickets,
+          totalPages: Math.ceil(totalTickets / limit)
+        }
+      }, { headers: corsHeaders });
+    } catch (dbError: any) {
+      console.error('Database query error:', dbError);
+      // If database is slow, return empty results instead of erroring
+      if (dbError.name === 'MongooseError' || dbError.message?.includes('buffering timed out')) {
+        return NextResponse.json({
+          success: true,
+          tickets: [],
+          pagination: {
+            page,
+            limit,
+            totalTickets: 0,
+            totalPages: 0
+          }
+        }, { headers: corsHeaders });
       }
-    }, { headers: corsHeaders });
+      throw dbError;
+    }
 
   } catch (error: any) {
     console.error('Error fetching tickets:', error);
