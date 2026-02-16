@@ -3,12 +3,23 @@ import clientPromise from '@/lib/mongodb';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+
+/**
+ * OPTIONS /api/support/tickets
+ * Handle CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsPreFlight(req);
+}
 
 /**
  * POST /api/support/tickets
  * Create a new support ticket
  */
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     // Rate limiting check: 5 tickets per hour
     const identifier = req.headers.get('x-user-id') || req.headers.get('x-forwarded-for') || 'anonymous';
@@ -17,7 +28,7 @@ export async function POST(req: NextRequest) {
     if (!allowed) {
       return NextResponse.json(
         { success: false, error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429 }
+        { status: 429, headers: corsHeaders }
       );
     }
 
@@ -40,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (!userId || !userEmail || !userName || !subject || !description || !issueType || !appVersion) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -49,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (!validIssueTypes.includes(issueType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid issue type' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -58,7 +69,7 @@ export async function POST(req: NextRequest) {
     if (priority && !validPriorities.includes(priority)) {
       return NextResponse.json(
         { success: false, error: 'Invalid priority' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -116,13 +127,14 @@ export async function POST(req: NextRequest) {
         status: ticket.status,
         createdAt: ticket.createdAt
       }
-    }, { status: 201 });
+    }, { status: 201, headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Error creating support ticket:', error);
+    const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       { success: false, error: 'Failed to create ticket', details: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -132,6 +144,8 @@ export async function POST(req: NextRequest) {
  * Get all tickets for a user
  */
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get('userId');
@@ -142,7 +156,7 @@ export async function GET(req: NextRequest) {
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'userId is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -181,13 +195,14 @@ export async function GET(req: NextRequest) {
         totalTickets,
         totalPages: Math.ceil(totalTickets / limit)
       }
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Error fetching tickets:', error);
+    const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch tickets', details: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

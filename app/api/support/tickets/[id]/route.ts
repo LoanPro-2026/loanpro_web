@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+
+/**
+ * OPTIONS /api/support/tickets/[id]
+ * Handle CORS preflight
+ */
+export async function OPTIONS(req: NextRequest) {
+  return handleCorsPreFlight(req);
+}
 
 /**
  * GET /api/support/tickets/[id]
@@ -11,6 +20,8 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     const { id } = await params;
     const ticketId = id;
@@ -20,7 +31,7 @@ export async function GET(
     if (!userId) {
       return NextResponse.json(
         { success: false, error: 'userId is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -31,7 +42,7 @@ export async function GET(
     if (!ticket) {
       return NextResponse.json(
         { success: false, error: 'Ticket not found' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -39,7 +50,7 @@ export async function GET(
     if (ticket.userId !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
@@ -52,13 +63,14 @@ export async function GET(
     return NextResponse.json({
       success: true,
       ticket
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Error fetching ticket:', error);
+    const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch ticket', details: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -71,6 +83,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const corsHeaders = getCorsHeaders(req);
+  
   try {
     const { id } = await params;
     const ticketId = id;
@@ -80,7 +94,7 @@ export async function PATCH(
     if (!userId || !message) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -91,7 +105,7 @@ export async function PATCH(
     if (!ticket) {
       return NextResponse.json(
         { success: false, error: 'Ticket not found' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -99,7 +113,7 @@ export async function PATCH(
     if (ticket.userId !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
-        { status: 403 }
+        { status: 403, headers: corsHeaders }
       );
     }
 
@@ -139,13 +153,14 @@ export async function PATCH(
         status: ticket.status,
         updatedAt: ticket.updatedAt
       }
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Error updating ticket:', error);
+    const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       { success: false, error: 'Failed to update ticket', details: error.message },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

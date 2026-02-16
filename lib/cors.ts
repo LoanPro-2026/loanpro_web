@@ -16,7 +16,8 @@ const ALLOWED_ORIGINS = [
  * Check if an origin is allowed
  */
 export function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
+  // Allow requests with no origin (Electron apps, mobile apps, etc.)
+  if (!origin || origin === 'null' || origin.startsWith('file://')) return true;
   return ALLOWED_ORIGINS.includes(origin);
 }
 
@@ -28,13 +29,15 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const isAllowed = isOriginAllowed(origin);
 
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-user-id, x-admin-token',
     'Access-Control-Max-Age': '86400', // 24 hours
   };
 
-  if (isAllowed && origin) {
-    headers['Access-Control-Allow-Origin'] = origin;
+  if (isAllowed) {
+    // Allow all origins for desktop/mobile apps or set specific origin for web
+    headers['Access-Control-Allow-Origin'] = origin || '*';
+    headers['Access-Control-Allow-Credentials'] = 'true';
   }
 
   return headers;
