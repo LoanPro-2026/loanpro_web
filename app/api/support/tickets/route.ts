@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Reject invalid userId (from incomplete auth setup)
-    if (userId === 'unknown' || userId.trim() === '') {
+    // Reject only if userId is explicitly 'unknown'
+    if (userId === 'unknown') {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
