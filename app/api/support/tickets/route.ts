@@ -156,20 +156,20 @@ export async function GET(req: NextRequest) {
   
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
+    const userEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId');
     const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    if (!userId) {
+    if (!userEmail) {
       return NextResponse.json(
-        { success: false, error: 'userId is required' },
+        { success: false, error: 'userEmail or userId is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
     // Reject invalid userId (from incomplete auth setup)
-    if (userId === 'unknown' || userId.trim() === '') {
+    if (userEmail === 'unknown' || userEmail.trim() === '') {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
     await clientPromise;
 
     // Build query - use userEmail instead of userId since that's where the email is stored
-    const query: any = { userEmail: userId }; // userId param contains the email value
+    const query: any = { userEmail: userEmail }; // userId param may contain the email value
     if (status && status !== 'all') {
       query.status = status;
     }

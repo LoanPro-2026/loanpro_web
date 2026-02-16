@@ -26,17 +26,17 @@ export async function GET(
     const { id } = await params;
     const ticketId = id;
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
+    const userEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId');
 
-    if (!userId) {
+    if (!userEmail) {
       return NextResponse.json(
-        { success: false, error: 'userId is required' },
+        { success: false, error: 'userEmail or userId is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
     // Reject only if userId is explicitly 'unknown'
-    if (userId === 'unknown') {
+    if (userEmail === 'unknown') {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -55,7 +55,7 @@ export async function GET(
     }
 
     // Verify ownership - check userEmail instead of userId since userId param contains the email
-    if (ticket.userEmail !== userId) {
+    if (ticket.userEmail !== userEmail) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }
@@ -97,9 +97,10 @@ export async function PATCH(
     const { id } = await params;
     const ticketId = id;
     const body = await req.json();
-    const { userId, message } = body;
+    const { userId, userEmail, message } = body;
+    const requesterEmail = userEmail || userId;
 
-    if (!userId || !message) {
+    if (!requesterEmail || !message) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
@@ -107,7 +108,7 @@ export async function PATCH(
     }
 
     // Reject only if userId is explicitly 'unknown'
-    if (userId === 'unknown') {
+    if (requesterEmail === 'unknown') {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -126,7 +127,7 @@ export async function PATCH(
     }
 
     // Verify ownership - check userEmail instead of userId since userId param contains the email
-    if (ticket.userEmail !== userId) {
+    if (ticket.userEmail !== requesterEmail) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }
