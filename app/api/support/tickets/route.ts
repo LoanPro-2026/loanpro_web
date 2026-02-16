@@ -55,6 +55,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Reject invalid userId (from incomplete auth setup)
+    if (userId === 'unknown' || userId.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid user authentication. Please log in again.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     // Validate issue type
     const validIssueTypes = ['bug', 'feature', 'question', 'billing', 'other'];
     if (!validIssueTypes.includes(issueType)) {
@@ -157,6 +165,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'userId is required' },
         { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Reject invalid userId (from incomplete auth setup)
+    if (userId === 'unknown' || userId.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid user authentication. Please log in again.' },
+        { status: 401, headers: corsHeaders }
       );
     }
 

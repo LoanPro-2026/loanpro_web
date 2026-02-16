@@ -35,6 +35,14 @@ export async function GET(
       );
     }
 
+    // Reject invalid userId (from incomplete auth setup)
+    if (userId === 'unknown' || userId.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid user authentication. Please log in again.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     await clientPromise;
 
     const ticket = await SupportTicket.findOne({ ticketId }).lean();
@@ -95,6 +103,14 @@ export async function PATCH(
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Reject invalid userId (from incomplete auth setup)
+    if (userId === 'unknown' || userId.trim() === '') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid user authentication. Please log in again.' },
+        { status: 401, headers: corsHeaders }
       );
     }
 
