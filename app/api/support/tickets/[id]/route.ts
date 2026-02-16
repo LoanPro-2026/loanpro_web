@@ -54,8 +54,8 @@ export async function GET(
       );
     }
 
-    // Verify ownership
-    if (ticket.userId !== userId) {
+    // Verify ownership - check userEmail instead of userId since userId param contains the email
+    if (ticket.userEmail !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }
@@ -125,8 +125,8 @@ export async function PATCH(
       );
     }
 
-    // Verify ownership
-    if (ticket.userId !== userId) {
+    // Verify ownership - check userEmail instead of userId since userId param contains the email
+    if (ticket.userEmail !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }

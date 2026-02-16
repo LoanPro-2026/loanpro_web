@@ -178,8 +178,8 @@ export async function GET(req: NextRequest) {
 
     await clientPromise;
 
-    // Build query
-    const query: any = { userId };
+    // Build query - use userEmail instead of userId since that's where the email is stored
+    const query: any = { userEmail: userId }; // userId param contains the email value
     if (status && status !== 'all') {
       query.status = status;
     }
