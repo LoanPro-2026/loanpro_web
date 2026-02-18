@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * GET /api/admin/get-token
- * Returns the admin secret token for authenticated admin users
+ * GET /api/admin/verify
+ * Returns a token for the admin to use with support tickets API
  * The admin must have already authenticated with password on the admin panel
  */
 export async function GET(req: NextRequest) {

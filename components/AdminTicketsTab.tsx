@@ -60,7 +60,7 @@ const AdminTicketsTab: React.FC<AdminTicketsTabProps> = () => {
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const res = await fetch('/api/admin/get-token');
+        const res = await fetch('/api/admin/get-admin-token');
         if (res.ok) {
           const data = await res.json();
           setAdminToken(data.token);
