@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 
@@ -27,7 +27,7 @@ export async function GET(
 
     const { id } = await params;
     const ticketId = id;
-    await clientPromise;
+    await connectMongoose();
 
     const ticket = await SupportTicket.findOne({ ticketId }).lean();
 
@@ -79,7 +79,7 @@ export async function PATCH(
     const body = await req.json();
     const { status, priority, message, adminName, assignedTo, tags } = body;
 
-    await clientPromise;
+    await connectMongoose();
 
     const ticket = await SupportTicket.findOne({ ticketId });
 
