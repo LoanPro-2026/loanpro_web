@@ -43,10 +43,10 @@ interface TicketStats {
 }
 
 interface AdminTicketsTabProps {
-  adminToken: string;
+  // No props needed - token fetched automatically
 }
 
-const AdminTicketsTab: React.FC<AdminTicketsTabProps> = ({ adminToken }) => {
+const AdminTicketsTab: React.FC<AdminTicketsTabProps> = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [stats, setStats] = useState<TicketStats>({ open: 0, 'in-progress': 0, resolved: 0, closed: 0 });
   const [loading, setLoading] = useState(true);
@@ -55,10 +55,29 @@ const AdminTicketsTab: React.FC<AdminTicketsTabProps> = ({ adminToken }) => {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [reply, setReply] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
+  const [adminToken, setAdminToken] = useState('');
 
   useEffect(() => {
-    fetchTickets();
-  }, [statusFilter]);
+    const fetchToken = async () => {
+      try {
+        const res = await fetch('/api/admin/get-token');
+        if (res.ok) {
+          const data = await res.json();
+          setAdminToken(data.token);
+        }
+      } catch (error) {
+        console.error('Error fetching admin token:', error);
+      }
+    };
+
+    fetchToken();
+  }, []);
+
+  useEffect(() => {
+    if (adminToken) {
+      fetchTickets();
+    }
+  }, [statusFilter, adminToken]);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -286,7 +305,7 @@ const AdminTicketsTab: React.FC<AdminTicketsTabProps> = ({ adminToken }) => {
               {loading ? (
                 <div className="p-4 text-center text-gray-400">
                   <ArrowPathIcon className="w-5 h-5 animate-spin mx-auto mb-2" />
-                  Loading...
+                  {adminToken ? 'Loading tickets...' : 'Initializing...'}
                 </div>
               ) : filteredTickets.length === 0 ? (
                 <div className="p-4 text-center text-gray-400">No tickets found</div>

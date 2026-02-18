@@ -97,7 +97,6 @@ const AdminDashboard = () => {
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [verifyingPassword, setVerifyingPassword] = useState(false);
-  const [adminToken, setAdminToken] = useState('');
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -321,11 +320,6 @@ const AdminDashboard = () => {
       if (response.ok && data.success) {
         setIsAuthenticated(true);
         setPassword('');
-        // Get admin token from localStorage or environment
-        const token = localStorage.getItem('adminToken');
-        if (token) {
-          setAdminToken(token);
-        }
       } else {
         setPasswordError(data.error || 'Invalid password');
       }
@@ -425,24 +419,9 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              <div>
-                <label htmlFor="adminToken" className="block text-sm font-medium text-gray-300 mb-2">
-                  Admin Token
-                </label>
-                <input
-                  id="adminToken"
-                  type="password"
-                  value={adminToken}
-                  onChange={(e) => setAdminToken(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-white/40 transition-all"
-                  placeholder="Enter admin secret token"
-                  required
-                />
-              </div>
-
               <button
                 type="submit"
-                disabled={verifyingPassword || !password || !adminToken}
+                disabled={verifyingPassword || !password}
                 className="w-full bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
               >
                 {verifyingPassword ? (
@@ -1020,14 +999,8 @@ const AdminDashboard = () => {
         )}
 
         {/* Support Tickets Tab */}
-        {activeTab === 'tickets' && adminToken && (
-          <AdminTicketsTab adminToken={adminToken} />
-        )}
-
-        {activeTab === 'tickets' && !adminToken && (
-          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-12 text-center">
-            <p className="text-gray-400">Admin token not available. Please refresh the page.</p>
-          </div>
+        {activeTab === 'tickets' && (
+          <AdminTicketsTab />
         )}
       </div>
 
