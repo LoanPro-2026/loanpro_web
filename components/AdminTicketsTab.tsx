@@ -343,7 +343,7 @@ const AdminTicketsTab: React.FC<AdminTicketsTabProps> = () => {
         {/* Ticket Detail */}
         <div className="lg:col-span-2">
           {selectedTicket ? (
-            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden flex flex-col h-96">
+            <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden flex flex-col min-h-[600px]">
               <div className="p-6 border-b border-white/20">
                 <div className="flex items-start justify-between mb-4">
                   <div>
