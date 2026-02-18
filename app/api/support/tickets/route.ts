@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 import { checkRateLimit } from '@/lib/rateLimit';
@@ -84,8 +84,7 @@ export async function POST(req: NextRequest) {
     // Optional: Verify access token if provided
     // TODO: Add token verification logic here
 
-    // Connect to database
-    await clientPromise;
+    await connectMongoose();
 
     // Create ticket
     const ticket = new SupportTicket({
@@ -176,7 +175,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    await clientPromise;
+    await connectMongoose();
 
     // Build query - use userEmail instead of userId since that's where the email is stored
     const query: any = { userEmail: userEmail }; // userId param may contain the email value

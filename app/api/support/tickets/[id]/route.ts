@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
@@ -43,7 +43,7 @@ export async function GET(
       );
     }
 
-    await clientPromise;
+    await connectMongoose();
 
     const ticket = await SupportTicket.findOne({ ticketId }).lean();
 
@@ -115,7 +115,7 @@ export async function PATCH(
       );
     }
 
-    await clientPromise;
+    await connectMongoose();
 
     const ticket = await SupportTicket.findOne({ ticketId });
 
