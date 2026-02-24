@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowDownTrayIcon, CheckCircleIcon, ComputerDesktopIcon, ShieldCheckIcon, RocketLaunchIcon, ClockIcon, FingerPrintIcon, ChevronDownIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import HowToSetup from '../../components/HowToSetup';
 
@@ -45,9 +45,67 @@ const systemRequirements = [
 	'Active subscription plan',
 ];
 
+type ReleaseInfo = {
+	version: string;
+	publishedAt: string;
+	assetName: string;
+	downloadUrl: string;
+	assetSizeBytes: number;
+};
+
+const FALLBACK_RELEASE: ReleaseInfo = {
+	version: '1.0.3',
+	publishedAt: 'latest',
+	assetName: 'LoanPro.Setup.1.0.3.exe',
+	downloadUrl: 'https://github.com/jakshat296/loanpro_web/releases/download/v1.0.3/LoanPro.Setup.1.0.3.exe',
+	assetSizeBytes: 130 * 1024 * 1024,
+};
+
 const DownloadPage = () => {
 	const [checkedRequirements, setCheckedRequirements] = useState<{[key: number]: boolean}>({});
 	const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+	const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo>(FALLBACK_RELEASE);
+	const [isReleaseLoading, setIsReleaseLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchLatestRelease = async () => {
+			try {
+				const response = await fetch('https://api.github.com/repos/jakshat296/loanpro_web/releases/latest', {
+					headers: {
+						Accept: 'application/vnd.github+json',
+					},
+					cache: 'no-store',
+				});
+
+				if (!response.ok) {
+					throw new Error(`Failed to fetch release: ${response.status}`);
+				}
+
+				const data = await response.json();
+				const exeAsset = (data.assets || []).find((asset: any) =>
+					typeof asset?.name === 'string' && asset.name.toLowerCase().endsWith('.exe')
+				);
+
+				if (!exeAsset) {
+					throw new Error('No .exe asset found in latest release');
+				}
+
+				setReleaseInfo({
+					version: String(data.tag_name || '').replace(/^v/i, '') || FALLBACK_RELEASE.version,
+					publishedAt: data.published_at || FALLBACK_RELEASE.publishedAt,
+					assetName: exeAsset.name,
+					downloadUrl: exeAsset.browser_download_url,
+					assetSizeBytes: exeAsset.size || FALLBACK_RELEASE.assetSizeBytes,
+				});
+			} catch {
+				setReleaseInfo(FALLBACK_RELEASE);
+			} finally {
+				setIsReleaseLoading(false);
+			}
+		};
+
+		fetchLatestRelease();
+	}, []);
 
 	const faqs = [
 		{
@@ -79,133 +137,132 @@ const DownloadPage = () => {
 		}));
 	};
 
-	return (
-		<div className="relative min-h-screen overflow-hidden pt-20">
-			{/* Background Elements */}
-			<div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50"></div>
-			<div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
-			<div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-pink-400/10 rounded-full blur-3xl"></div>
+	const formatSize = (bytes: number) => {
+		if (!bytes) return 'Unknown size';
+		const mb = bytes / (1024 * 1024);
+		return `${mb.toFixed(1)} MB`;
+	};
 
-			<div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+	return (
+		<div className="min-h-screen bg-slate-50 pt-20">
+			<div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
 				{/* Header Section */}
 				<div className="text-center mb-16">
-					<div className="inline-flex items-center space-x-2 bg-white/30 backdrop-blur-sm border border-white/40 rounded-full px-6 py-2 mb-6">
-						<ArrowDownTrayIcon className="w-5 h-5 text-blue-600" />
-						<span className="text-blue-600 font-semibold">Desktop Application</span>
+					<div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600">
+						<ArrowDownTrayIcon className="w-4 h-4 text-blue-600" />
+						Desktop app
 					</div>
-					<h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-						Download
-						<span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-							{' '}
-							LoanPro Desktop
-						</span>
+					<h1 className="mt-6 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
+						Download LoanPro for Windows
 					</h1>
-					<p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-						Get the official LoanPro desktop application for Windows. Fast, secure, and designed specifically for loan
-						management professionals.
+					<p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
+						Install the desktop application to manage loans locally with optional cloud backup and biometric access.
 					</p>
 
-					{/* Download Button */}
-					<div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12">
+					<div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
 						<a
-							href="/downloads/LoanPro-Setup-1.0.1.exe"
+							href={releaseInfo.downloadUrl}
 							download
-							className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-4 rounded-2xl shadow-2xl hover:shadow-blue-500/25 transform hover:scale-105 transition-all duration-300 flex items-center space-x-3"
+							className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
 						>
-							<ArrowDownTrayIcon className="w-6 h-6" />
-							<span>Download for Windows</span>
-							<div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-purple-700 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+							<ArrowDownTrayIcon className="w-5 h-5" />
+							Download for Windows
 						</a>
 
-						<div className="text-center">
-							<div className="text-sm text-gray-500">Version 1.0.1 • 96.3 MB</div>
-							<div className="text-sm text-green-600 font-medium">✓ Virus-free & Digitally Signed</div>
+						<div className="text-center text-sm text-slate-500">
+							<div>
+								Version {releaseInfo.version} • {formatSize(releaseInfo.assetSizeBytes)}
+							</div>
+							<div className="text-slate-500">Digitally signed installer</div>
+							{isReleaseLoading ? (
+								<div className="text-xs text-slate-400">Fetching latest release...</div>
+							) : null}
 						</div>
 					</div>
 				</div>
 
 				{/* Screenshots Section */}
 				<div className="mb-20">
-					<h2 className="text-3xl font-bold text-center text-gray-900 mb-12">See LoanPro in Action</h2>
+					<h2 className="text-2xl sm:text-3xl font-semibold text-center text-slate-900 mb-10 font-display">See LoanPro in action</h2>
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/DashBoard.png"
+								src="/screenshots/download/dashboard.png"
 								alt="LoanPro Dashboard"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Main Dashboard</h3>
-							<p className="text-sm text-gray-600">Comprehensive overview of your loan operations</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Main Dashboard</h3>
+							<p className="text-sm text-slate-600">Overview of loan operations and daily performance.</p>
 						</div>
 
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/Add New Record.png"
+								src="/screenshots/download/add-new-record.png"
 								alt="Add New Record"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Add New Record</h3>
-							<p className="text-sm text-gray-600">Easy loan record creation with biometric verification</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Add New Record</h3>
+							<p className="text-sm text-slate-600">Create loan records quickly with verification.</p>
 						</div>
 
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/View Accounts.png"
+								src="/screenshots/download/view-accounts.png"
 								alt="View Accounts"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Account Management</h3>
-							<p className="text-sm text-gray-600">Track all customer accounts and loan details</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Account Management</h3>
+							<p className="text-sm text-slate-600">Track customer accounts and loan details.</p>
 						</div>
 
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/Daily Report.png"
+								src="/screenshots/download/daily-report.png"
 								alt="Daily Report"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Daily Reports</h3>
-							<p className="text-sm text-gray-600">Detailed financial reports and analytics</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Settings</h3>
+							<p className="text-sm text-slate-600">Configure application preferences and system settings.</p>
 						</div>
 
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/Stock Details.png"
+								src="/screenshots/download/stock-details.png"
 								alt="Stock Details"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Investment Tracking</h3>
-							<p className="text-sm text-gray-600">Monitor portfolios and investment performance</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Cloud Backup</h3>
+							<p className="text-sm text-slate-600">Automatic backup and synchronization with cloud storage.</p>
 						</div>
 
-						<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-4 hover:bg-white/30 transition-all duration-300 group">
+						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
 							<img
-								src="/screenshots/DashBoard Dark Mode.png"
+								src="/screenshots/download/dashboard-dark-mode.png"
 								alt="Dark Mode Dashboard"
-								className="w-full h-48 object-cover rounded-lg mb-4 group-hover:scale-105 transition-transform"
+								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
-							<h3 className="font-semibold text-gray-900 mb-2">Dark Mode</h3>
-							<p className="text-sm text-gray-600">Eye-friendly dark theme for extended use</p>
+							<h3 className="font-semibold text-slate-900 mb-2">Support Tickets</h3>
+							<p className="text-sm text-slate-600">Get help and support for LoanPro desktop application.</p>
 						</div>
 					</div>
 				</div>
 
 				{/* Features Grid */}
 				<div className="mb-20">
-					<h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Why Choose LoanPro Desktop?</h2>
+					<h2 className="text-2xl sm:text-3xl font-semibold text-center text-slate-900 mb-10 font-display">Why choose LoanPro Desktop</h2>
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 						{features.map((feature, idx) => {
 							const IconComponent = feature.icon;
 							return (
 								<div
 									key={idx}
-									className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-6 hover:bg-white/30 transition-all duration-300 group"
+									className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow"
 								>
-									<div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-										<IconComponent className="w-6 h-6 text-white" />
+									<div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center mb-4">
+										<IconComponent className="w-5 h-5 text-blue-600" />
 									</div>
-									<h3 className="text-lg font-bold text-gray-900 mb-2">{feature.title}</h3>
-									<p className="text-gray-600">{feature.description}</p>
+									<h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
+									<p className="text-sm text-slate-600">{feature.description}</p>
 								</div>
 							);
 						})}
@@ -216,23 +273,23 @@ const DownloadPage = () => {
 				<HowToSetup showTitle={true} />
 
 				{/* System Requirements & Installation */}
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
+				<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
 					{/* System Requirements - Interactive Checklist */}
-					<div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-3xl p-8 hover:shadow-lg transition-shadow">
-						<h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center space-x-3">
-							<ComputerDesktopIcon className="w-7 h-7 text-blue-600" />
-							<span>System Requirements</span>
+					<div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+						<h3 className="text-xl font-semibold text-slate-900 mb-2 flex items-center gap-2">
+							<ComputerDesktopIcon className="w-5 h-5 text-blue-600" />
+							<span>System requirements</span>
 						</h3>
-						<p className="text-gray-600 text-sm mb-6">Check off your system capabilities before installing:</p>
+						<p className="text-slate-600 text-sm mb-6">Check your system before installing:</p>
 						<ul className="space-y-3">
 							{systemRequirements.map((req, idx) => (
 								<li 
 									key={idx}
 									onClick={() => toggleRequirementCheck(idx)}
-									className={`flex items-center space-x-3 p-3 rounded-xl cursor-pointer transition-all ${
+									className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
 										checkedRequirements[idx] 
-											? 'bg-green-100 border border-green-300' 
-											: 'bg-white/50 border border-transparent hover:bg-white/80'
+											? 'bg-green-50 border border-green-200' 
+											: 'bg-slate-50 border border-slate-200 hover:bg-slate-100'
 									}`}
 								>
 									<div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
@@ -242,68 +299,68 @@ const DownloadPage = () => {
 									}`}>
 										{checkedRequirements[idx] && <CheckIcon className="w-4 h-4 text-white" />}
 									</div>
-									<span className={`${checkedRequirements[idx] ? 'text-gray-900 font-medium line-through opacity-60' : 'text-gray-700'}`}>
+									<span className={`${checkedRequirements[idx] ? 'text-slate-900 font-medium line-through opacity-60' : 'text-slate-700'}`}>
 										{req}
 									</span>
 								</li>
 							))}
 						</ul>
-						<div className="mt-6 p-4 bg-green-100 border border-green-300 rounded-xl">
-							<p className="text-sm text-green-900">
-								<strong>✓ Ready to install?</strong> Once all items are checked, you're good to go!
+						<div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+							<p className="text-sm text-slate-700">
+								Once all items are checked, you're ready to install.
 							</p>
 						</div>
 					</div>
 
 					{/* Installation Instructions */}
-					<div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-3xl p-8 hover:shadow-lg transition-shadow">
-						<h3 className="text-2xl font-bold text-gray-900 mb-2 flex items-center space-x-3">
-							<RocketLaunchIcon className="w-7 h-7 text-purple-600" />
-							<span>Installation Guide</span>
+					<div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+						<h3 className="text-xl font-semibold text-slate-900 mb-2 flex items-center gap-2">
+							<RocketLaunchIcon className="w-5 h-5 text-blue-600" />
+							<span>Installation guide</span>
 						</h3>
-						<p className="text-gray-600 text-sm mb-6">Follow these 4 simple steps:</p>
+						<p className="text-slate-600 text-sm mb-6">Follow these steps:</p>
 						<ol className="space-y-4">
 							<li className="flex items-start space-x-3">
-								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 mt-0.5">
 									1
 								</div>
 								<div>
-									<p className="text-gray-900 font-semibold">Download</p>
-									<p className="text-sm text-gray-600">Click the blue <strong>Download for Windows</strong> button above</p>
+									<p className="text-slate-900 font-semibold">Download</p>
+									<p className="text-sm text-slate-600">Click the Download for Windows button above.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 mt-0.5">
 									2
 								</div>
 								<div>
-									<p className="text-gray-900 font-semibold">Run</p>
-									<p className="text-sm text-gray-600">Open the <strong>LoanPro-Setup-1.0.1.exe</strong> file from your Downloads folder</p>
+									<p className="text-slate-900 font-semibold">Run</p>
+									<p className="text-sm text-slate-600">Open LoanPro-Setup-1.0.1.exe from your Downloads folder.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 mt-0.5">
 									3
 								</div>
 								<div>
-									<p className="text-gray-900 font-semibold">Install</p>
-									<p className="text-sm text-gray-600">Follow the wizard, accept terms, and choose your installation location</p>
+									<p className="text-slate-900 font-semibold">Install</p>
+									<p className="text-sm text-slate-600">Follow the setup wizard and choose an install location.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
-								<div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 mt-0.5">
+								<div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 mt-0.5">
 									4
 								</div>
 								<div>
-									<p className="text-gray-900 font-semibold">Launch & Login</p>
-									<p className="text-sm text-gray-600">Open LoanPro and sign in with your account credentials</p>
+									<p className="text-slate-900 font-semibold">Launch & login</p>
+									<p className="text-sm text-slate-600">Open LoanPro and sign in with your account.</p>
 								</div>
 							</li>
 						</ol>
-						<div className="mt-6 p-4 bg-blue-100 border border-blue-300 rounded-xl flex items-start gap-3">
-							<ExclamationTriangleIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-							<p className="text-sm text-blue-900">
-								If you get a security warning, that's normal! Click "More info" then "Run anyway"
+						<div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
+							<ExclamationTriangleIcon className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" />
+							<p className="text-sm text-slate-700">
+								If Windows SmartScreen appears, select More info, then Run anyway.
 							</p>
 						</div>
 					</div>
@@ -311,40 +368,32 @@ const DownloadPage = () => {
 
 				{/* Device Binding Walkthrough */}
 				<div className="mb-16">
-					<h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Next: Bind Your Device</h2>
-					<div className="bg-gradient-to-r from-green-100 to-blue-100 border-2 border-green-300 rounded-3xl p-8">
-						<div className="flex items-start gap-4 mb-6">
-							<div className="text-4xl">📱</div>
+					<h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 mb-10 text-center font-display">Bind your device</h2>
+					<div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+						<div className="flex items-start gap-3 mb-6">
+							<FingerPrintIcon className="w-6 h-6 text-blue-600 flex-shrink-0" />
 							<div>
-								<h3 className="text-2xl font-bold text-gray-900">Device Binding Setup</h3>
-								<p className="text-gray-700">Secure your account with device binding (required for Pro/Enterprise plans)</p>
+								<h3 className="text-lg font-semibold text-slate-900">Device binding for biometric access</h3>
+								<p className="text-sm text-slate-600">Required for Pro and Enterprise plans that use fingerprint login.</p>
 							</div>
 						</div>
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-							<div className="bg-white/60 rounded-xl p-4">
-								<div className="text-3xl mb-2">🔧</div>
-								<p className="font-semibold text-gray-900 text-sm mb-1">Connect Scanner</p>
-								<p className="text-xs text-gray-600">Plug in your Secu-Hamster Pro 20-AP fingerprint scanner via USB</p>
-							</div>
-							<div className="bg-white/60 rounded-xl p-4">
-								<div className="text-3xl mb-2">🖐️</div>
-								<p className="font-semibold text-gray-900 text-sm mb-1">Enroll Fingers</p>
-								<p className="text-xs text-gray-600">Scan 4-5 fingers for biometric authentication setup</p>
-							</div>
-							<div className="bg-white/60 rounded-xl p-4">
-								<div className="text-3xl mb-2">🔐</div>
-								<p className="font-semibold text-gray-900 text-sm mb-1">Bind Device</p>
-								<p className="text-xs text-gray-600">Confirm device binding in LoanPro settings</p>
-							</div>
-							<div className="bg-white/60 rounded-xl p-4">
-								<div className="text-3xl mb-2">✅</div>
-								<p className="font-semibold text-gray-900 text-sm mb-1">Start Using</p>
-								<p className="text-xs text-gray-600">Use fingerprint to unlock and manage loans</p>
-							</div>
+							{[
+								{ title: 'Connect scanner', text: 'Plug in the SecuGen Hamster Pro 20-AP via USB.' },
+								{ title: 'Enroll fingerprints', text: 'Scan 4-5 fingers in the setup flow.' },
+								{ title: 'Bind device', text: 'Confirm the device in Settings → Devices.' },
+								{ title: 'Start using', text: 'Use fingerprint login for secure access.' }
+							].map((item, idx) => (
+								<div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+									<div className="text-xs font-semibold text-slate-500">Step {idx + 1}</div>
+									<p className="mt-2 font-semibold text-slate-900 text-sm">{item.title}</p>
+									<p className="text-xs text-slate-600 mt-1">{item.text}</p>
+								</div>
+							))}
 						</div>
-						<div className="mt-6 bg-white/80 rounded-xl p-4 border border-green-200">
-							<p className="text-sm text-gray-900">
-								<strong>Need help with device binding?</strong> Go to Settings → Devices in LoanPro, or contact our support team.
+						<div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+							<p className="text-sm text-slate-700">
+								Need help? Visit Settings → Devices in LoanPro or contact support.
 							</p>
 						</div>
 					</div>
@@ -352,23 +401,23 @@ const DownloadPage = () => {
 
 				{/* Troubleshooting FAQ */}
 				<div className="mb-16">
-					<h2 className="text-3xl font-bold text-gray-900 mb-12 text-center">Troubleshooting & FAQs</h2>
+					<h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 mb-10 text-center font-display">Troubleshooting & FAQs</h2>
 					<div className="max-w-3xl mx-auto space-y-4">
 						{faqs.map((faq, idx) => (
 							<div 
 								key={idx}
-								className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl overflow-hidden hover:border-white/50 transition-all"
+								className="bg-white border border-slate-200 rounded-2xl overflow-hidden"
 							>
 								<button
 									onClick={() => setExpandedFAQ(expandedFAQ === idx ? null : idx)}
-									className="w-full flex items-center justify-between p-6 hover:bg-white/10 transition-colors"
+									className="w-full flex items-center justify-between p-5 text-left"
 								>
-									<h4 className="text-lg font-semibold text-gray-900 text-left">{faq.question}</h4>
-									<ChevronDownIcon className={`w-5 h-5 text-gray-600 flex-shrink-0 transition-transform ${expandedFAQ === idx ? 'rotate-180' : ''}`} />
+									<h4 className="text-base font-semibold text-slate-900">{faq.question}</h4>
+									<ChevronDownIcon className={`w-5 h-5 text-slate-500 flex-shrink-0 transition-transform ${expandedFAQ === idx ? 'rotate-180' : ''}`} />
 								</button>
 								{expandedFAQ === idx && (
-									<div className="px-6 pb-6 border-t border-white/20 bg-white/5">
-										<p className="text-gray-700">{faq.answer}</p>
+									<div className="px-5 pb-5 text-sm text-slate-600">
+										{faq.answer}
 									</div>
 								)}
 							</div>
@@ -376,27 +425,27 @@ const DownloadPage = () => {
 					</div>
 				</div>
 				<div className="text-center">
-					<div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 max-w-2xl mx-auto">
-						<h3 className="text-2xl font-bold text-gray-900 mb-4">Need Help Getting Started?</h3>
-						<p className="text-gray-600 mb-6">
-							Our support team is here to help you with installation, setup, and any questions you might have.
+					<div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto shadow-sm">
+						<h3 className="text-xl font-semibold text-slate-900 mb-3">Need help getting started?</h3>
+						<p className="text-slate-600 mb-6">
+							Our support team can help with installation and setup.
 						</p>
-						<div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+						<div className="flex flex-col sm:flex-row items-center justify-center gap-3">
 							<a
 								href="mailto:support@loanpro.tech"
-								className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+								className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
 							>
-								Email Support
+								Email support
 							</a>
 							<a
 								href="tel:+911234567890"
-								className="bg-white/30 hover:bg-white/40 text-gray-700 font-semibold px-6 py-3 rounded-xl border border-white/40 transition-all duration-300"
+								className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-3 rounded-lg hover:border-slate-300 transition-colors"
 							>
-								Call Support
+								Call support
 							</a>
 						</div>
-						<p className="text-gray-500 text-sm mt-4">
-							📞 Available Monday-Friday, 9 AM - 6 PM IST
+						<p className="text-slate-500 text-sm mt-4">
+							Support hours: Monday-Friday, 9 AM - 6 PM IST
 						</p>
 					</div>
 				</div>

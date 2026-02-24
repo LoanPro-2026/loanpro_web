@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  throw new Error('ADMIN_PASSWORD environment variable must be set');
+}
 
 async function verifyAdmin() {
   const { userId } = await auth();

@@ -1,12 +1,12 @@
-'use client'
-import React, { useState, useRef, useEffect, ReactNode, Suspense } from 'react';
+'use client';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, UserButton, useUser, useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
-import { UserCircleIcon, CreditCardIcon, ReceiptRefundIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import Loader from './Loader';
+import Image from 'next/image';
+import { SignedIn, SignedOut, useUser, useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { UserCircleIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const NavBar = () => {
-  const { openUserProfile, signOut } = useClerk();
+  const { signOut } = useClerk();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -38,55 +38,60 @@ const NavBar = () => {
 
   const navLinks = [
     { href: '/#features', label: 'Features' },
+    { href: '/#how-it-works', label: 'How it works' },
     { href: '/#pricing', label: 'Pricing' },
-    { href: '/#reviews', label: 'Reviews' },
     { href: '/#faq', label: 'FAQs' },
-    { href: '/download', label: 'Download' },
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/30 shadow-xl">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-blue-600/10"></div>
-      
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity"></div>
-              <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xl px-4 py-2 rounded-xl shadow-2xl">
-                LoanPro
-              </div>
-            </div>
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/brand/loanpro-logo.png"
+              alt="LoanPro logo"
+              width={120}
+              height={36}
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="relative text-gray-700 hover:text-blue-600 font-medium transition-all duration-300 group"
+                className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors duration-200 px-2 py-1 rounded-md hover:bg-blue-50"
               >
-                <span className="relative z-10">{link.label}</span>
-                <span className="absolute inset-x-0 -bottom-1 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
+                {link.label}
               </Link>
             ))}
+            <Link
+              href="/download"
+              className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors duration-200 px-2 py-1 rounded-md hover:bg-blue-50"
+            >
+              Download
+            </Link>
           </div>
 
           {/* Auth Section */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <SignedOut>
-              <div className="hidden sm:flex items-center space-x-3">
-                <Link href="/sign-in">
-                  <button className="text-gray-700 hover:text-blue-600 font-medium px-4 py-2 rounded-xl transition-all duration-300 hover:bg-white/30 backdrop-blur-sm">
-                    Sign In
-                  </button>
+              <div className="hidden sm:flex items-center gap-3">
+                <Link
+                  href="/sign-in"
+                  className="text-sm font-semibold text-slate-600 hover:text-blue-600 transition-colors duration-200 px-2 py-1 rounded-md hover:bg-blue-50"
+                >
+                  Login
                 </Link>
-                <Link href="/sign-up">
-                  <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-                    Get Started
-                  </button>
+                <Link
+                  href="/sign-up"
+                  className="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+                >
+                  Get started
                 </Link>
               </div>
             </SignedOut>
@@ -96,21 +101,20 @@ const NavBar = () => {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-gray-700 font-medium px-4 py-2 rounded-xl transition-all duration-300 border border-white/20"
+                    className="flex items-center gap-2 border border-slate-200 bg-white px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:border-slate-300 transition-colors"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-white text-sm font-bold">
                       {username.charAt(0).toUpperCase()}
                     </div>
                     <span className="hidden sm:block">{username}</span>
                   </button>
 
                   {dropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-64 bg-white/80 backdrop-blur-xl border border-white/40 rounded-2xl shadow-2xl overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/70 to-purple-50/70"></div>
-                      <div className="relative p-2">
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                      <div className="p-2">
                         <Link
                           href="/profile"
-                          className="flex items-center space-x-3 px-4 py-3 text-gray-800 hover:bg-white/30 rounded-xl transition-all duration-300 group"
+                          className="flex items-center gap-3 px-3 py-2 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
                           onClick={() => setDropdownOpen(false)}
                         >
                           <UserCircleIcon className="w-5 h-5 text-blue-600" />
@@ -122,7 +126,7 @@ const NavBar = () => {
                             signOut();
                             setDropdownOpen(false);
                           }}
-                          className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50/70 rounded-xl transition-all duration-300 group"
+                          className="w-full flex items-center gap-3 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -139,7 +143,7 @@ const NavBar = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-gray-700 hover:text-blue-600 hover:bg-white/20 rounded-xl transition-all duration-300"
+              className="md:hidden p-2 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
             >
               {mobileMenuOpen ? (
                 <XMarkIcon className="w-6 h-6" />
@@ -152,40 +156,47 @@ const NavBar = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/40 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/70 to-purple-50/70"></div>
-            <div className="relative px-4 py-6 space-y-4">
+          <div className="md:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-200 shadow-lg">
+            <div className="px-4 py-6 space-y-4">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300"
+                  className="block text-slate-700 hover:text-slate-900 font-medium py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {link.label}
                 </Link>
               ))}
+
+              <Link
+                href="/download"
+                className="block text-slate-700 hover:text-slate-900 font-medium py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Download
+              </Link>
               
               <SignedOut>
-                <div className="pt-4 border-t border-white/30 space-y-3">
+                <div className="pt-4 border-t border-slate-200 space-y-3">
                   <SignInButton mode="modal">
-                    <button className="w-full text-left text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300">
-                      Sign In
+                    <button className="w-full text-left text-slate-700 hover:text-slate-900 font-medium py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
+                      Login
                     </button>
                   </SignInButton>
                   <SignUpButton mode="modal">
-                    <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg">
-                      Get Started
+                    <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                      Get started
                     </button>
                   </SignUpButton>
                 </div>
               </SignedOut>
 
               <SignedIn>
-                <div className="pt-4 border-t border-white/30 space-y-3">
+                <div className="pt-4 border-t border-slate-200 space-y-3">
                   <Link
                     href="/profile"
-                    className="flex items-center space-x-3 text-gray-800 hover:text-blue-600 font-medium py-2 px-4 rounded-xl hover:bg-white/30 transition-all duration-300"
+                    className="flex items-center gap-3 text-slate-700 hover:text-slate-900 font-medium py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <UserCircleIcon className="w-5 h-5" />
@@ -196,7 +207,7 @@ const NavBar = () => {
                       signOut();
                       setMobileMenuOpen(false);
                     }}
-                    className="flex items-center space-x-3 text-red-600 font-medium py-2 px-4 rounded-xl hover:bg-red-50/70 transition-all duration-300"
+                    className="flex items-center gap-3 text-red-600 font-medium py-2 px-3 rounded-lg hover:bg-red-50 transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

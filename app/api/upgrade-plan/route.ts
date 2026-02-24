@@ -5,8 +5,7 @@ import Razorpay from 'razorpay';
 import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateUpgradeRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
-import { logger } from '@/lib/logger';
-
+import { logger } from '@/lib/logger';import { getSubscriptionEndDate, getBillingPeriod } from '@/lib/subscriptionHelpers';
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
@@ -14,9 +13,9 @@ const razorpay = new Razorpay({
 
 // Plan pricing (monthly rates in rupees) - matching create-order API
 const PLAN_PRICES = {
-  Basic: 699,       // ₹699/month
-  Pro: 833,         // ₹833/month
-  Enterprise: 979   // ₹979/month
+  Basic: 599,       // ₹599/month
+  Pro: 899,         // ₹899/month
+  Enterprise: 1399  // ₹1399/month
 };
 
 // Payment gateway fee (2.5% + fixed amount) - matches actual Razorpay charges
@@ -33,6 +32,7 @@ function calculateUpgradeAmount(
   newPlan: string,
   daysRemaining: number,
   billingPeriod: 'monthly' | 'annually' = 'monthly',
+  currentBillingPeriod: 'monthly' | 'annually' = billingPeriod,
   subscriptionStartDate?: Date // Add parameter to calculate actual billing period
 ): {
   currentPlanValue: number;
@@ -43,7 +43,7 @@ function calculateUpgradeAmount(
   gatewayFee: number;
   totalAmount: number;
 } {
-  console.log('calculateUpgradeAmount called with:', { currentPlan, newPlan, daysRemaining, billingPeriod });
+  console.log('calculateUpgradeAmount called with:', { currentPlan, newPlan, daysRemaining, billingPeriod, currentBillingPeriod });
   console.log('Available plans in PLAN_PRICES:', Object.keys(PLAN_PRICES));
   
   const currentMonthlyPrice = currentPlan === 'trial' ? 0 : PLAN_PRICES[currentPlan as keyof typeof PLAN_PRICES];
@@ -60,42 +60,52 @@ function calculateUpgradeAmount(
     throw new Error('Invalid new plan selected');
   }
   
-  // Calculate based on billing period
-  const periodMultiplier = billingPeriod === 'annually' ? 12 : 1;
-  const discountMultiplier = billingPeriod === 'annually' ? 0.85 : 1; // 15% discount for annual
-  
-  const currentPlanValue = currentPlan === 'trial' ? 0 : Math.round(currentMonthlyPrice * periodMultiplier * discountMultiplier);
-  const newPlanValue = Math.round(newMonthlyPrice * periodMultiplier * discountMultiplier);
-  
-  // Calculate total days in current billing period (actual days, not hardcoded)
-  let totalDays: number;
-  if (billingPeriod === 'annually') {
-    totalDays = 365; // Annual subscription
+  const targetPeriodMultiplier = billingPeriod === 'annually' ? 12 : 1;
+  const targetDiscountMultiplier = billingPeriod === 'annually' ? 0.85 : 1; // 15% discount for annual
+  const currentPeriodMultiplier = currentBillingPeriod === 'annually' ? 12 : 1;
+  const currentDiscountMultiplier = currentBillingPeriod === 'annually' ? 0.85 : 1;
+
+  const currentPlanValue = currentPlan === 'trial' ? 0 : Math.round(currentMonthlyPrice * currentPeriodMultiplier * currentDiscountMultiplier);
+  const newPlanValue = Math.round(newMonthlyPrice * targetPeriodMultiplier * targetDiscountMultiplier);
+
+  // Calculate total days in current billing period for remaining credit valuation
+  let currentPeriodTotalDays: number;
+  if (currentBillingPeriod === 'annually') {
+    currentPeriodTotalDays = 365;
   } else {
-    // For monthly, calculate days in the actual billing month
     if (subscriptionStartDate) {
       const startDate = new Date(subscriptionStartDate);
       const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1); // Add one month
-      totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      endDate.setMonth(endDate.getMonth() + 1);
+      currentPeriodTotalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     } else {
-      // Fallback: Use actual days in current month
       const now = new Date();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      totalDays = daysInMonth;
+      currentPeriodTotalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     }
   }
-  
-  // Calculate prorated amounts based on actual days
-  const proratedCurrent = Math.round((currentPlanValue * daysRemaining) / totalDays);
-  const proratedNew = Math.round((newPlanValue * daysRemaining) / totalDays);
-  
-  // Calculate upgrade amount
+
+  const remainingCredit = Math.round((currentPlanValue * daysRemaining) / currentPeriodTotalDays);
+
+  // Same billing period => prorated period difference (existing behavior)
+  // Billing period switch => full target period price minus remaining credit from current period
+  const isBillingPeriodSwitch = currentBillingPeriod !== billingPeriod;
+  const proratedCurrent = remainingCredit;
+  const proratedNew = isBillingPeriodSwitch
+    ? newPlanValue
+    : Math.round((newPlanValue * daysRemaining) / currentPeriodTotalDays);
+
   const upgradeAmount = Math.max(0, proratedNew - proratedCurrent);
   const gatewayFee = calculateGatewayFee(upgradeAmount);
   const totalAmount = upgradeAmount + gatewayFee;
   
-  console.log('Prorated calculation:', { totalDays, daysRemaining, proratedCurrent, proratedNew, upgradeAmount });
+  console.log('Upgrade calculation:', {
+    currentPeriodTotalDays,
+    daysRemaining,
+    isBillingPeriodSwitch,
+    proratedCurrent,
+    proratedNew,
+    upgradeAmount,
+  });
   
   return {
     currentPlanValue,
@@ -283,9 +293,10 @@ export async function POST(request: NextRequest) {
     
     // Calculate days remaining
     const startDate = new Date(currentSubscription.startDate);
-    const endDate = new Date(currentSubscription.subscriptionExpiresAt || currentSubscription.endDate || currentSubscription.expiryDate);
+    const endDate = getSubscriptionEndDate(currentSubscription); // Use helper for consistent date field handling
     const today = new Date();
     const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const currentBillingPeriod = getBillingPeriod(currentSubscription);
     
     console.log('Date calculation:', { startDate, endDate, today, daysRemaining });
     
@@ -301,7 +312,14 @@ export async function POST(request: NextRequest) {
     
     // Calculate upgrade costs with actual billing period start date
     console.log('Calculating upgrade amount...');
-    const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, billingPeriod, startDate);
+    const calculation = calculateUpgradeAmount(
+      normalizedCurrentPlan,
+      normalizedNewPlan,
+      daysRemaining,
+      billingPeriod,
+      currentBillingPeriod,
+      startDate
+    );
     console.log('Upgrade calculation result:', calculation);
     
     // If no payment required (should not happen in upgrade, but safety check)
@@ -345,7 +363,9 @@ export async function POST(request: NextRequest) {
         ...calculation,
         daysRemaining,
         currentPlan: normalizedCurrentPlan,
-        newPlan: normalizedNewPlan
+        newPlan: normalizedNewPlan,
+        currentBillingPeriod,
+        targetBillingPeriod: billingPeriod
       }
     });
     
@@ -425,7 +445,7 @@ export async function GET(request: NextRequest) {
     console.log('[UPGRADE-PLAN GET] Current subscription:', {
       plan: currentPlan,
       status: currentSubscription.status,
-      expiresAt: currentSubscription.subscriptionExpiresAt || currentSubscription.endDate,
+      expiresAt: getSubscriptionEndDate(currentSubscription),
       isTrialUser
     });
     
@@ -480,8 +500,8 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Get current subscription's billing period (not the target billing period)
-    const currentBillingPeriod = currentSubscription.billingPeriod || 'monthly';
+    // Get current subscription's billing period
+    const currentBillingPeriod = getBillingPeriod(currentSubscription);
     
     console.log('[UPGRADE-PLAN GET] Billing periods:', { 
       currentBillingPeriod, 
@@ -489,9 +509,16 @@ export async function GET(request: NextRequest) {
       willUseForCalculation: currentBillingPeriod 
     });
     
-    // Calculate upgrade costs using CURRENT billing period for prorated values
+    // Calculate upgrade costs with correct current->target billing transition behavior
     try {
-      const calculation = calculateUpgradeAmount(normalizedCurrentPlan, normalizedNewPlan, daysRemaining, currentBillingPeriod);
+      const calculation = calculateUpgradeAmount(
+        normalizedCurrentPlan,
+        normalizedNewPlan,
+        daysRemaining,
+        billingPeriod,
+        currentBillingPeriod,
+        new Date(currentSubscription.startDate)
+      );
       
       const duration = Date.now() - startTime;
       logger.info('Upgrade calculation completed', 'UPGRADE_PLAN', { 

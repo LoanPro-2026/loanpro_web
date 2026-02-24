@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders } from '../devices/cors';
+import { getCorsHeaders } from '@/lib/cors';
 
 // Analytics endpoint for desktop app usage tracking
 export async function POST(req: Request) {

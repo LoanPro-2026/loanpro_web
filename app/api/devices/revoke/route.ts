@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import emailService from '@/services/emailService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +77,24 @@ export async function POST(request: NextRequest) {
       revokedAt: now,
       createdAt: now
     });
+
+    const resolvedEmail = userWithToken?.email || '';
+    const resolvedName =
+      userWithToken?.fullName ||
+      userWithToken?.username ||
+      (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
+
+    if (resolvedEmail) {
+      Promise.resolve(
+        emailService.sendDeviceRevokedEmail({
+          userName: resolvedName,
+          userEmail: resolvedEmail,
+          deviceName: deviceToRevoke.deviceName || 'Unknown Device',
+          deviceId: deviceToRevoke.deviceId || deviceId,
+          reason
+        })
+      ).catch(() => undefined);
+    }
 
     const remainingRevokes = Math.max(0, 2 - revokesThisMonth); // 2 because we just used one
 

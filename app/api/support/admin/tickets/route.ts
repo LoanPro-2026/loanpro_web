@@ -1,14 +1,23 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 
-// TODO: Add proper admin authentication middleware
-function isAdmin(req: NextRequest): boolean {
-  // For now, check a simple admin token
-  // Replace this with your actual admin authentication
-  const adminToken = req.headers.get('x-admin-token');
-  return adminToken === process.env.ADMIN_SECRET_TOKEN;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
+
+async function verifyAdmin() {
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+    headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
+  });
+  const user = await userResponse.json();
+  const userEmail = user.email_addresses[0]?.email_address;
+
+  if (userEmail !== ADMIN_EMAIL) throw new Error('Access denied');
+  return userEmail;
 }
 
 /**
@@ -18,12 +27,7 @@ function isAdmin(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   try {
     // Check admin authentication
-    if (!isAdmin(req)) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - Admin access required' },
-        { status: 401 }
-      );
-    }
+    await verifyAdmin();
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');

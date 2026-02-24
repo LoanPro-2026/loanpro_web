@@ -64,13 +64,13 @@ function getSecurityHeaders() {
     // Content Security Policy - restrict resource loading
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
       "worker-src 'self' blob: https://*.clerk.dev",
       "style-src 'self' 'unsafe-inline' https://*.razorpay.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https:",
-      "connect-src 'self' https://api.clerk.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev",
-      "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech",
+      "connect-src 'self' https://api.clerk.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
+      "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
       "frame-ancestors 'none'",
     ].join('; '),
   };

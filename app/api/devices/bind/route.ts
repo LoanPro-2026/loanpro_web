@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders, handlePreflight } from '../cors';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import emailService from '@/services/emailService';
 
 export function OPTIONS(req: Request) {
-  return handlePreflight(req); // ✅ Returns only a Response
+  return handleCorsPreFlight(req); // ✅ Returns only a Response
 }
 
 export async function POST(req: Request) {
@@ -20,6 +21,12 @@ export async function POST(req: Request) {
     const user = await db.collection('users').findOne({ accessToken });
 
     if (!user) return NextResponse.json({ error: 'Invalid access token' }, { status: 401, headers: corsHeaders });
+
+    const resolvedEmail = user.email || '';
+    const resolvedName =
+      user.fullName ||
+      user.username ||
+      (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
 
     // Check device limits based on subscription plan
     const getDeviceLimit = (plan: string) => {
@@ -52,6 +59,20 @@ export async function POST(req: Request) {
           } 
         }
       );
+
+      if (resolvedEmail) {
+        const effectiveDeviceName = deviceName || existingDevice.deviceName || 'Unnamed Device';
+        Promise.resolve(
+          emailService.sendDeviceUpdatedEmail({
+            userName: resolvedName,
+            userEmail: resolvedEmail,
+            deviceName: effectiveDeviceName,
+            deviceId,
+            organizationName: organizationName || existingDevice.organizationName
+          })
+        ).catch(() => undefined);
+      }
+
       return NextResponse.json({ 
         success: true, 
         message: 'Device information updated', 
@@ -108,6 +129,18 @@ export async function POST(req: Request) {
           lastActive: d.lastActive
         }))
       }, { status: 403, headers: corsHeaders });
+    }
+
+    if (resolvedEmail) {
+      Promise.resolve(
+        emailService.sendDeviceBoundEmail({
+          userName: resolvedName,
+          userEmail: resolvedEmail,
+          deviceName: deviceEntry.deviceName,
+          deviceId: deviceEntry.deviceId,
+          organizationName: deviceEntry.organizationName
+        })
+      ).catch(() => undefined);
     }
 
     return NextResponse.json({ success: true, message: 'Device bound successfully', device: deviceEntry }, { headers: corsHeaders });

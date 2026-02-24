@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/components/ToastProvider';
+import { useDialog } from '@/components/DialogProvider';
 import ProgressBar from '@/components/ProgressBar';
 import { CheckIcon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
@@ -24,7 +25,7 @@ interface SubscriptionPlan {
 const plans: SubscriptionPlan[] = [
   {
     name: 'Basic',
-    price: 699,
+    price: 599,
     period: 'month',
     description: 'Essential features for small loan businesses',
     deviceLimit: 1,
@@ -46,7 +47,7 @@ const plans: SubscriptionPlan[] = [
   },
   {
     name: 'Pro',
-    price: 833,
+    price: 899,
     period: 'month',
     description: 'Most popular choice for growing loan businesses',
     deviceLimit: 1,
@@ -68,7 +69,7 @@ const plans: SubscriptionPlan[] = [
   },
   {
     name: 'Enterprise',
-    price: 979,
+    price: 1399,
     period: 'month',
     description: 'Complete solution for large organizations',
     deviceLimit: 2,
@@ -114,6 +115,7 @@ export default function SubscribePage() {
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
+  const dialog = useDialog();
   const selectedPlanData = plans.find((p) => p.name === selectedPlan) || plans[1];
 
   // Auto-close modal and redirect after 10 seconds
@@ -175,6 +177,7 @@ export default function SubscribePage() {
         body: JSON.stringify({
           username: user?.username || user?.fullName,
           email: user?.primaryEmailAddress?.emailAddress,
+          fullName: user?.fullName,
         }),
       });
 
@@ -184,7 +187,7 @@ export default function SubscribePage() {
         throw new Error(data.error || 'Failed to start free trial');
       }
 
-      showToast('14-day Pro trial started successfully!', 'success');
+      showToast('1-month Pro trial started successfully!', 'success');
       setTimeout(() => {
         router.push('/download');
       }, 1200);
@@ -217,7 +220,8 @@ export default function SubscribePage() {
         body: JSON.stringify({ 
           plan: planName, 
           billingPeriod: billingPeriod,
-          amount: finalAmount 
+          amount: finalAmount,
+          paymentContext: 'new'
         }),
       });
 
@@ -267,7 +271,9 @@ export default function SubscribePage() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
               userId: user?.id || user?.primaryEmailAddress?.emailAddress,
-              username: user?.fullName || user?.username || user?.primaryEmailAddress?.emailAddress,
+              email: user?.primaryEmailAddress?.emailAddress || '',
+              fullName: user?.fullName || '',
+              username: user?.username || user?.fullName || user?.primaryEmailAddress?.emailAddress,
               plan: planName,
               billingPeriod: billingPeriod,
             };
@@ -304,7 +310,10 @@ export default function SubscribePage() {
             setLoading(null);
           } catch (error) {
             console.error('Error verifying payment:', error);
-            alert('Payment successful but verification failed. Please contact support.');
+            await dialog.alert('Payment successful but verification failed. Please contact support.', {
+              title: 'Payment Verification Issue',
+              type: 'error',
+            });
           }
         },
         prefill: {
@@ -366,73 +375,62 @@ export default function SubscribePage() {
         strategy="lazyOnload"
       />
       
-      <div className="min-h-screen bg-gradient-to-br from-white via-purple-50 to-blue-50 pt-32 pb-12 px-4 sm:px-6 lg:px-8">
-        {/* Background Elements */}
-        <div className="absolute top-1/4 left-0 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-pink-400/10 rounded-full blur-3xl"></div>
-        
-        <div className="relative max-w-7xl mx-auto">
+      <div className="min-h-screen bg-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center space-x-2 bg-white/30 backdrop-blur-sm border border-white/40 rounded-full px-6 py-2 mb-6">
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-              <span className="text-purple-600 font-semibold">Choose Your Plan</span>
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600">
+              Choose your plan
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-              Select Your 
-              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"> Perfect Plan</span>
+            <h1 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
+              Pricing for every team
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-              Choose the plan that best fits your business needs. All plans include core features with different levels of support and functionality.
+            <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
+              All plans include core loan management features. Select the backup and support level you need.
             </p>
             
             {/* Free Trial CTA */}
-            <div className="bg-gradient-to-r from-green-100 to-blue-100 border border-green-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                🎉 Start Your Free Trial Today!
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Get full access to <strong>Pro features</strong> for 14 days - no credit card required!
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">Start with a free trial</h3>
+              <p className="text-slate-600 mb-4">
+                Try the Pro plan for 1 month. No credit card required.
               </p>
               <button
                 onClick={handleFreeTrial}
                 disabled={trialLoading}
-                className="bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2 mx-auto"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors inline-flex items-center gap-2"
               >
-                <span>{trialLoading ? 'Starting Trial...' : 'Start 14-Day Free Trial'}</span>
-                {!trialLoading && <ArrowRightIcon className="w-5 h-5" />}
+                <span>{trialLoading ? 'Starting trial...' : 'Start free trial'}</span>
+                {!trialLoading && <ArrowRightIcon className="w-4 h-4" />}
               </button>
-              <p className="text-sm text-gray-500 mt-3">
-                Includes: Biometric authentication, analytics, priority support, and more!
+              <p className="text-sm text-slate-500 mt-3">
+                Includes biometrics, analytics, and priority support.
               </p>
             </div>
 
             {/* Billing Period Toggle */}
             <div className="flex justify-center mb-8">
-              <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-2">
-                <div className="flex items-center space-x-2">
+              <div className="border border-slate-200 bg-white rounded-lg p-1">
+                <div className="flex items-center">
                   <button
                     onClick={() => setBillingPeriod('monthly')}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                       billingPeriod === 'monthly'
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                        : 'text-gray-700 hover:bg-white/30'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     Monthly
                   </button>
                   <button
                     onClick={() => setBillingPeriod('annually')}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 relative ${
+                    className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                       billingPeriod === 'annually'
-                        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                        : 'text-gray-700 hover:bg-white/30'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Annually
-                    <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                      Save 15%
-                    </span>
+                    Annual (Save 15%)
                   </button>
                 </div>
               </div>
@@ -440,17 +438,17 @@ export default function SubscribePage() {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative group ${plan.recommended ? 'scale-105 z-10' : ''}`}
+                className="relative"
               >
                 {/* Popular Badge */}
                 {plan.recommended && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
-                      Most Popular
+                    <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
+                      Most popular
                     </div>
                   </div>
                 )}
@@ -458,69 +456,62 @@ export default function SubscribePage() {
                 {/* Coming Soon Badge */}
                 {plan.comingSoon && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                    <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg animate-pulse">
+                    <div className="bg-slate-900 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
                       Coming Soon
                     </div>
                   </div>
                 )}
 
-                <div className="relative bg-white/20 backdrop-blur-xl border border-white/30 rounded-3xl p-8 hover:bg-white/30 transition-all duration-500 hover:scale-105 shadow-2xl">
-                  {/* Background Gradient */}
-                  <div className={`absolute inset-0 bg-gradient-to-br ${plan.gradient.replace('from-', 'from-').replace('to-', 'to-')}/10 opacity-0 group-hover:opacity-20 rounded-3xl transition-opacity duration-500`}></div>
-                  
-                  <div className="relative">
+                <div className={`bg-white border ${plan.recommended ? 'border-blue-600' : 'border-slate-200'} rounded-2xl p-6 shadow-sm`}>
+                  <div>
                     {/* Plan Header */}
                     <div className="text-center mb-8">
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                      <p className="text-gray-600 mb-6">{plan.description}</p>
+                      <h3 className="text-xl font-semibold text-slate-900 mb-2">{plan.name}</h3>
+                      <p className="text-sm text-slate-600">{plan.description}</p>
                       
                       {/* Pricing */}
                       <div className="mb-6">
                         <div className="flex items-center justify-center space-x-2 mb-2">
-                          <span className="text-4xl font-bold text-gray-900">
+                          <span className="text-3xl font-semibold text-slate-900">
                             ₹{formatINR(calculateFinalAmount(plan.price, billingPeriod) / 100)}
                           </span>
-                          <span className="text-gray-600">{getPeriodText(billingPeriod)}</span>
+                          <span className="text-slate-500">{getPeriodText(billingPeriod)}</span>
                         </div>
                         {billingPeriod === 'annually' && (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs text-slate-500">
                             <span className="line-through">₹{formatINR(plan.price * 12)}</span>
                             <span className="text-green-600 font-semibold ml-2">Save 15%</span>
                           </div>
                         )}
-                        <div className="text-sm text-gray-500 mt-1">
+                        <div className="text-xs text-slate-500 mt-1">
                           Base plan: ₹{formatINR(plan.price)}/month
                         </div>
-                        <div className="mt-3 flex items-center justify-center gap-3 text-xs text-gray-700">
-                          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700">{plan.deviceLimit} device{plan.deviceLimit > 1 ? 's' : ''}</span>
-                          <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700">{plan.storage}</span>
+                        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-600">
+                          <span className="px-3 py-1 rounded-full bg-slate-100">{plan.deviceLimit} device{plan.deviceLimit > 1 ? 's' : ''}</span>
+                          <span className="px-3 py-1 rounded-full bg-slate-100">{plan.storage}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Features */}
-                    <div className="space-y-4 mb-6">
-                      <h4 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Included Features</h4>
+                    <div className="space-y-3 mb-6">
+                      <h4 className="font-semibold text-slate-900 text-xs uppercase tracking-wide">Included features</h4>
                       {plan.features.map((feature, featureIdx) => (
-                        <div key={featureIdx} className="flex items-center space-x-3">
-                          <div className={`w-5 h-5 bg-gradient-to-r ${plan.gradient} rounded-full flex items-center justify-center flex-shrink-0`}>
-                            <CheckIcon className="w-3 h-3 text-white" />
-                          </div>
-                          <span className="text-gray-700 text-sm">{feature}</span>
+                        <div key={featureIdx} className="flex items-center gap-2">
+                          <CheckIcon className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm text-slate-600">{feature}</span>
                         </div>
                       ))}
                     </div>
 
                     {/* Limitations */}
                     {plan.limitations && plan.limitations.length > 0 && (
-                      <div className="space-y-4 mb-8">
-                        <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Limitations</h4>
+                      <div className="space-y-3 mb-8">
+                        <h4 className="font-semibold text-slate-500 text-xs uppercase tracking-wide">Limitations</h4>
                         {plan.limitations.map((limitation, limitationIdx) => (
-                          <div key={limitationIdx} className="flex items-center space-x-3">
-                            <div className="w-5 h-5 bg-gray-300 rounded-full flex items-center justify-center flex-shrink-0">
-                              <XMarkIcon className="w-3 h-3 text-gray-600" />
-                            </div>
-                            <span className="text-gray-600 text-sm">{limitation}</span>
+                          <div key={limitationIdx} className="flex items-center gap-2">
+                            <XMarkIcon className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm text-slate-500">{limitation}</span>
                           </div>
                         ))}
                       </div>
@@ -535,12 +526,9 @@ export default function SubscribePage() {
                       }}
                       disabled={loading === plan.name || plan.comingSoon}
                       className={`w-full ${plan.comingSoon 
-                        ? 'bg-gray-400 cursor-not-allowed opacity-70' 
-                        : `bg-gradient-to-r ${plan.gradient}`
-                      } text-white font-bold py-4 px-6 rounded-2xl shadow-lg ${plan.comingSoon 
-                        ? '' 
-                        : 'hover:shadow-xl transform hover:scale-105'
-                      } transition-all duration-300 flex items-center justify-center space-x-2 ${
+                        ? 'bg-slate-300 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700'
+                      } text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
                         loading === plan.name ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
@@ -553,45 +541,42 @@ export default function SubscribePage() {
                         }
                       </span>
                       {!plan.comingSoon && loading !== plan.name && (
-                        <ArrowRightIcon className="w-5 h-5" />
+                        <ArrowRightIcon className="w-4 h-4" />
                       )}
                     </button>
                     
                     <div className="mt-4 text-center">
-                      <p className="text-gray-500 text-sm">Cancel anytime • No setup fees</p>
+                      <p className="text-slate-500 text-xs">Cancel anytime • No setup fees</p>
                     </div>
                   </div>
-
-                  {/* Hover Effect */}
-                  <div className={`absolute inset-0 rounded-3xl bg-gradient-to-r ${plan.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300 -z-10`}></div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Sticky summary bar */}
-          <div className="sticky bottom-4 z-20">
-            <div className="bg-white/90 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="sticky bottom-4 z-20 mb-32">
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <div className="flex items-center gap-3 text-gray-900 font-semibold">
+                <div className="flex items-center gap-3 text-slate-900 font-semibold">
                   <span>{selectedPlanData.name} · {billingPeriod === 'annually' ? 'Annual (15% off)' : 'Monthly'}</span>
-                  <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">{selectedPlanData.deviceLimit} device{selectedPlanData.deviceLimit > 1 ? 's' : ''}</span>
-                  <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs">{selectedPlanData.storage}</span>
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.deviceLimit} device{selectedPlanData.deviceLimit > 1 ? 's' : ''}</span>
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.storage}</span>
                 </div>
-                <div className="text-sm text-gray-600 mt-1">₹{formatINR(calculateFinalAmount(selectedPlanData.price, billingPeriod) / 100)} {billingPeriod === 'annually' ? '/year (paid upfront)' : '/month'}</div>
+                <div className="text-sm text-slate-600 mt-1">₹{formatINR(calculateFinalAmount(selectedPlanData.price, billingPeriod) / 100)} {billingPeriod === 'annually' ? '/year (paid upfront)' : '/month'}</div>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => handleSubscribeWithValidation(selectedPlanData.name, billingPeriod)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-5 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors"
                 >
                   Complete purchase
                 </button>
                 <button
                   onClick={handleFreeTrial}
-                  className="px-4 py-3 rounded-xl border border-gray-200 text-gray-800 bg-white hover:bg-gray-50 transition font-semibold"
+                  className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:border-slate-300 transition-colors font-semibold"
                 >
-                  Start 14-day trial
+                  Start 1-month trial
                 </button>
               </div>
             </div>
@@ -599,23 +584,21 @@ export default function SubscribePage() {
 
           {/* Bottom Section */}
           <div className="text-center">
-            <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 max-w-4xl mx-auto">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Need Help Choosing?
-              </h3>
-              <p className="text-gray-600 mb-6">
-                All plans include our core loan management features. The difference is in cloud storage, device support, and additional premium features.
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-4xl mx-auto">
+              <h3 className="text-xl font-semibold text-slate-900 mb-3">Need help choosing?</h3>
+              <p className="text-slate-600 mb-6">
+                All plans include core loan management features. The main differences are cloud storage and device support.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <button className="bg-white/30 hover:bg-white/40 text-gray-700 font-semibold px-6 py-3 rounded-xl border border-white/40 transition-all duration-300">
-                  Contact Sales
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-2.5 rounded-lg hover:border-slate-300 transition-colors">
+                  Contact sales
                 </button>
-                <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-                  Try Free Demo
+                <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors">
+                  Try free demo
                 </button>
               </div>
-              <p className="text-gray-500 text-sm mt-4">
-                💡 14-day free trial available • Secure payment via Razorpay
+              <p className="text-slate-500 text-sm mt-4">
+                1-month free trial available • Secure payment via Razorpay
               </p>
             </div>
           </div>
@@ -624,11 +607,12 @@ export default function SubscribePage() {
 
       {/* Post-Purchase Success Modal */}
       {showPostPurchasePanel && postPurchaseData && (
-        <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/80 z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-in fade-in zoom-in duration-500">
             
             {/* Header with professional design */}
-            <div className="relative bg-slate-900 px-8 py-12 text-center text-white\">\n              <div className="relative">
+            <div className="relative bg-slate-900 px-8 py-12 text-center text-white">
+              <div className="relative">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-10 h-10 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -696,20 +680,18 @@ export default function SubscribePage() {
                     setShowPostPurchasePanel(false);
                     router.push('/download');
                   }}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
                 >
-                  <span>⬇️</span>
-                  <span>Download App Now</span>
+                  Download app now
                 </button>
                 <button
                   onClick={() => {
                     setShowPostPurchasePanel(false);
                     router.push('/profile');
                   }}
-                  className="flex-1 bg-white border-2 border-gray-200 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-50 transition-all duration-300 flex items-center justify-center gap-2"
+                  className="flex-1 bg-white border border-slate-200 text-slate-700 font-semibold py-3 px-6 rounded-lg hover:border-slate-300 transition-colors flex items-center justify-center"
                 >
-                  <span>⚙️</span>
-                  <span>Manage Devices</span>
+                  Manage devices
                 </button>
               </div>
 

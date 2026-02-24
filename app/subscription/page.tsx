@@ -24,11 +24,11 @@ export default async function MySubscriptionPage() {
 
   if (!subscription) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8 flex flex-col items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full text-center">
-          <h1 className="text-3xl font-bold mb-4">No Active Subscription</h1>
-          <p className="mb-6">You do not have an active subscription. Please choose a plan to get started.</p>
-          <Link href="/subscribe" className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">Choose Plan</Link>
+      <div className="min-h-screen bg-slate-50 p-8 flex flex-col items-center justify-center">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8 max-w-lg w-full text-center">
+          <h1 className="text-2xl font-semibold text-slate-900 mb-4">No active subscription</h1>
+          <p className="text-slate-600 mb-6">You do not have an active subscription. Please choose a plan to get started.</p>
+          <Link href="/subscribe" className="inline-block px-5 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">Choose plan</Link>
         </div>
       </div>
     );
@@ -39,39 +39,42 @@ export default async function MySubscriptionPage() {
   const isExpired = daysLeft === 0 || subscription.status === 'canceled';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 p-8">
+    <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-extrabold mb-10 text-center text-blue-900 drop-shadow">My Subscription</h1>
-        <div className="bg-white rounded-3xl shadow-2xl p-10 flex flex-col gap-8 items-center border border-blue-100">
+        <h1 className="text-3xl font-semibold mb-8 text-center text-slate-900 font-display">My subscription</h1>
+        <div className="bg-white rounded-2xl shadow-sm p-8 flex flex-col gap-8 items-center border border-slate-200">
           <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
-              <div className="text-2xl font-bold text-blue-700 mb-1 tracking-wide uppercase">{subscription.subscriptionType}</div>
-              <div className="text-gray-500">{subscription.username}</div>
+              <div className="text-xl font-semibold text-slate-900 mb-1 uppercase">{subscription.subscriptionType}</div>
+              <div className="text-slate-500">{subscription.username}</div>
             </div>
-            <div className={`flex items-center gap-2 px-4 py-1 rounded-full text-base font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{isActive ? <CheckCircleIcon className="w-5 h-5" /> : <XCircleIcon className="w-5 h-5" />}{isActive ? 'Active' : 'Inactive'}</div>
+            <div className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {isActive ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+              {isActive ? 'Active' : 'Inactive'}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
-            <div className="bg-blue-50 rounded-xl p-6 flex flex-col items-center">
-              <span className="text-gray-700">Start Date</span>
-              <span className="text-gray-800 font-bold text-lg">{new Date(subscription.startDate).toLocaleDateString()}</span>
+            <div className="bg-slate-50 rounded-xl p-6 flex flex-col items-center border border-slate-200">
+              <span className="text-slate-600">Start date</span>
+              <span className="text-slate-900 font-semibold text-lg">{new Date(subscription.startDate).toLocaleDateString()}</span>
             </div>
-            <div className="bg-blue-50 rounded-xl p-6 flex flex-col items-center">
-              <span className="text-gray-700">End Date</span>
-              <span className="text-gray-800 font-bold text-lg">{new Date(subscription.endDate).toLocaleDateString()}</span>
+            <div className="bg-slate-50 rounded-xl p-6 flex flex-col items-center border border-slate-200">
+              <span className="text-slate-600">End date</span>
+              <span className="text-slate-900 font-semibold text-lg">{new Date(subscription.endDate).toLocaleDateString()}</span>
             </div>
-            <div className="bg-blue-50 rounded-xl p-6 flex flex-col items-center">
-              <span className="text-gray-700">Days Left</span>
-              <span className="text-gray-800 font-bold text-lg">{daysLeft}</span>
+            <div className="bg-slate-50 rounded-xl p-6 flex flex-col items-center border border-slate-200">
+              <span className="text-slate-600">Days left</span>
+              <span className="text-slate-900 font-semibold text-lg">{daysLeft}</span>
             </div>
-            <div className="bg-blue-50 rounded-xl p-6 flex flex-col items-center">
-              <span className="text-gray-700">Renewal</span>
-              <span className="text-gray-800 font-bold text-lg">{isActive ? 'Auto-renewal enabled' : 'Expired'}</span>
+            <div className="bg-slate-50 rounded-xl p-6 flex flex-col items-center border border-slate-200">
+              <span className="text-slate-600">Renewal</span>
+              <span className="text-slate-900 font-semibold text-lg">{isActive ? 'Auto-renewal enabled' : 'Expired'}</span>
             </div>
           </div>
           <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">
-            <div className="text-gray-500 text-sm">Payment ID: <span className="font-mono">{subscription.paymentId}</span></div>
+            <div className="text-slate-500 text-sm">Payment ID: <span className="font-mono">{subscription.paymentId}</span></div>
             {subscription.receiptUrl && (
-              <a href={subscription.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-semibold">View Receipt</a>
+              <a href={subscription.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm font-semibold">View receipt</a>
             )}
           </div>
           {isActive && (

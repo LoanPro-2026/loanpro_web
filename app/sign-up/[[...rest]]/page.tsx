@@ -3,67 +3,57 @@
 import { SignUp, SignedIn, SignedOut } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { CheckIcon, SparklesIcon, LockClosedIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, SparklesIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 
 export default function SignUpPage() {
   const router = useRouter();
   const plans = [
     {
       name: "Basic",
-      color: "bg-blue-50",
-      icon: "💼",
       features: ["Single device", "Basic analytics", "Email support"]
     },
     {
       name: "Pro",
-      color: "bg-purple-50",
-      icon: "⭐",
-      features: ["Dual devices", "Advanced analytics", "Priority support", "Cloud sync"],
+      features: ["Dual devices", "Advanced analytics", "Priority support", "Cloud backup"],
       highlighted: true
     },
     {
       name: "Enterprise",
-      color: "bg-pink-50",
-      icon: "🚀",
-      features: ["Multi-device", "Custom features", "24/7 support", "Unlimited cloud"]
+      features: ["Multi-device", "Custom workflows", "Phone support", "Unlimited cloud"]
     }
   ];
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-white via-purple-50 to-blue-50 overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute top-1/4 left-0 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-blue-400/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-gradient-to-r from-blue-400/10 to-pink-400/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen bg-slate-50">
 
       <SignedIn>
         {/* Redirect signed-in users to profile */}
         <RedirectToProfile />
       </SignedIn>
       <SignedOut>
-      <div className="max-w-7xl mx-auto relative z-10 pt-24 pb-12 px-4">
+      <div className="max-w-7xl mx-auto pt-24 pb-12 px-4">
         {/* Header */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-            Create Your
-            <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"> LoanPro Account</span>
+          <h1 className="text-4xl sm:text-5xl font-semibold text-slate-900 font-display mb-4">
+            Create your LoanPro account
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-2">
-            Join thousands of users who manage their loans with confidence
+          <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-2">
+            Start with a 1-month Pro trial and set up your team in minutes.
           </p>
-          <p className="text-gray-500">Start with a 14-day free Pro trial • No credit card required</p>
+          <p className="text-slate-500 text-sm">No credit card required to start</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-16">
           {/* Sign-Up Form */}
           <div className="flex justify-center items-start">
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <SignUp 
                 fallbackRedirectUrl="/profile"
                 signInUrl="/sign-in"
                 appearance={{
                   elements: {
                     rootBox: "w-full",
-                    card: "shadow-2xl"
+                    card: "shadow-none"
                   }
                 }}
               />
@@ -73,29 +63,28 @@ export default function SignUpPage() {
           {/* Plans Overview */}
           <div className="space-y-8">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Plan After Sign Up</h2>
-              <p className="text-gray-600">Start with a 14-day free trial, then select the plan that fits your needs</p>
+              <h2 className="text-2xl font-semibold text-slate-900 font-display mb-2">Pick a plan after sign-up</h2>
+              <p className="text-slate-600">Choose the plan that matches your device and backup requirements.</p>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {plans.map((plan) => (
                 <div
                   key={plan.name}
-                  className={`${plan.color} rounded-2xl p-6 border-2 ${
-                    plan.highlighted ? "border-purple-300 ring-2 ring-purple-200" : "border-transparent"
-                  } relative`}
+                  className={`rounded-2xl p-6 border ${
+                    plan.highlighted ? "border-blue-600" : "border-slate-200"
+                  } bg-white relative`}
                 >
                   {plan.highlighted && (
-                    <div className="absolute -top-3 right-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                      POPULAR
+                    <div className="absolute -top-3 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                      Most popular
                     </div>
                   )}
-                  <div className="text-3xl mb-3">{plan.icon}</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">{plan.name}</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">{plan.name}</h3>
                   <ul className="space-y-2">
                     {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-gray-700">
-                        <CheckIcon className="h-5 w-5 text-green-600 flex-shrink-0" />
+                      <li key={feature} className="flex items-center gap-2 text-slate-600">
+                        <CheckIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
                       </li>
                     ))}
@@ -105,55 +94,55 @@ export default function SignUpPage() {
             </div>
 
             {/* Why LoanPro */}
-            <div className="bg-white/40 backdrop-blur-sm border border-white/60 rounded-2xl p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Why Choose LoanPro?</h3>
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Why teams choose LoanPro</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100">
+                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-50">
                       <LockClosedIcon className="h-6 w-6 text-blue-600" />
                     </div>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">Military-Grade Encryption</p>
-                    <p className="text-gray-600 text-xs mt-1">Your data is encrypted end-to-end</p>
+                    <p className="font-semibold text-slate-900 text-sm">Secure access controls</p>
+                    <p className="text-slate-600 text-xs mt-1">Role-based access and audit-ready workflows.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-purple-100">
-                      <SparklesIcon className="h-6 w-6 text-purple-600" />
+                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-50">
+                      <SparklesIcon className="h-6 w-6 text-blue-600" />
                     </div>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">Smart Dashboard</p>
-                    <p className="text-gray-600 text-xs mt-1">Real-time insights & analytics</p>
+                    <p className="font-semibold text-slate-900 text-sm">Clear reporting</p>
+                    <p className="text-slate-600 text-xs mt-1">Daily insights for collections and portfolio health.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100">
-                      <ClockIcon className="h-6 w-6 text-green-600" />
+                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-50">
+                      <LockClosedIcon className="h-6 w-6 text-blue-600" />
                     </div>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">Always Available</p>
-                    <p className="text-gray-600 text-xs mt-1">24/7 cloud access & sync</p>
+                    <p className="font-semibold text-slate-900 text-sm">Local-first performance</p>
+                    <p className="text-slate-600 text-xs mt-1">Fast day-to-day operations with optional backup.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-pink-100">
-                      <CheckIcon className="h-6 w-6 text-pink-600" />
+                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-50">
+                      <CheckIcon className="h-6 w-6 text-blue-600" />
                     </div>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm">Instant Device Binding</p>
-                    <p className="text-gray-600 text-xs mt-1">Secure access with biometrics</p>
+                    <p className="font-semibold text-slate-900 text-sm">Biometric access</p>
+                    <p className="text-slate-600 text-xs mt-1">Available for supported plans and devices.</p>
                   </div>
                 </div>
             </div>
@@ -162,13 +151,13 @@ export default function SignUpPage() {
 
         {/* Footer CTA */}
         <div className="text-center">
-          <p className="text-gray-600 mb-4">
-            Already have an account? 
-            <a href="/sign-in" className="text-purple-600 font-semibold hover:text-purple-700 ml-1">
+          <p className="text-slate-600 mb-4">
+            Already have an account?
+            <a href="/sign-in" className="text-blue-600 font-semibold hover:text-blue-700 ml-1">
               Sign in here
             </a>
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             By creating an account, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>

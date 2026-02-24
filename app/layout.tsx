@@ -1,15 +1,17 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import ToastProvider from '@/components/ToastProvider';
+import DialogProvider from '@/components/DialogProvider';
 import GlobalLoader from '@/components/GlobalLoader';
 import { TenantProvider } from '../components/TenantProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import AppWrapper from './AppWrapper';
 import { headers } from 'next/headers';
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-display" });
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -33,13 +35,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* Prevent MIME type sniffing */}
           <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         </head>
-        <body className={inter.className}>
+        <body className={`${inter.variable} ${plusJakarta.variable} antialiased`}>
           <ErrorBoundary>
             <ToastProvider>
-              <GlobalLoader />
-              <TenantProvider tenant={tenant}>
-                <AppWrapper>{children}</AppWrapper>
-              </TenantProvider>
+              <DialogProvider>
+                <GlobalLoader />
+                <TenantProvider tenant={tenant}>
+                  <AppWrapper>{children}</AppWrapper>
+                </TenantProvider>
+              </DialogProvider>
             </ToastProvider>
           </ErrorBoundary>
           {/* Global jQuery Load */}

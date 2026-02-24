@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders } from '../devices/cors';
+import { getCorsHeaders } from '@/lib/cors';
 
 // Remote configuration for desktop app
 export async function POST(req: Request) {

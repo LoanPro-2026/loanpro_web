@@ -116,3 +116,64 @@ export function getSubscriptionStatus(subscription: EnrichedSubscription): strin
     return 'expired';
   }
 }
+
+/**
+ * Get subscription end date from any field variant
+ * Handles legacy field names: endDate, subscriptionExpiresAt, expiryDate
+ * This ensures backward compatibility with different field naming conventions
+ * 
+ * @param subscription - Subscription object with potentially different date field names
+ * @returns Date object representing when subscription ends
+ * @throws Error if no end date field is found
+ */
+export function getSubscriptionEndDate(subscription: any): Date {
+  const endDateValue = subscription.endDate || 
+                       subscription.subscriptionExpiresAt || 
+                       subscription.expiryDate;
+  
+  if (!endDateValue) {
+    throw new Error('No end date found in subscription object');
+  }
+  
+  return new Date(endDateValue);
+}
+
+/**
+ * Get billing period in consistent format
+ * Converts between different naming conventions:
+ * - subscriptionType ('monthly'|'yearly') → billingPeriod ('monthly'|'annually')
+ * - billingPeriod ('monthly'|'annually') → kept as is
+ * 
+ * @param subscription - Subscription object with billing period info
+ * @returns Consistent billing period format: 'monthly' | 'annually'
+ */
+export function getBillingPeriod(subscription: any): 'monthly' | 'annually' {
+  // If billingPeriod exists, use it
+  if (subscription.billingPeriod) {
+    return subscription.billingPeriod === 'annually' ? 'annually' : 'monthly';
+  }
+  
+  // Fallback to subscriptionType (from SubscriptionService)
+  if (subscription.subscriptionType) {
+    return subscription.subscriptionType === 'yearly' ? 'annually' : 'monthly';
+  }
+  
+  // Default to monthly if nothing found
+  return 'monthly';
+}
+
+/**
+ * Normalize subscription type for SubscriptionService compatibility
+ * Converts billing period to subscription type format
+ * 
+ * @param billingPeriod - 'monthly' | 'annually'
+ * @returns 'monthly' | '6months' | 'yearly'
+ */
+export function normalizeSubscriptionType(billingPeriod: 'monthly' | 'annually'): 'monthly' | '6months' | 'yearly' {
+  const map: Record<string, 'monthly' | '6months' | 'yearly'> = {
+    'monthly': 'monthly',
+    'annually': 'yearly'
+  };
+  
+  return map[billingPeriod] || 'monthly';
+}

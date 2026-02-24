@@ -12,6 +12,7 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
+import { useDialog } from '@/components/DialogProvider';
 
 interface User {
   id: string;
@@ -26,6 +27,7 @@ interface User {
 
 const AdminUsersPage = () => {
   const { user, isLoaded } = useUser();
+  const dialog = useDialog();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,14 +54,22 @@ const AdminUsersPage = () => {
   };
 
   const handleBanUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to ban this user?')) return;
+    const shouldContinue = await dialog.confirm('Are you sure you want to ban this user?', {
+      title: 'Ban User',
+      confirmText: 'Ban',
+      cancelText: 'Cancel',
+      type: 'warning',
+    });
+    if (!shouldContinue) return;
     try {
       const response = await fetch(`/api/admin/users/${userId}/ban`, { method: 'POST' });
       if (response.ok) {
         setUsers(users.map(u => u.id === userId ? { ...u, status: 'banned' as const } : u));
+        await dialog.alert('User has been banned.', { title: 'Success', type: 'success' });
       }
     } catch (err) {
       console.error('Error banning user:', err);
+      await dialog.alert('Failed to ban user.', { title: 'Action Failed', type: 'error' });
     }
   };
 

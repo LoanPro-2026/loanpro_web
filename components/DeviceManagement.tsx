@@ -8,6 +8,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useDialog } from '@/components/DialogProvider';
 
 interface Device {
   deviceId: string;
@@ -30,6 +31,7 @@ interface DeviceUsage {
 
 const DeviceManagement = () => {
   const { user } = useUser();
+  const dialog = useDialog();
   const [devices, setDevices] = useState<Device[]>([]);
   const [deviceUsage, setDeviceUsage] = useState<DeviceUsage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +68,30 @@ const DeviceManagement = () => {
   };
 
   const revokeDevice = async (deviceId: string) => {
-    const reason = prompt('Reason for revoking this device (optional):') || 'User revoked';
-    
-    if (!confirm(`Are you sure you want to revoke this device?\n\nReason: ${reason}\n\nThis will:\n• Completely remove the device from your account\n• Prevent it from accessing your data\n• Require re-authorization if you want to use it again`)) {
+    const promptReason = await dialog.prompt('Reason for revoking this device (optional):', {
+      title: 'Revoke Device',
+      placeholder: 'Optional reason',
+      confirmText: 'Continue',
+      cancelText: 'Cancel',
+    });
+
+    if (promptReason === null) {
       return;
     }
+
+    const reason = promptReason || 'User revoked';
+
+    const shouldRevoke = await dialog.confirm(
+      `Are you sure you want to revoke this device?\n\nReason: ${reason}\n\nThis will:\n• Completely remove the device from your account\n• Prevent it from accessing your data\n• Require re-authorization if you want to use it again`,
+      {
+        title: 'Confirm Device Revoke',
+        confirmText: 'Revoke Device',
+        cancelText: 'Keep Device',
+        type: 'warning',
+      }
+    );
+
+    if (!shouldRevoke) return;
 
     try {
       const response = await fetch('/api/devices/revoke', {
@@ -83,7 +104,10 @@ const DeviceManagement = () => {
 
       if (!response.ok) {
         if (response.status === 429) {
-          alert(`Monthly revoke limit exceeded!\n\n${data.message}\n\nRevokes this month: ${data.revokesThisMonth}/${data.maxRevokesPerMonth}`);
+          await dialog.alert(
+            `Monthly revoke limit exceeded!\n\n${data.message}\n\nRevokes this month: ${data.revokesThisMonth}/${data.maxRevokesPerMonth}`,
+            { title: 'Limit Exceeded', type: 'warning' }
+          );
         } else {
           throw new Error(data.error || 'Failed to revoke device');
         }
@@ -91,13 +115,19 @@ const DeviceManagement = () => {
       }
       
       // Show success message with remaining revokes
-      alert(`Device revoked successfully!\n\nThe device has been completely removed from your account and will need to be re-authorized to access your data again.\n\nRevokes this month: ${data.revokesThisMonth}/${data.maxRevokesPerMonth}\nRemaining revokes: ${data.remainingRevokes}`);
+      await dialog.alert(
+        `Device revoked successfully!\n\nThe device has been completely removed from your account and will need to be re-authorized to access your data again.\n\nRevokes this month: ${data.revokesThisMonth}/${data.maxRevokesPerMonth}\nRemaining revokes: ${data.remainingRevokes}`,
+        { title: 'Device Revoked', type: 'success' }
+      );
       setRevokesInfo({ used: data.revokesThisMonth, remaining: data.remainingRevokes, max: data.maxRevokesPerMonth });
       
       // Refresh data
       fetchDevices();
     } catch (err) {
-      alert(`Error revoking device: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      await dialog.alert(`Error revoking device: ${err instanceof Error ? err.message : 'Unknown error'}`, {
+        title: 'Revoke Failed',
+        type: 'error',
+      });
     }
   };
 
@@ -162,13 +192,7 @@ const DeviceManagement = () => {
       {devices.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           <p className="mb-3">No devices registered yet.</p>
-          <p className="text-sm text-gray-600 mb-4">Install and sign in to the desktop app to register your first device.</p>
-          <a
-            href="/download"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold shadow hover:shadow-md transition"
-          >
-            Download desktop app
-          </a>
+          <p className="text-sm text-gray-600">Install and sign in to the desktop app to register your first device.</p>
         </div>
       ) : (
         <div className="space-y-4">

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders, handlePreflight } from './cors';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 
 export function OPTIONS(req: Request) {
-  return handlePreflight(req);
+  return handleCorsPreFlight(req);
 }
 
 // Clerk-authenticated device listing (for web dashboard)

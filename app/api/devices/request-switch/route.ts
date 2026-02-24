@@ -2,10 +2,11 @@
 
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getCorsHeaders, handlePreflight } from '../cors';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import emailService from '@/services/emailService';
 
 export function OPTIONS(req: Request) {
-  return handlePreflight(req);
+  return handleCorsPreFlight(req);
 }
 
 export async function POST(req: Request) {
@@ -38,6 +39,24 @@ export async function POST(req: Request) {
       { accessToken },
       { $push: { devices: deviceEntry } } as any
     );
+
+    const resolvedEmail = user.email || '';
+    const resolvedName =
+      user.fullName ||
+      user.username ||
+      (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
+
+    if (resolvedEmail) {
+      Promise.resolve(
+        emailService.sendDeviceSwitchRequestedEmail({
+          userName: resolvedName,
+          userEmail: resolvedEmail,
+          deviceName: deviceEntry.deviceName,
+          deviceId: deviceEntry.deviceId,
+          requestedAt: deviceEntry.lastActive
+        })
+      ).catch(() => undefined);
+    }
 
     return NextResponse.json({ success: true, message: 'Device switch requested', device: deviceEntry }, { headers: corsHeaders });
 

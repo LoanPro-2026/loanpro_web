@@ -12,6 +12,7 @@ import {
   ArrowRightIcon
 } from '@heroicons/react/24/outline';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
+import { useDialog } from '@/components/DialogProvider';
 
 interface Subscription {
   id: string;
@@ -28,6 +29,7 @@ interface Subscription {
 
 const AdminSubscriptionsPage = () => {
   const { user, isLoaded } = useUser();
+  const dialog = useDialog();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,19 +56,33 @@ const AdminSubscriptionsPage = () => {
   };
 
   const handleCancelSubscription = async (subId: string) => {
-    if (!confirm('Are you sure you want to cancel this subscription?')) return;
+    const shouldContinue = await dialog.confirm('Are you sure you want to cancel this subscription?', {
+      title: 'Cancel Subscription',
+      confirmText: 'Cancel Subscription',
+      cancelText: 'Keep Active',
+      type: 'warning',
+    });
+    if (!shouldContinue) return;
     try {
       const response = await fetch(`/api/admin/subscriptions/${subId}/cancel`, { method: 'POST' });
       if (response.ok) {
         setSubscriptions(subscriptions.map(s => s.id === subId ? { ...s, status: 'cancelled' as const } : s));
+        await dialog.alert('Subscription cancelled successfully.', { title: 'Success', type: 'success' });
       }
     } catch (err) {
       console.error('Error cancelling subscription:', err);
+      await dialog.alert('Failed to cancel subscription.', { title: 'Action Failed', type: 'error' });
     }
   };
 
   const handleExtendSubscription = async (subId: string) => {
-    const months = prompt('Extend for how many months?', '1');
+    const months = await dialog.prompt('Extend for how many months?', {
+      title: 'Extend Subscription',
+      defaultValue: '1',
+      placeholder: 'Months',
+      required: true,
+      confirmText: 'Extend',
+    });
     if (!months || isNaN(parseInt(months))) return;
 
     try {
@@ -77,9 +93,11 @@ const AdminSubscriptionsPage = () => {
       });
       if (response.ok) {
         fetchSubscriptions();
+        await dialog.alert('Subscription extended successfully.', { title: 'Success', type: 'success' });
       }
     } catch (err) {
       console.error('Error extending subscription:', err);
+      await dialog.alert('Failed to extend subscription.', { title: 'Action Failed', type: 'error' });
     }
   };
 

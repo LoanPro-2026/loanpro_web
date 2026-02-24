@@ -11,7 +11,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { username, email } = await req.json();
+    const { username, email, fullName } = await req.json();
 
     // Check if user already has an active trial or subscription
     const db = (await clientPromise).db('AdminDB');
@@ -44,28 +44,40 @@ export async function POST(req: Request) {
       }
     }
 
-    // Generate username from email
-    const generatedUsername = email?.split('@')[0].replace(/\./g, '') || username || '';
+    const resolvedUsername =
+      (typeof username === 'string' ? username.trim() : '') ||
+      (typeof existingUser?.username === 'string' ? existingUser.username : '') ||
+      (typeof email === 'string' && email ? email.split('@')[0].replace(/\./g, '') : '');
+
+    const resolvedEmail =
+      (typeof email === 'string' ? email.trim() : '') ||
+      (typeof existingUser?.email === 'string' ? existingUser.email : '');
+
+    const resolvedFullName =
+      (typeof fullName === 'string' ? fullName.trim() : '') ||
+      (typeof existingUser?.fullName === 'string' ? existingUser.fullName : '');
 
     // Generate a secure access token
     const accessToken = crypto.randomBytes(48).toString('hex');
     
-    // Calculate trial expiry (14 days from now)
+    // Calculate trial expiry (1 month from now)
     const trialExpiresAt = new Date();
-    trialExpiresAt.setDate(trialExpiresAt.getDate() + 14);
+    trialExpiresAt.setMonth(trialExpiresAt.getMonth() + 1);
 
     // Calculate grace period expiry (10 days after trial ends)
     const gracePeriodExpiresAt = new Date(trialExpiresAt);
     gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 10);
 
     // Upsert user in users collection (only user-specific data, no subscription data)
+    // IMPORTANT: Always set accessToken on trial activation (existing users need desktop access during trial)
     await db.collection('users').updateOne(
       { userId },
       {
         $set: {
           userId,
-          username: generatedUsername,
-          email,
+          username: resolvedUsername,
+          email: resolvedEmail,
+          fullName: resolvedFullName,
           accessToken,
           hasUsedTrial: true, // Mark that user has used their trial
           trialStartedAt: new Date() // Track when trial started
@@ -95,7 +107,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true,
-      message: '14-day Pro trial started successfully!',
+      message: '1-month Pro trial started successfully!',
       trialExpiresAt,
       accessToken,
       redirectUrl: '/download'

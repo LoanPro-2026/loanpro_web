@@ -23,9 +23,9 @@ try {
 // Plan pricing configuration (monthly price in paise)
 // Note: For Razorpay test mode, yearly plans should not exceed ₹10,000 total
 const PLAN_PRICES: Record<string, number> = {
-  'Basic': 69900,      // ₹699/month (yearly with 15% discount: ₹7,134)
-  'Pro': 83300,        // ₹833/month (yearly with 15% discount: ₹8,496)
-  'Enterprise': 97900, // ₹979/month (yearly with 15% discount: ₹9,983)
+  'Basic': 59900,      // ₹599/month (yearly with 15% discount: ₹6,117)
+  'Pro': 89900,        // ₹899/month (yearly with 15% discount: ₹9,179)
+  'Enterprise': 139900, // ₹1399/month (yearly with 15% discount: ₹14,287)
 };
 
 export async function POST(req: Request) {
@@ -81,7 +81,10 @@ export async function POST(req: Request) {
       });
     }
 
-    const { plan, billingPeriod = 'monthly', amount } = body;
+    const { plan, billingPeriod = 'monthly', amount, paymentContext = 'new' } = body;
+
+    const allowedContexts = ['new', 'renewal', 'upgrade'];
+    const normalizedPaymentContext = allowedContexts.includes(paymentContext) ? paymentContext : 'new';
 
     // IDEMPOTENCY: Check for existing pending order (prevent duplicate orders)
     const { connectToDatabase } = await import('@/lib/mongodb');
@@ -92,6 +95,7 @@ export async function POST(req: Request) {
       userId,
       plan,
       billingPeriod,
+      paymentContext: normalizedPaymentContext,
       status: 'pending',
       createdAt: { $gt: fiveMinutesAgo }
     });
@@ -185,6 +189,7 @@ export async function POST(req: Request) {
           userId,
           plan,
           billingPeriod,
+          paymentContext: normalizedPaymentContext,
         },
       });
       console.log('[CREATE-ORDER] Razorpay order created:', order.id);
@@ -201,6 +206,7 @@ export async function POST(req: Request) {
       orderId: order.id,
       plan,
       billingPeriod,
+      paymentContext: normalizedPaymentContext,
       amount: orderAmount,
       status: 'pending',
       createdAt: new Date(),

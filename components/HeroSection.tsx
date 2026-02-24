@@ -1,88 +1,80 @@
-'use client';
 import React from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
-import { ArrowDownIcon, PlayIcon, ChartBarIcon, ShieldCheckIcon, CpuChipIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background Gradients */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-blue-100"></div>
-      <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/10 via-transparent to-purple-600/10"></div>
-      
-      {/* Floating Elements */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-xl animate-pulse"></div>
-      <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-r from-purple-400/20 to-blue-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
-      <div className="absolute bottom-20 left-20 w-40 h-40 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-2xl animate-pulse delay-500"></div>
-      
-      {/* Main Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-32">
-        <div className="mb-8">
-          <div className="inline-flex items-center space-x-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-6 py-3 mb-8">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-gray-700 font-medium">Professional Loan Management Solution</span>
+    <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.08),transparent_40%)]"></div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
+              Trusted by loan teams across India
+            </div>
+
+            <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-slate-900 font-display leading-tight">
+              Professional loan management for modern teams
+            </h1>
+
+            <p className="mt-5 text-lg text-slate-600 max-w-xl">
+              LoanPro is a Windows desktop platform for tracking loans, collections, and portfolios with optional cloud backup and biometric access for secured workflows.
+            </p>
+
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <SignedOut>
+                <SignUpButton mode="modal">
+                  <button className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+                    Get started
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </SignUpButton>
+              </SignedOut>
+
+              <SignedIn>
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+                >
+                  Go to dashboard
+                  <ArrowRightIcon className="w-4 h-4" />
+                </Link>
+              </SignedIn>
+
+              <Link
+                href="/download"
+                className="inline-flex items-center justify-center gap-2 border border-slate-200 bg-white text-slate-700 font-semibold px-6 py-3 rounded-lg hover:border-slate-300 hover:text-slate-900 transition-colors"
+              >
+                Download app
+              </Link>
+            </div>
+
+            <div className="mt-6 text-sm text-slate-500">
+              Windows 10+ required. Biometric scanner supported for Pro and Enterprise plans.
+            </div>
           </div>
-        </div>
 
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-6 leading-tight">
-          <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Modern Loan
-          </span>
-          <br />
-          <span className="text-gray-800">Management</span>
-        </h1>
-        
-        <p className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
-          Streamline your lending operations with our powerful desktop application featuring 
-          <span className="text-blue-600 font-semibold"> advanced dashboard</span>, 
-          <span className="text-purple-600 font-semibold"> biometric authentication</span>, and 
-          <span className="text-blue-600 font-semibold"> seamless cloud integration</span>.
-        </p>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-16">
-          <SignedOut>
-            <SignUpButton mode="modal">
-              <button className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-4 rounded-2xl shadow-2xl hover:shadow-blue-500/25 transform hover:scale-105 transition-all duration-300">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-purple-700 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <span className="relative flex items-center space-x-2">
-                  <span>Start Free Trial</span>
-                  <ArrowDownIcon className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" />
-                </span>
-              </button>
-            </SignUpButton>
-          </SignedOut>
-
-          <SignedIn>
-            <Link href="/profile">
-              <button className="group relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-4 rounded-2xl shadow-2xl hover:shadow-blue-500/25 transform hover:scale-105 transition-all duration-300">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-purple-700 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <span className="relative flex items-center space-x-2">
-                  <span>Go to Dashboard</span>
-                  <ArrowDownIcon className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" />
-                </span>
-              </button>
-            </Link>
-          </SignedIn>
-
-          <Link href="/download">
-            <button className="group bg-white/20 backdrop-blur-sm border border-white/30 text-gray-700 font-semibold px-8 py-4 rounded-2xl hover:bg-white/30 transition-all duration-300 shadow-xl">
-              <span className="flex items-center space-x-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>Download App</span>
-              </span>
-            </button>
-          </Link>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="mt-16 flex justify-center">
-          <button className="animate-bounce bg-white/20 backdrop-blur-sm border border-white/30 rounded-full p-3 hover:bg-white/30 transition-all duration-300">
-            <ArrowDownIcon className="w-6 h-6 text-gray-600" />
-          </button>
+          <div className="relative">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+                <div className="flex gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+                </div>
+                <span className="text-sm font-semibold text-slate-600">LoanPro Dashboard</span>
+              </div>
+              <div className="p-4">
+                <img
+                  src="/screenshots/hero/hero-dashboard.png"
+                  alt="LoanPro dashboard preview"
+                  className="w-full h-auto rounded-xl border border-slate-200 object-cover"
+                />
+              </div>
+            </div>
+            <div className="absolute -z-10 -bottom-6 -right-6 h-24 w-24 rounded-full bg-blue-100"></div>
+          </div>
         </div>
       </div>
     </section>

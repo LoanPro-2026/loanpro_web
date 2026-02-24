@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useDialog } from '@/components/DialogProvider';
 
 interface Ticket {
   _id: string;
@@ -24,6 +25,7 @@ interface Stats {
 }
 
 export default function AdminSupportPage() {
+  const dialog = useDialog();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [stats, setStats] = useState<Stats>({ open: 0, 'in-progress': 0, resolved: 0, closed: 0 });
   const [loading, setLoading] = useState(true);
@@ -34,13 +36,27 @@ export default function AdminSupportPage() {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    // Get admin token from localStorage or prompt
-    const token = localStorage.getItem('adminToken') || prompt('Enter admin token:');
-    if (token) {
-      localStorage.setItem('adminToken', token);
-      setAdminToken(token);
-      fetchTickets(token);
-    }
+    const initializeToken = async () => {
+      const existingToken = localStorage.getItem('adminToken');
+      let token = existingToken;
+
+      if (!token) {
+        token = await dialog.prompt('Enter admin token:', {
+          title: 'Admin Token Required',
+          placeholder: 'Admin token',
+          required: true,
+          confirmText: 'Continue',
+        });
+      }
+
+      if (token) {
+        localStorage.setItem('adminToken', token);
+        setAdminToken(token);
+        fetchTickets(token);
+      }
+    };
+
+    initializeToken();
   }, [statusFilter]);
 
   const fetchTickets = async (token: string) => {
@@ -62,7 +78,10 @@ export default function AdminSupportPage() {
         setTickets(data.tickets);
         setStats(data.stats);
       } else {
-        alert('Failed to fetch tickets. Check your admin token.');
+        await dialog.alert('Failed to fetch tickets. Check your admin token.', {
+          title: 'Fetch Failed',
+          type: 'error',
+        });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -106,12 +125,12 @@ export default function AdminSupportPage() {
       });
 
       if (res.ok) {
-        alert('Response sent!');
+        await dialog.alert('Response sent!', { title: 'Success', type: 'success' });
         setResponse('');
         fetchTicketDetail(selectedTicket.ticketId);
         fetchTickets(adminToken);
       } else {
-        alert('Failed to send response');
+        await dialog.alert('Failed to send response', { title: 'Send Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error:', error);
@@ -134,7 +153,7 @@ export default function AdminSupportPage() {
       });
 
       if (res.ok) {
-        alert('Status updated!');
+        await dialog.alert('Status updated!', { title: 'Success', type: 'success' });
         fetchTicketDetail(selectedTicket.ticketId);
         fetchTickets(adminToken);
       }

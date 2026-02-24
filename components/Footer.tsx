@@ -1,178 +1,111 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
-import { 
-  EnvelopeIcon, 
-  PhoneIcon, 
-  MapPinIcon,
-  ArrowTopRightOnSquareIcon
+import {
+  EnvelopeIcon,
+  PhoneIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 
 const Footer = () => (
-  <footer className="relative bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden">
-    {/* Background Elements */}
-    <div className="absolute inset-0 bg-black/20"></div>
-    <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-full blur-3xl"></div>
-    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-600/10 to-pink-600/10 rounded-full blur-3xl"></div>
-    
-    <div className="relative">
-      {/* Main Footer Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          
-          {/* Company Info */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl blur-lg opacity-30"></div>
-                <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xl px-4 py-2 rounded-xl">
-                  LoanPro
-                </div>
-              </div>
-              <span className="text-sm font-medium text-gray-300">Modern Loan Management</span>
+  <footer className="bg-slate-950 text-slate-200">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
+        <div className="lg:col-span-2">
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/brand/loanpro-logo-dark.png"
+              alt="LoanPro logo"
+              width={130}
+              height={38}
+            />
+          </Link>
+          <p className="mt-4 text-sm text-slate-400 max-w-md">
+            LoanPro is a Windows desktop loan management platform built for clarity, control, and secure operations.
+          </p>
+          <div className="mt-6 space-y-3 text-sm text-slate-400">
+            <div className="flex items-center gap-3">
+              <EnvelopeIcon className="w-4 h-4 text-slate-500" />
+              <a href="mailto:support@loanpro.tech" className="hover:text-white transition-colors">
+                support@loanpro.tech
+              </a>
             </div>
-            
-            <p className="text-gray-300 mb-6 leading-relaxed max-w-md">
-              Revolutionizing loan management with cutting-edge technology, bank-grade security, 
-              and intuitive design. Trusted by thousands of loan professionals worldwide.
-            </p>
-            
-            {/* Contact Info */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3 text-gray-300">
-                <EnvelopeIcon className="w-5 h-5 text-blue-400" />
-                <a href="mailto:support@loanpro.tech" className="hover:text-blue-400 transition-colors">
-                  support@loanpro.tech
-                </a>
-              </div>
-              <div className="flex items-center space-x-3 text-gray-300">
-                <PhoneIcon className="w-5 h-5 text-blue-400" />
-                <a href="tel:+911234567890" className="hover:text-blue-400 transition-colors">
-                  +91 12345 67890
-                </a>
-              </div>
-              <div className="flex items-center space-x-3 text-gray-300">
-                <MapPinIcon className="w-5 h-5 text-blue-400" />
-                <span>Mumbai, Maharashtra, India</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <PhoneIcon className="w-4 h-4 text-slate-500" />
+              <a href="tel:+911234567890" className="hover:text-white transition-colors">
+                +91 12345 67890
+              </a>
             </div>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-lg font-bold text-white mb-6 relative">
-              Quick Links
-              <div className="absolute -bottom-2 left-0 w-12 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600"></div>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                { href: '/#features', label: 'Features' },
-                { href: '/#pricing', label: 'Pricing' },
-                { href: '/download', label: 'Download' },
-                { href: '/#faq', label: 'FAQ' },
-                { href: '/#reviews', label: 'Reviews' }
-              ].map((link, idx) => (
-                <li key={idx}>
-                  <Link 
-                    href={link.href} 
-                    className="text-gray-300 hover:text-blue-400 transition-colors flex items-center space-x-2 group"
-                  >
-                    <span>{link.label}</span>
-                    <ArrowTopRightOnSquareIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal & Support */}
-          <div>
-            <h3 className="text-lg font-bold text-white mb-6 relative">
-              Legal & Support
-              <div className="absolute -bottom-2 left-0 w-12 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600"></div>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                { href: '/terms', label: 'Terms of Service' },
-                { href: '/privacy', label: 'Privacy Policy' },
-                { href: '/payment-policy', label: 'Payment Policy' },
-                { href: '/cancellation-policy', label: 'Cancellation Policy' },
-                { href: '/support', label: 'Support Center' }
-              ].map((link, idx) => (
-                <li key={idx}>
-                  <Link 
-                    href={link.href} 
-                    className="text-gray-300 hover:text-blue-400 transition-colors flex items-center space-x-2 group"
-                  >
-                    <span>{link.label}</span>
-                    <ArrowTopRightOnSquareIcon className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div className="flex items-center gap-3">
+              <MapPinIcon className="w-4 h-4 text-slate-500" />
+              <span>Mumbai, Maharashtra, India</span>
+            </div>
           </div>
         </div>
 
-        {/* CTA Section */}
-        <div className="mt-16 pt-12 border-t border-gray-700/50">
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center">
-            <h3 className="text-2xl font-bold text-white mb-4">
-              Ready to Transform Your Loan Management?
-            </h3>
-            <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Join thousands of satisfied users who have revolutionized their loan operations with LoanPro's advanced features and secure platform.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <SignedOut>
-                <SignUpButton mode="modal">
-                  <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-                    Start Free Trial
-                  </button>
-                </SignUpButton>
-              </SignedOut>
-              
-              <SignedIn>
-                <Link href="/profile">
-                  <button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
-                    Go to Dashboard
-                  </button>
-                </Link>
-              </SignedIn>
-              
-              <Link href="/download">
-                <button className="bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-3 rounded-xl border border-white/20 transition-all duration-300">
-                  Download App
-                </button>
-              </Link>
-            </div>
-          </div>
+        <div>
+          <h3 className="text-sm font-semibold text-white">Product</h3>
+          <ul className="mt-4 space-y-3 text-sm text-slate-400">
+            <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
+            <li><Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+            <li><Link href="/download" className="hover:text-white transition-colors">Download</Link></li>
+            <li><Link href="/#faq" className="hover:text-white transition-colors">FAQs</Link></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-white">Company</h3>
+          <ul className="mt-4 space-y-3 text-sm text-slate-400">
+            <li><Link href="/support" className="hover:text-white transition-colors">Support</Link></li>
+            <li><Link href="/subscription" className="hover:text-white transition-colors">Plans</Link></li>
+            <li><Link href="/profile" className="hover:text-white transition-colors">Account</Link></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-white">Legal</h3>
+          <ul className="mt-4 space-y-3 text-sm text-slate-400">
+            <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+            <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+            <li><Link href="/payment-policy" className="hover:text-white transition-colors">Payment Policy</Link></li>
+            <li><Link href="/cancellation-policy" className="hover:text-white transition-colors">Cancellation Policy</Link></li>
+          </ul>
         </div>
       </div>
 
-      {/* Bottom Bar */}
-      <div className="border-t border-gray-700/50 bg-black/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            <div className="text-gray-400 text-sm">
-              © {new Date().getFullYear()} LoanPro. All rights reserved. Built with ❤️ in India.
-            </div>
-            
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>All systems operational</span>
-              </div>
-              
-              {/* Social Links */}
-              <div className="flex items-center space-x-4">
-                {/* Add social media icons here if needed */}
-                <div className="text-gray-400 text-sm">
-                  Follow us for updates
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="mt-12 flex flex-col md:flex-row items-center justify-between gap-4 border-t border-slate-800 pt-6 text-sm text-slate-500">
+        <div>© {new Date().getFullYear()} LoanPro. All rights reserved.</div>
+        <div>Built in India.</div>
+      </div>
+
+      <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
+        <h3 className="text-lg font-semibold text-white">Ready to streamline loan operations?</h3>
+        <p className="mt-2 text-sm text-slate-400">
+          Start with a 1-month Pro trial or download the desktop app today.
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <SignedOut>
+            <SignUpButton mode="modal">
+              <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors">
+                Start free trial
+              </button>
+            </SignUpButton>
+          </SignedOut>
+          <SignedIn>
+            <Link
+              href="/profile"
+              className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors"
+            >
+              Go to dashboard
+            </Link>
+          </SignedIn>
+          <Link
+            href="/download"
+            className="rounded-lg border border-slate-700 bg-slate-900 text-white font-semibold px-5 py-2.5 hover:border-slate-500 transition-colors"
+          >
+            Download app
+          </Link>
         </div>
       </div>
     </div>

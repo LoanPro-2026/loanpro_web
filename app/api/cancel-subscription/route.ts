@@ -6,6 +6,7 @@ import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateCancellationRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { logger } from '@/lib/logger';
+import emailService from '@/services/emailService';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -14,9 +15,9 @@ const razorpay = new Razorpay({
 
 // Plan pricing (monthly rates)
 const PLAN_PRICES = {
-  basic: 699,
-  pro: 833,
-  enterprise: 979
+  basic: 599,
+  pro: 899,
+  enterprise: 1399
 };
 
 // Payment gateway fee (2.5% + fixed amount) - matches actual Razorpay charges
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
     // Get current active subscription or trial
     const currentSubscription = await db.collection('subscriptions').findOne({
       userId,
-      status: 'active' // Both trial and paid subscriptions have status 'active' in your DB
+      status: { $in: ['active', 'trial', 'active_subscription'] }
     });
     
     if (!currentSubscription) {
@@ -124,26 +125,76 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle trial cancellation - completely delete trial user data
-    if (currentSubscription.subscriptionPlan === 'trial') {
-      console.log('Processing trial cancellation - deleting all trial user data');
+    // Handle trial cancellation - delete trial subscription but keep user record without token
+    const isTrialSubscription =
+      (currentSubscription.subscriptionPlan || '').toLowerCase() === 'trial' ||
+      (currentSubscription.plan || '').toLowerCase() === 'trial' ||
+      (currentSubscription.subscriptionType || '').toLowerCase() === 'trial' ||
+      (currentSubscription.status || '').toLowerCase() === 'trial';
+
+    if (isTrialSubscription) {
+      logger.info('Processing trial cancellation - removing access token', 'CANCEL_SUBSCRIPTION', { userId });
       
       // Delete from subscriptions collection
       await db.collection('subscriptions').deleteOne({ _id: currentSubscription._id });
-      console.log('Deleted trial subscription record');
+      logger.info('Deleted trial subscription record', 'CANCEL_SUBSCRIPTION');
       
-      // Delete from users collection
-      await db.collection('users').deleteOne({ userId });
-      console.log('Deleted trial user record');
+      // Remove access token from user (prevent access without active subscription)
+      await db.collection('users').updateOne(
+        { userId },
+        {
+          $set: {
+            accessToken: null,
+            status: 'trial_cancelled'
+          }
+        }
+      );
+      logger.info('Removed user access token', 'CANCEL_SUBSCRIPTION');
+
+      try {
+        const userRecord = await db.collection('users').findOne(
+          { userId },
+          { projection: { email: 1, username: 1, fullName: 1 } }
+        );
+        const resolvedEmail = userRecord?.email || '';
+        const resolvedName =
+          userRecord?.fullName ||
+          userRecord?.username ||
+          (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
+
+        if (resolvedEmail && resolvedEmail.includes('@')) {
+          Promise.resolve(
+            emailService.sendTrialCancellationEmail({
+              userName: resolvedName,
+              userEmail: resolvedEmail,
+              cancelledAt: new Date()
+            })
+          ).catch(err => {
+            logger.warn('Trial cancellation email failed', 'CANCEL_SUBSCRIPTION', {
+              userId,
+              error: err instanceof Error ? err.message : 'unknown'
+            });
+          });
+        }
+      } catch (emailError) {
+        logger.warn('Failed to prepare trial cancellation email', 'CANCEL_SUBSCRIPTION', {
+          userId,
+          error: emailError instanceof Error ? emailError.message : 'unknown'
+        });
+      }
       
       return NextResponse.json({
         success: true,
-        message: 'Trial subscription cancelled successfully. All trial data has been removed.',
+        message: 'Trial subscription cancelled successfully. Access token has been removed.',
         isTrial: true,
         dataDeleted: true
       });
     }
     
-    // Calculate usage and refund
+    // Handle paid subscription cancellation
+    logger.info('Processing paid subscription cancellation - issuing refund and removing access token', 'CANCEL_SUBSCRIPTION');
+    
+    // Mark subscription as cancelled and remove user access token
     const startDate = new Date(currentSubscription.startDate);
     const endDate = new Date(currentSubscription.endDate);
     const today = new Date();
@@ -177,17 +228,44 @@ export async function POST(request: NextRequest) {
         logger.info('Payment found by subscriptionId', 'CANCEL_SUBSCRIPTION');
       }
     }
-    
+
     if (!paymentHistory) {
-      // Priority 3: Fallback to most recent completed payment for this user
-      // (less reliable but better than nothing)
+      // Priority 2b: Try with 'captured' status as well
       paymentHistory = await db.collection('payments').findOne({
         userId,
-        status: 'completed'
+        subscriptionId: currentSubscription._id.toString(),
+        status: 'captured'
+      });
+      if (paymentHistory) {
+        logger.info('Payment found by subscriptionId with captured status', 'CANCEL_SUBSCRIPTION');
+      }
+    }
+    
+    if (!paymentHistory) {
+      // Priority 3: Fallback to most recent payment for this user by plan and user
+      paymentHistory = await db.collection('payments').findOne({
+        userId,
+        plan: { $regex: new RegExp(currentSubscription.subscriptionType || currentSubscription.plan || 'basic', 'i') },
+        status: { $in: ['completed', 'captured'] }
       }, { sort: { createdAt: -1, _id: -1 } });
       
       if (paymentHistory) {
-        logger.warn('Using most recent payment as fallback', 'CANCEL_SUBSCRIPTION', {
+        logger.warn('Using most recent payment by plan type as fallback', 'CANCEL_SUBSCRIPTION', {
+          userId,
+          plan: currentSubscription.subscriptionType || currentSubscription.plan
+        });
+      }
+    }
+
+    if (!paymentHistory) {
+      // Priority 4: Last resort - any recent payment for this user
+      paymentHistory = await db.collection('payments').findOne({
+        userId,
+        status: { $in: ['completed', 'captured'] }
+      }, { sort: { createdAt: -1, _id: -1 } });
+      
+      if (paymentHistory) {
+        logger.warn('Using any most recent payment as fallback', 'CANCEL_SUBSCRIPTION', {
           userId,
           paymentId: paymentHistory.paymentId
         });
@@ -195,34 +273,111 @@ export async function POST(request: NextRequest) {
     }
     
     if (!paymentHistory) {
-      // If no payment history found, handle as trial or free subscription
-      console.warn('No payment history found for subscription cancellation, treating as trial/free subscription');
+      // If no payment history found, but it's a paid plan subscription (not trial), estimate from plan
+      const planType = (currentSubscription.subscriptionType || currentSubscription.plan || 'basic').toLowerCase();
       
-      await db.collection('subscriptions').updateOne(
-        { _id: currentSubscription._id },
-        {
-          $set: {
-            status: 'cancelled',
-            cancelledDate: new Date(),
-            cancellationReason: reason
-          }
+      // Check if this is actually a paid subscription by checking if it has a paymentId or isRenewal/isUpgrade marker
+      const hasPaidIndicator = currentSubscription.paymentId || currentSubscription.isRenewal || currentSubscription.isUpgrade;
+      
+      if (hasPaidIndicator || (planType !== 'trial' && currentSubscription.status === 'active')) {
+        // This looks like a paid subscription, estimate the refund
+        logger.warn('No payment record found but subscription appears to be paid - estimating from plan', 'CANCEL_SUBSCRIPTION', {
+          userId,
+          plan: planType,
+          hasPaidIndicator
+        });
+        
+        // Estimate based on plan type
+        let estimatedAmount = PLAN_PRICES[planType as keyof typeof PLAN_PRICES] || 599;
+        const billingPeriod = currentSubscription.billingPeriod || 'monthly';
+        
+        // For annual billing, multiply by 12 and apply 15% discount
+        if (billingPeriod === 'annually') {
+          estimatedAmount = Math.round(estimatedAmount * 12 * 0.85);
         }
-      );
 
-      return NextResponse.json({
-        success: true,
-        message: 'Subscription cancelled successfully. No refund applicable.',
-        isTrial: true,
-        refundCalculation: {
-          totalPaid: 0,
-          netRefund: 0,
-          message: 'No payment record found - likely trial subscription'
-        }
-      });
+        // Use estimated amount for refund calculation
+        paymentHistory = {
+          amount: estimatedAmount,
+          razorpayPaymentId: 'estimated',
+          paymentId: 'estimated',
+          status: 'completed'
+        };
+
+        logger.info('Using estimated payment amount for refund calculation', 'CANCEL_SUBSCRIPTION', {
+          plan: planType,
+          estimatedAmount,
+          billingPeriod
+        });
+      } else {
+        // If no payment history found and not a paid subscription, handle as trial
+        logger.warn('No payment history found for subscription cancellation, treating as trial/free subscription', 'CANCEL_SUBSCRIPTION');
+        
+        await db.collection('subscriptions').updateOne(
+          { _id: currentSubscription._id },
+          {
+            $set: {
+              status: 'cancelled',
+              cancelledDate: new Date(),
+              cancellationReason: reason
+            }
+          }
+        );
+
+        return NextResponse.json({
+          success: true,
+          message: 'Subscription cancelled successfully. No refund applicable.',
+          isTrial: true,
+          refundCalculation: {
+            totalPaid: 0,
+            netRefund: 0,
+            message: 'No payment record found - trial or free subscription'
+          }
+        });
+      }
     }
     
-    const originalAmount = paymentHistory.amount;
+    let originalAmount = typeof paymentHistory.amount === 'number' ? paymentHistory.amount : 0;
+    const paymentLookupId = (paymentHistory as any)?.razorpayPaymentId || (paymentHistory as any)?.paymentId;
+
+    if (originalAmount <= 0 && (paymentHistory as any)?.orderId) {
+      const orderIntent = await db.collection('order_intents').findOne({ orderId: (paymentHistory as any).orderId });
+      if (orderIntent?.amount) {
+        originalAmount = Math.round(orderIntent.amount / 100);
+      }
+    }
+
+    if (originalAmount <= 0 && paymentLookupId) {
+      try {
+        const razorpayPayment = await razorpay.payments.fetch(paymentLookupId);
+        if (razorpayPayment?.amount) {
+          originalAmount = Math.round((razorpayPayment.amount as number) / 100);
+        }
+      } catch (fetchError) {
+        logger.warn('Unable to fetch Razorpay payment amount', 'CANCEL_SUBSCRIPTION', {
+          userId,
+          paymentId: paymentLookupId,
+          error: fetchError instanceof Error ? fetchError.message : 'unknown'
+        });
+      }
+    }
+
     const billingPeriod = currentSubscription.billingPeriod || 'monthly';
+
+    if (originalAmount <= 0) {
+      const planType = (currentSubscription.subscriptionType || currentSubscription.plan || currentSubscription.subscriptionPlan || 'basic').toLowerCase();
+      let estimatedAmount = PLAN_PRICES[planType as keyof typeof PLAN_PRICES] || 599;
+      if (billingPeriod === 'annually') {
+        estimatedAmount = Math.round(estimatedAmount * 12 * 0.85);
+      }
+      originalAmount = estimatedAmount;
+      logger.warn('Fallback to estimated plan amount for refund', 'CANCEL_SUBSCRIPTION', {
+        userId,
+        plan: planType,
+        estimatedAmount,
+        billingPeriod
+      });
+    }
     
     // Calculate refund
     const refundCalculation = calculateRefundAmount(
@@ -264,13 +419,15 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // IMPORTANT: Also update user status to cancelled
+    // IMPORTANT: Remove user access token and update user status on cancellation
+    // This prevents the user from using the desktop app after cancellation
     await db.collection('users').updateOne(
       { userId },
       {
         $set: {
           status: 'cancelled_subscription',
           subscriptionType: 'cancelled',
+          accessToken: null, // Remove access token on cancellation
           cancelledDate: new Date(),
           cancellationReason: reason,
           // Keep subscription plan info for reference
@@ -280,7 +437,7 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    console.log('Subscription cancelled:', {
+    logger.info('Subscription cancelled', 'CANCEL_SUBSCRIPTION', {
       userId,
       subscriptionId: currentSubscription._id.toString(),
       plan: currentSubscription.subscriptionPlan || currentSubscription.plan,
@@ -317,7 +474,7 @@ export async function POST(request: NextRequest) {
         );
         
       } catch (razorpayError) {
-        console.error('Razorpay refund creation failed:', razorpayError);
+        logger.error('Razorpay refund creation failed', razorpayError, 'CANCEL_SUBSCRIPTION');
         // Continue without Razorpay refund - manual processing will handle it
       }
     }
@@ -345,18 +502,56 @@ export async function POST(request: NextRequest) {
     }
     
     // Log cancellation for admin review
-    console.log('\n========== CANCELLATION RECORD ==========');
-    console.log('Cancellation ID:', cancellationResult.insertedId.toString());
-    console.log('User ID:', userId);
-    console.log('Plan:', currentSubscription.subscriptionType || currentSubscription.plan || 'unknown');
-    console.log('Original Payment ID:', paymentHistory?.razorpayPaymentId || paymentHistory?.paymentId || 'unknown');
-    console.log('Total Paid:', refundCalculation.totalPaid);
-    console.log('Days Used:', refundCalculation.daysUsed);
-    console.log('Days Remaining:', refundCalculation.daysRemaining);
-    console.log('Net Refund Amount:', refundCalculation.netRefund);
-    console.log('Razorpay Refund ID:', razorpayRefund?.id || 'Not created');
-    console.log('Status: Pending Manual Review');
-    console.log('========================================\n');
+    logger.info('Cancellation record created', 'CANCEL_SUBSCRIPTION', {
+      cancellationId: cancellationResult.insertedId.toString(),
+      userId,
+      plan: currentSubscription.subscriptionType || currentSubscription.plan || 'unknown',
+      originalPaymentId: paymentHistory?.razorpayPaymentId || paymentHistory?.paymentId || 'unknown',
+      totalPaid: refundCalculation.totalPaid,
+      daysUsed: refundCalculation.daysUsed,
+      daysRemaining: refundCalculation.daysRemaining,
+      netRefund: refundCalculation.netRefund,
+      razorpayRefundId: razorpayRefund?.id || 'Not created',
+      status: 'Pending Manual Review'
+    });
+
+    try {
+      const userRecord = await db.collection('users').findOne(
+        { userId },
+        { projection: { email: 1, username: 1, fullName: 1 } }
+      );
+      const resolvedEmail = userRecord?.email || '';
+      const resolvedName =
+        userRecord?.fullName ||
+        userRecord?.username ||
+        (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
+
+      if (resolvedEmail && resolvedEmail.includes('@')) {
+        const emailData = {
+          userName: resolvedName,
+          userEmail: resolvedEmail,
+          plan: String(currentSubscription.subscriptionType || currentSubscription.plan || currentSubscription.subscriptionPlan || 'basic'),
+          billingPeriod: (currentSubscription.billingPeriod || 'monthly') as 'monthly' | 'annually',
+          cancellationId: cancellationResult.insertedId.toString(),
+          refundAmount: refundCalculation.netRefund,
+          refundStatus: razorpayRefund?.id ? 'initiated' : 'pending_review',
+          requestedAt: cancellationRecord.requestDate,
+          endDate: currentSubscription.endDate
+        };
+
+        Promise.resolve(emailService.sendSubscriptionCancellationEmail(emailData)).catch(err => {
+          logger.warn('Cancellation email failed', 'CANCEL_SUBSCRIPTION', {
+            userId,
+            error: err instanceof Error ? err.message : 'unknown'
+          });
+        });
+      }
+    } catch (emailError) {
+      logger.warn('Failed to prepare cancellation email', 'CANCEL_SUBSCRIPTION', {
+        userId,
+        error: emailError instanceof Error ? emailError.message : 'unknown'
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -376,11 +571,12 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Cancel subscription error:', error);
-    return NextResponse.json(
-      { error: 'Failed to cancel subscription' },
-      { status: 500 }
-    );
+    logger.error('Cancel subscription error', error, 'CANCEL_SUBSCRIPTION');
+    return errorResponse({
+      code: 'CANCELLATION_FAILED',
+      message: 'Failed to cancel subscription',
+      statusCode: 500,
+    });
   }
 }
 
@@ -400,10 +596,10 @@ export async function GET(request: NextRequest) {
     // Get current subscription (active or trial)
     const currentSubscription = await db.collection('subscriptions').findOne({
       userId,
-      status: 'active' // Both trial and paid subscriptions have status 'active' in your DB
+      status: { $in: ['active', 'trial', 'active_subscription'] }
     });
     
-    console.log('Cancel GET - Found subscription:', {
+    logger.info('Cancel GET - Found subscription', 'CANCEL_SUBSCRIPTION', {
       found: !!currentSubscription,
       subscriptionType: currentSubscription?.subscriptionType,
       plan: currentSubscription?.plan,
@@ -418,7 +614,13 @@ export async function GET(request: NextRequest) {
     }
     
     // Calculate usage and potential refund
-    if (currentSubscription.subscriptionPlan === 'trial') {
+    const isTrialSubscription =
+      (currentSubscription.subscriptionPlan || '').toLowerCase() === 'trial' ||
+      (currentSubscription.plan || '').toLowerCase() === 'trial' ||
+      (currentSubscription.subscriptionType || '').toLowerCase() === 'trial' ||
+      (currentSubscription.status || '').toLowerCase() === 'trial';
+
+    if (isTrialSubscription) {
       // For trial users, show deletion warning instead of refund calculation
       return NextResponse.json({
         subscription: {
@@ -463,7 +665,7 @@ export async function GET(request: NextRequest) {
       status: 'completed'
     }, { sort: { _id: -1 } });
     
-    console.log('Cancel GET - Payment search:', {
+    logger.info('Cancel GET - Payment search', 'CANCEL_SUBSCRIPTION', {
       found: !!paymentHistory,
       amount: paymentHistory?.amount,
       subscriptionId: currentSubscription._id.toString(),
@@ -472,7 +674,7 @@ export async function GET(request: NextRequest) {
     
     // If no payment in payments collection, estimate based on subscription data
     if (!paymentHistory) {
-      console.log('Cancel GET - No payment found, estimating from subscription:', {
+      logger.warn('Cancel GET - No payment found, estimating from subscription', 'CANCEL_SUBSCRIPTION', {
         subscriptionPlan: currentSubscription?.subscriptionPlan,
         plan: currentSubscription?.plan,
         subscriptionType: currentSubscription?.subscriptionType,
@@ -493,7 +695,7 @@ export async function GET(request: NextRequest) {
         ? Math.round(monthlyPrice * 12 * 0.85) // Annual with 15% discount
         : monthlyPrice;
         
-      console.log('Cancel GET - Estimated payment from subscription:', {
+      logger.info('Cancel GET - Estimated payment from subscription', 'CANCEL_SUBSCRIPTION', {
         plan: planName,
         billingPeriod: subBillingPeriod,
         monthlyPrice,
