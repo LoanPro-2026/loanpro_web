@@ -5,6 +5,20 @@ import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
+function getClerkWebhookSecret(): string {
+  const candidates = [
+    process.env.CLERK_WEBHOOK_SECRET,
+    process.env.CLERK_WEBHOOK_SIGNING_SECRET,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = (candidate || '').trim();
+    if (normalized) return normalized;
+  }
+
+  return '';
+}
+
 /**
  * Clerk Webhook Handler
  * Automatically creates MongoDB user when new user signs up via Clerk
@@ -20,12 +34,19 @@ export async function POST(req: Request) {
   const startTime = Date.now();
   
   try {
-    const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+    const WEBHOOK_SECRET = getClerkWebhookSecret();
 
     if (!WEBHOOK_SECRET) {
-      logger.error('Clerk webhook secret not configured', new Error('Missing CLERK_WEBHOOK_SECRET'), 'CLERK_WEBHOOK');
+      logger.error(
+        'Clerk webhook secret not configured',
+        new Error('Missing CLERK_WEBHOOK_SECRET/CLERK_WEBHOOK_SIGNING_SECRET'),
+        'CLERK_WEBHOOK'
+      );
       return NextResponse.json(
-        { error: 'Webhook configuration error' },
+        {
+          error: 'Webhook configuration error',
+          message: 'Missing Clerk webhook secret in environment (CLERK_WEBHOOK_SECRET)',
+        },
         { status: 500 }
       );
     }
@@ -97,10 +118,11 @@ export async function POST(req: Request) {
         (resolvedFullName ? resolvedFullName.replace(/\s+/g, '') : '') ||
         (userEmail ? userEmail.split('@')[0] : '');
 
-      logger.info('Processing user.created event', 'CLERK_WEBHOOK', { 
+      logger.info('Processing Clerk user event', 'CLERK_WEBHOOK', { 
         userId: id, 
         email: userEmail,
         username: userName,
+        eventType: evt.type,
         firstName,
         lastName
       });

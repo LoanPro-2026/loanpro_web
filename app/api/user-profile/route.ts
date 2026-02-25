@@ -15,6 +15,83 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || '',
 });
 
+interface ResolvedIdentity {
+  email: string;
+  username: string;
+  fullName: string;
+}
+
+async function resolveUserIdentity(
+  userId: string,
+  authResult: Awaited<ReturnType<typeof auth>>
+): Promise<ResolvedIdentity> {
+  const claims = authResult.sessionClaims as Record<string, any> | undefined;
+  let email =
+    typeof claims?.email === 'string'
+      ? claims.email
+      : typeof claims?.email_address === 'string'
+      ? claims.email_address
+      : '';
+  let username =
+    typeof claims?.username === 'string'
+      ? claims.username
+      : typeof claims?.preferred_username === 'string'
+      ? claims.preferred_username
+      : '';
+  let fullName =
+    typeof claims?.full_name === 'string'
+      ? claims.full_name
+      : `${typeof claims?.given_name === 'string' ? claims.given_name : ''} ${typeof claims?.family_name === 'string' ? claims.family_name : ''}`.trim();
+
+  if (!email || !username || !fullName) {
+    const clerkSecret = process.env.CLERK_SECRET_KEY;
+    if (clerkSecret) {
+      try {
+        const response = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${clerkSecret}`,
+          },
+        });
+
+        if (response.ok) {
+          const clerkUser = await response.json();
+          const primaryEmailId = clerkUser?.primary_email_address_id;
+          const primaryEmail = Array.isArray(clerkUser?.email_addresses)
+            ? clerkUser.email_addresses.find((entry: any) => entry?.id === primaryEmailId)
+            : null;
+
+          email = email || primaryEmail?.email_address || clerkUser?.email_addresses?.[0]?.email_address || '';
+          username = username || clerkUser?.username || '';
+
+          const firstName = clerkUser?.first_name || '';
+          const lastName = clerkUser?.last_name || '';
+          const derivedFullName = `${firstName} ${lastName}`.trim();
+          fullName = fullName || derivedFullName || '';
+        }
+      } catch (error) {
+        logger.warn('Failed to fetch user identity from Clerk API', 'USER_PROFILE', {
+          userId,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    }
+  }
+
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  const normalizedFullName = typeof fullName === 'string' ? fullName.trim() : '';
+  const normalizedUsername =
+    (typeof username === 'string' ? username.trim() : '') ||
+    (normalizedFullName ? normalizedFullName.replace(/\s+/g, '') : '') ||
+    (normalizedEmail ? normalizedEmail.split('@')[0] : '') ||
+    userId;
+
+  return {
+    email: normalizedEmail,
+    username: normalizedUsername,
+    fullName: normalizedFullName,
+  };
+}
+
 async function attemptPendingPaymentRecovery(userId: string, user: any, db: any) {
   try {
     const pendingOrders = await db
@@ -162,35 +239,18 @@ export async function GET() {
 
     // Fetch user info or create new user
     let user = await db.collection('users').findOne({ userId });
+    const resolvedIdentity = await resolveUserIdentity(userId, authResult);
     
     if (!user) {
       // Create new user WITHOUT accessToken if not found
       // Token will only be created after successful payment
       logger.info('New Clerk user, creating MongoDB user record', 'USER_PROFILE', { userId });
-
-      const claims = authResult.sessionClaims as Record<string, any> | undefined;
-      const claimEmail =
-        typeof claims?.email === 'string'
-          ? claims.email
-          : typeof claims?.email_address === 'string'
-          ? claims.email_address
-          : '';
-      const claimUsername =
-        typeof claims?.username === 'string'
-          ? claims.username
-          : typeof claims?.preferred_username === 'string'
-          ? claims.preferred_username
-          : '';
-      const claimFullName =
-        typeof claims?.full_name === 'string'
-          ? claims.full_name
-          : `${typeof claims?.given_name === 'string' ? claims.given_name : ''} ${typeof claims?.family_name === 'string' ? claims.family_name : ''}`.trim();
       
       const newUser = {
         userId,
-        username: claimUsername || (claimEmail ? claimEmail.split('@')[0] : userId),
-        email: claimEmail,
-        fullName: claimFullName,
+        username: resolvedIdentity.username,
+        email: resolvedIdentity.email,
+        fullName: resolvedIdentity.fullName,
         // accessToken is NOT created at signup - only after payment
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -202,6 +262,31 @@ export async function GET() {
       user = { ...newUser, _id: insertResult.insertedId };
       
       logger.info('New user created successfully', 'USER_PROFILE', { userId });
+    } else {
+      const currentEmail = typeof user.email === 'string' ? user.email.trim() : '';
+      const currentFullName = typeof user.fullName === 'string' ? user.fullName.trim() : '';
+      const currentUsername = typeof user.username === 'string' ? user.username.trim() : '';
+      const currentEmailPrefix = currentEmail ? currentEmail.split('@')[0] : '';
+
+      const shouldUpdateUsername =
+        !currentUsername || currentUsername === userId || currentUsername === currentEmailPrefix;
+
+      const updates: Record<string, unknown> = {};
+      if (!currentEmail && resolvedIdentity.email) updates.email = resolvedIdentity.email;
+      if (!currentFullName && resolvedIdentity.fullName) updates.fullName = resolvedIdentity.fullName;
+      if (shouldUpdateUsername && resolvedIdentity.username && resolvedIdentity.username !== currentUsername) {
+        updates.username = resolvedIdentity.username;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        updates.updatedAt = new Date();
+        await db.collection('users').updateOne({ userId }, { $set: updates });
+        user = { ...user, ...updates };
+        logger.info('Backfilled missing user identity fields', 'USER_PROFILE', {
+          userId,
+          updatedKeys: Object.keys(updates),
+        });
+      }
     }
 
     // Recover pending successful payments if user closed tab before payment-success callback
