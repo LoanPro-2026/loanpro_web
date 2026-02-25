@@ -1,24 +1,9 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
-  });
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) throw new Error('Access denied');
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 
 /**
  * GET /api/support/admin/tickets/[id]
@@ -29,7 +14,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(req, {
+      permission: 'support:read',
+      rateLimitKey: 'support-ticket:get',
+      limit: 100,
+      windowMs: 60_000,
+    });
 
     const { id } = await params;
     const ticketId = id;
@@ -59,7 +49,7 @@ export async function GET(
     console.error('Error fetching ticket:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch ticket', details: error.message },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }
@@ -73,12 +63,47 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(req, {
+      permission: 'support:write',
+      rateLimitKey: 'support-ticket:patch',
+      limit: 40,
+      windowMs: 60_000,
+    });
 
     const { id } = await params;
     const ticketId = id;
     const body = await req.json();
     const { status, priority, message, adminName, assignedTo, tags } = body;
+
+    if (message && (typeof message !== 'string' || message.trim().length > 3000)) {
+      return NextResponse.json(
+        { success: false, error: 'message must be a string up to 3000 characters' },
+        { status: 400 }
+      );
+    }
+
+    if (adminName && (typeof adminName !== 'string' || adminName.trim().length > 100)) {
+      return NextResponse.json(
+        { success: false, error: 'adminName must be a string up to 100 characters' },
+        { status: 400 }
+      );
+    }
+
+    if (assignedTo !== undefined && typeof assignedTo !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'assignedTo must be a string' },
+        { status: 400 }
+      );
+    }
+
+    if (tags !== undefined) {
+      if (!Array.isArray(tags) || tags.length > 20 || tags.some((tag) => typeof tag !== 'string' || tag.length > 30)) {
+        return NextResponse.json(
+          { success: false, error: 'tags must be an array of up to 20 short strings' },
+          { status: 400 }
+        );
+      }
+    }
 
     await connectMongoose();
 
@@ -138,6 +163,8 @@ export async function PATCH(
 
     await ticket.save();
 
+    invalidateAdminCacheByTags(['support']);
+
     // Send email notification to user
     if (shouldSendEmail) {
       emailService.sendTicketUpdateToUser({
@@ -164,7 +191,7 @@ export async function PATCH(
     console.error('Error updating ticket:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update ticket', details: error.message },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

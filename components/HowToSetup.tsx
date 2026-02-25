@@ -15,13 +15,13 @@ const setupSteps = [
   {
     step: 2,
     title: 'Connect your account',
-    description: 'Sign in, copy your access token from Profile, and authenticate the desktop app.',
+    description: 'Enter any Device Name, Organization Name , copy your access token from Profile, and authenticate the desktop app.',
     icon: KeyIcon
   },
   {
     step: 3,
     title: 'Configure your workspace',
-    description: 'Set up the local database and enable biometric access if your plan supports it.',
+    description: 'Go through Settings and COnfigure Your WorkSpace as Per Your Requirements',
     icon: FingerPrintIcon
   }
 ];
@@ -44,7 +44,7 @@ const HowToSetup: React.FC<HowToSetupProps> = ({ showTitle = true, variant = 'de
               Get started in three simple steps
             </h2>
             <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-              Install the desktop app, connect your account, and configure your workspace for daily operations.
+              Install the desktop app, connect your account, and configure your workspace and start using.
             </p>
           </div>
         )}

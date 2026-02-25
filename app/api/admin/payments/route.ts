@@ -1,42 +1,26 @@
-import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(
-    `https://api.clerk.com/v1/users/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-      },
-    }
-  );
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 export async function GET(request: Request) {
   try {
-    await verifyAdmin();
-
-    const { db } = await connectToDatabase();
+    await enforceAdminAccess(request, {
+      permission: 'payments:read',
+      rateLimitKey: 'payments:get',
+      limit: 100,
+      windowMs: 60_000,
+    });
 
     // Get query parameters
     const url = new URL(request.url);
+    const cacheKey = `admin:payments:v1:${url.searchParams.toString()}`;
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return new Response(JSON.stringify(cached), { status: 200 });
+    }
+
+    const { db } = await connectToDatabase();
+
     const status = url.searchParams.get('status');
     const limit = parseInt(url.searchParams.get('limit') || '100');
     const skip = parseInt(url.searchParams.get('skip') || '0');
@@ -95,7 +79,7 @@ export async function GET(request: Request) {
     // Get total count
     const totalCount = await db.collection('payments').countDocuments(filter);
 
-    return new Response(JSON.stringify({
+    const payload = {
       payments,
       pagination: {
         total: totalCount,
@@ -103,9 +87,13 @@ export async function GET(request: Request) {
         skip,
         hasMore: skip + limit < totalCount
       }
-    }), { status: 200 });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 15_000, ['payments', 'dashboard']);
+
+    return new Response(JSON.stringify(payload), { status: 200 });
   } catch (error) {
     console.error('Error fetching payments:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch payments' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Failed to fetch payments' }), { status: getAdminErrorStatus(error) });
   }
 }

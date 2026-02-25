@@ -1,31 +1,22 @@
 import { NextResponse } from 'next/server';
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { clerkClient } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
 
 export async function DELETE(request: Request) {
   try {
-    const { userId: adminUserId } = await auth();
-    
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    await enforceAdminAccess(request, {
+      permission: 'users:write',
+      rateLimitKey: 'users:delete',
+      limit: 20,
+      windowMs: 60_000,
+    });
 
-    // Get admin's email
     const client = await clientPromise;
     const db = client.db('AdminDB');
-    
-    const adminUser = await db.collection('users').findOne({ userId: adminUserId });
-    const adminEmail = process.env.ADMIN_EMAIL || '';
-    
-    if (!adminUser || adminUser.email !== adminEmail) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
 
     const { userId } = await request.json();
 
@@ -36,11 +27,11 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Prevent admin from deleting themselves
-    if (userId === adminUserId) {
+    const existingUser = await db.collection('users').findOne({ userId });
+    if (existingUser?.email === ADMIN_EMAIL) {
       return NextResponse.json(
-        { error: 'Cannot delete your own account' },
-        { status: 400 }
+        { error: 'Cannot delete admin account' },
+        { status: 403 }
       );
     }
 
@@ -73,6 +64,8 @@ export async function DELETE(request: Request) {
       // Continue even if Clerk deletion fails
     }
 
+    invalidateAdminCacheByTags(['users', 'subscriptions', 'payments', 'dashboard', 'analytics']);
+
     return NextResponse.json({
       success: true,
       message: 'User deleted successfully'
@@ -81,7 +74,7 @@ export async function DELETE(request: Request) {
     console.error('Error deleting user:', error);
     return NextResponse.json(
       { error: 'Failed to delete user' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

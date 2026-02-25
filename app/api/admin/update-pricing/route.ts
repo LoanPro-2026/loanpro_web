@@ -1,32 +1,19 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const authResult = await enforceAdminAccess(request, {
+      permission: 'settings:write',
+      rateLimitKey: 'settings:pricing:post',
+      limit: 15,
+      windowMs: 60_000,
+    });
 
-    // Get user's email from Clerk
     const client = await clientPromise;
     const db = client.db('AdminDB');
-    
-    // First check if user is admin
-    const adminUser = await db.collection('users').findOne({ userId });
-    const adminEmail = process.env.ADMIN_EMAIL || '';
-    
-    if (!adminUser || adminUser.email !== adminEmail) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
 
     const { prices } = await request.json();
 
@@ -60,11 +47,13 @@ export async function POST(request: Request) {
             Enterprise: prices.Enterprise
           },
           updatedAt: new Date(),
-          updatedBy: userId
+          updatedBy: authResult.email
         }
       },
       { upsert: true, returnDocument: 'after' }
     );
+
+    invalidateAdminCacheByTags(['settings', 'dashboard']);
 
     return NextResponse.json({
       success: true,
@@ -75,14 +64,27 @@ export async function POST(request: Request) {
     console.error('Error updating pricing:', error);
     return NextResponse.json(
       { error: 'Failed to update pricing' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }
 
 // GET endpoint to retrieve current pricing
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    await enforceAdminAccess(request, {
+      permission: 'settings:read',
+      rateLimitKey: 'settings:pricing:get',
+      limit: 80,
+      windowMs: 60_000,
+    });
+
+    const cacheKey = 'admin:pricing:get:v1';
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     const client = await clientPromise;
     const db = client.db('AdminDB');
 
@@ -90,7 +92,7 @@ export async function GET() {
 
     if (!config || !config.prices) {
       // Return default prices if not set
-      return NextResponse.json({
+      const payload = {
         success: true,
         prices: {
           Basic: 699,
@@ -98,20 +100,26 @@ export async function GET() {
           Enterprise: 979
         },
         isDefault: true
-      });
+      };
+
+      setAdminCachedResponse(cacheKey, payload, 30_000, ['settings']);
+      return NextResponse.json(payload);
     }
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       prices: config.prices,
       updatedAt: config.updatedAt,
       isDefault: false
-    });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 30_000, ['settings']);
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('Error fetching pricing:', error);
     return NextResponse.json(
       { error: 'Failed to fetch pricing' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

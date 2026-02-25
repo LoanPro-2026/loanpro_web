@@ -10,19 +10,19 @@ import {
 
 const features = [
   {
-    title: 'Portfolio Analytics',
+    title: 'Personalized DashBoard',
     icon: ChartBarIcon,
     description: 'Comprehensive analytics and reporting with real-time insights into your lending operations and portfolio performance.',
   },
   {
     title: 'Biometric Security',
     icon: FingerPrintIcon,
-    description: 'Secure fingerprint authentication using Secu-Hamster Pro 20-AP scanner for enhanced security and user verification.',
+    description: 'Secure fingerprint authentication using Secu-Hamster Pro 20-AP scanner for enhanced security and customer verification.',
   },
   {
     title: 'Cloud Sync & Backup',
     icon: CloudIcon,
-    description: 'Seamless synchronization between local database and cloud storage for data backup and accessibility.',
+    description: 'Seamless synchronization between local storage and cloud storage for data backup and safety.',
   },
   {
     title: 'Cashflow Tracking',
@@ -30,9 +30,9 @@ const features = [
     description: 'Track daily cash flow, deposits, withdrawals, and maintain accurate financial records with automated reporting.',
   },
   {
-    title: 'Local-First Database',
+    title: 'Local-First Storage',
     icon: ServerIcon,
-    description: 'Local SQLite database with encryption for sensitive data storage and fast query performance.',
+    description: 'Local database with encryption for sensitive loan data storage and fast query performance.',
   },
   {
     title: 'Secure Operations',

@@ -1,23 +1,8 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import ContactRequest from '@/models/ContactRequest';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
-  });
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) throw new Error('Access denied');
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 const VALID_STATUSES = ['new', 'called', 'follow-up', 'converted', 'closed'];
 const VALID_PRIORITIES = ['normal', 'high'];
@@ -27,9 +12,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(req, {
+      permission: 'leads:read',
+      rateLimitKey: 'leads:detail:get',
+      limit: 100,
+      windowMs: 60_000,
+    });
 
     const { id } = await params;
+    const cacheKey = `admin:leads:detail:v1:${id}`;
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     await connectMongoose();
 
     const lead = await ContactRequest.findOne({ requestId: id }).lean();
@@ -41,11 +37,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, lead });
+    const payload = { success: true, lead };
+    setAdminCachedResponse(cacheKey, payload, 15_000, ['leads']);
+
+    return NextResponse.json(payload);
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: 'Failed to fetch lead', details: error.message },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }
@@ -55,7 +54,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(req, {
+      permission: 'leads:write',
+      rateLimitKey: 'leads:detail:patch',
+      limit: 60,
+      windowMs: 60_000,
+    });
 
     const { id } = await params;
     const body = await req.json();
@@ -124,11 +128,13 @@ export async function PATCH(
     Object.assign(lead, updates);
     await lead.save();
 
+    invalidateAdminCacheByTags(['leads']);
+
     return NextResponse.json({ success: true, lead });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: 'Failed to update lead', details: error.message },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

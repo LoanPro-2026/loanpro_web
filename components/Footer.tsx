@@ -28,18 +28,18 @@ const Footer = () => (
             <div className="flex items-center gap-3">
               <EnvelopeIcon className="w-4 h-4 text-slate-500" />
               <a href="mailto:support@loanpro.tech" className="hover:text-white transition-colors">
-                support@loanpro.tech
+                j.akshat296@gmail.com
               </a>
             </div>
             <div className="flex items-center gap-3">
               <PhoneIcon className="w-4 h-4 text-slate-500" />
               <a href="tel:+911234567890" className="hover:text-white transition-colors">
-                +91 12345 67890
+                +91 78988 85129
               </a>
             </div>
             <div className="flex items-center gap-3">
               <MapPinIcon className="w-4 h-4 text-slate-500" />
-              <span>Mumbai, Maharashtra, India</span>
+              <span>Indore, Madhya Pradesh, India</span>
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ const Footer = () => (
           <h3 className="text-sm font-semibold text-white">Company</h3>
           <ul className="mt-4 space-y-3 text-sm text-slate-400">
             <li><Link href="/support" className="hover:text-white transition-colors">Support</Link></li>
-            <li><Link href="/subscription" className="hover:text-white transition-colors">Plans</Link></li>
+            <li><Link href="/#pricing" className="hover:text-white transition-colors">Plans</Link></li>
             <li><Link href="/profile" className="hover:text-white transition-colors">Account</Link></li>
           </ul>
         </div>

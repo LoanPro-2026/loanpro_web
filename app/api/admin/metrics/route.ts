@@ -1,37 +1,21 @@
-import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(
-    `https://api.clerk.com/v1/users/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-      },
-    }
-  );
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 export async function GET(request: Request) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'dashboard:read',
+      rateLimitKey: 'metrics:get',
+      limit: 80,
+      windowMs: 60_000,
+    });
+
+    const cacheKey = 'admin:metrics:v1';
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return new Response(JSON.stringify(cached), { status: 200 });
+    }
 
     const { db } = await connectToDatabase();
 
@@ -82,7 +66,7 @@ export async function GET(request: Request) {
     // Calculate averages
     const avgSubscriptionValue = activeSubscriptions > 0 ? monthlyRevenue / activeSubscriptions : 0;
 
-    return new Response(JSON.stringify({
+    const payload = {
       totalUsers,
       activeSubscriptions,
       totalRevenue,
@@ -92,9 +76,13 @@ export async function GET(request: Request) {
       expiredSubscriptions,
       activeUsersThisMonth: monthlyUsers,
       avgSubscriptionValue: Math.round(avgSubscriptionValue)
-    }), { status: 200 });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 20_000, ['dashboard', 'metrics', 'payments', 'subscriptions', 'users']);
+
+    return new Response(JSON.stringify(payload), { status: 200 });
   } catch (error) {
     console.error('Error fetching metrics:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch metrics' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Failed to fetch metrics' }), { status: getAdminErrorStatus(error) });
   }
 }

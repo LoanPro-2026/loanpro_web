@@ -1,39 +1,22 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  // Fetch user details from Clerk API
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  });
-
-  if (!userResponse.ok) {
-    throw new Error('Failed to fetch user details');
-  }
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'payments:read',
+      rateLimitKey: 'payments:recent:get',
+      limit: 100,
+      windowMs: 60_000,
+    });
+
+    const cacheKey = 'admin:payments:recent:v1';
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const client = await clientPromise;
     const db = client.db('AdminDB');
@@ -84,10 +67,14 @@ export async function GET() {
     console.log('Recent payments fetched:', payments.length);
     console.log('Sample payment:', payments[0]);
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       payments: payments
-    });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 10_000, ['payments', 'dashboard']);
+
+    return NextResponse.json(payload);
   } catch (error: unknown) {
     console.error('Error fetching recent payments:', error);
     return NextResponse.json(
@@ -95,7 +82,7 @@ export async function GET() {
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to fetch recent payments' 
       },
-      { status: error instanceof Error && error.message === 'Access denied' ? 403 : 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

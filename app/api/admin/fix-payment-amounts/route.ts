@@ -1,38 +1,16 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(
-    `https://api.clerk.com/v1/users/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-      },
-    }
-  );
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 
 export async function POST(request: Request) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'payments:write',
+      rateLimitKey: 'payments:fix-amounts',
+      limit: 10,
+      windowMs: 60_000,
+    });
 
     const client = await clientPromise;
     const db = client.db('AdminDB');
@@ -63,6 +41,8 @@ export async function POST(request: Request) {
       }
     }
 
+    invalidateAdminCacheByTags(['payments', 'dashboard', 'analytics']);
+
     return NextResponse.json({
       success: true,
       message: `Updated ${updated} payments, skipped ${skipped}`,
@@ -74,7 +54,7 @@ export async function POST(request: Request) {
     console.error('Error fixing payment amounts:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to fix payment amounts' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

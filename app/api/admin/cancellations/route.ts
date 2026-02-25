@@ -1,44 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { logger } from '@/lib/logger';
 import emailService from '@/services/emailService';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  // Fetch user details from Clerk API
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  });
-
-  if (!userResponse.ok) {
-    throw new Error('Failed to fetch user details');
-  }
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 
 // GET: Fetch all cancellations (with filters)
 export async function GET(request: NextRequest) {
   try {
     // Verify admin authentication
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'subscriptions:read',
+      rateLimitKey: 'cancellations:get',
+      limit: 60,
+      windowMs: 60_000,
+    });
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // pending_review, refunded, rejected
@@ -82,18 +58,10 @@ export async function GET(request: NextRequest) {
       cancellations: enrichedCancellations,
     });
   } catch (error: any) {
-    // Handle authentication errors specifically
-    if (error.message === 'Unauthorized' || error.message === 'Access denied') {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 401 }
-      );
-    }
-    
     logger.error('Admin cancellations GET failed', error, 'ADMIN_CANCELLATIONS');
     return NextResponse.json(
       { error: 'Failed to fetch cancellations' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }
@@ -102,7 +70,12 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     // Verify admin authentication
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'subscriptions:write',
+      rateLimitKey: 'cancellations:patch',
+      limit: 30,
+      windowMs: 60_000,
+    });
 
     const body = await request.json();
     const { cancellationId, status, refundPaymentId, adminNotes } = body;
@@ -111,6 +84,20 @@ export async function PATCH(request: NextRequest) {
     if (!cancellationId || !status) {
       return NextResponse.json(
         { error: 'Missing required fields: cancellationId, status' },
+        { status: 400 }
+      );
+    }
+
+    if (!ObjectId.isValid(cancellationId)) {
+      return NextResponse.json(
+        { error: 'Invalid cancellationId' },
+        { status: 400 }
+      );
+    }
+
+    if (adminNotes && (typeof adminNotes !== 'string' || adminNotes.length > 1500)) {
+      return NextResponse.json(
+        { error: 'adminNotes must be up to 1500 characters' },
         { status: 400 }
       );
     }
@@ -222,18 +209,10 @@ export async function PATCH(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    // Handle authentication errors specifically
-    if (error.message === 'Unauthorized' || error.message === 'Access denied') {
-      return NextResponse.json(
-        { error: 'Unauthorized: Admin access required' },
-        { status: 401 }
-      );
-    }
-    
     logger.error('Admin cancellation update failed', error, 'ADMIN_CANCELLATIONS');
     return NextResponse.json(
       { error: 'Failed to update cancellation status' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

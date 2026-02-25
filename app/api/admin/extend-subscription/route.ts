@@ -1,33 +1,20 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
-    
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    await enforceAdminAccess(request, {
+      permission: 'subscriptions:write',
+      rateLimitKey: 'subscriptions:extend',
+      limit: 25,
+      windowMs: 60_000,
+    });
 
-    // Get user's email from Clerk
     const client = await clientPromise;
     const db = client.db('AdminDB');
-    
-    // First check if user is admin
-    const adminUser = await db.collection('users').findOne({ userId });
-    const adminEmail = process.env.ADMIN_EMAIL || '';
-    
-    if (!adminUser || adminUser.email !== adminEmail) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
-    }
 
     const { subscriptionId, days } = await request.json();
 
@@ -79,6 +66,8 @@ export async function POST(request: Request) {
       );
     }
 
+    invalidateAdminCacheByTags(['subscriptions', 'dashboard', 'analytics']);
+
     return NextResponse.json({
       success: true,
       message: `Subscription extended by ${days} days`,
@@ -88,7 +77,7 @@ export async function POST(request: Request) {
     console.error('Error extending subscription:', error);
     return NextResponse.json(
       { error: 'Failed to extend subscription' },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

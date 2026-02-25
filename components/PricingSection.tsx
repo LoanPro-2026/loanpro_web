@@ -8,7 +8,7 @@ const plans = [
     name: 'Basic',
     price: '₹599',
     period: '/month',
-    description: 'Essential tools for small loan teams',
+    description: 'Essential tools for small Shop Owners',
     deviceLimit: 1,
     storage: 'Local only',
     features: [
@@ -16,7 +16,7 @@ const plans = [
       'Local data storage',
       'Basic analytics dashboard',
       'Standard reports',
-      'Email support'
+      'Email support',
     ],
     popular: false,
     tone: 'border-slate-200'
@@ -25,16 +25,17 @@ const plans = [
     name: 'Pro',
     price: '₹899',
     period: '/month',
-    description: 'For growing teams that need more control',
+    description: 'For growing Shop owners with Large Number of Loans',
     deviceLimit: 1,
-    storage: '1 GB cloud',
+    storage: 'Drive Backup Support(upto 15GB)',
     features: [
       'Everything in Basic',
-      'Cloud backup (1 GB)',
+      'Google Drive Cloud Backup',
       'Biometric access',
       'Daily automatic sync',
       'Advanced analytics & reports',
-      'Priority support'
+      'Priority support',
+      'Feature request'
     ],
     popular: true,
     tone: 'border-blue-600'
@@ -43,17 +44,19 @@ const plans = [
     name: 'Enterprise',
     price: '₹1,399',
     period: '/month',
-    description: 'Advanced controls for large organizations',
+    description: 'Advanced controls for large Shop Owners',
     deviceLimit: 2,
-    storage: 'Unlimited cloud',
+    storage: 'Drive Backup + Additional Cloud Support',
     features: [
       'Everything in Pro',
-      'Unlimited cloud backup',
+      'Additional cloud backup',
+      'Additional Customization',
       'Dual device support',
       'Custom sync schedules',
       'Dedicated onboarding',
-      'Phone support'
-    ],
+      'Phone support',
+      'Dedicated Support Ticket System',
+      ],
     popular: false,
     tone: 'border-slate-200'
   }

@@ -1,47 +1,31 @@
 export const runtime = 'nodejs';
 
-import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { runPaymentReconciliation, retryPaymentIncidentOrder } from '@/services/paymentReconciliationService';
 import { ObjectId } from 'mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  });
-
-  if (!userResponse.ok) {
-    throw new Error('Failed to fetch user details');
-  }
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 export async function GET(request: Request) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'payments:read',
+      rateLimitKey: 'payment-incidents:get',
+      limit: 60,
+      windowMs: 60_000,
+    });
+
+    const url = new URL(request.url);
+    const cacheKey = `admin:payment-incidents:get:v1:${url.searchParams.toString()}`;
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const client = await clientPromise;
     const db = client.db('AdminDB');
 
-    const url = new URL(request.url);
     const status = url.searchParams.get('status') || 'open';
     const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || '100'), 1), 300);
 
@@ -70,7 +54,7 @@ export async function GET(request: Request) {
       db.collection('payment_reconciliation_runs').find().sort({ createdAt: -1 }).limit(1).next(),
     ]);
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       incidents,
       summary: {
@@ -86,21 +70,30 @@ export async function GET(request: Request) {
         hasAdminEmails: Boolean((process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '').trim()),
         alertCooldownMinutes: Number(process.env.PAYMENT_INCIDENT_ALERT_COOLDOWN_MINUTES || '15'),
       },
-    });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 12_000, ['payments', 'dashboard', 'health']);
+
+    return NextResponse.json(payload);
   } catch (error: unknown) {
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch payment incidents',
       },
-      { status: error instanceof Error && error.message === 'Access denied' ? 403 : 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const adminEmail = await verifyAdmin();
+    const { email: adminEmail } = await enforceAdminAccess(request, {
+      permission: 'payments:write',
+      rateLimitKey: 'payment-incidents:post',
+      limit: 25,
+      windowMs: 60_000,
+    });
     const body = await request.json();
     const action = body?.action as string;
 
@@ -108,12 +101,30 @@ export async function POST(request: Request) {
     const db = client.db('AdminDB');
 
     if (action === 'run-reconciliation') {
+      const limit = Number(body?.limit || 150);
+      const minPendingMinutes = Number(body?.minPendingMinutes || 2);
+      const staleMinutes = Number(body?.staleMinutes || 30);
+
+      if (!Number.isFinite(limit) || limit < 1 || limit > 1000) {
+        return NextResponse.json({ success: false, error: 'limit must be between 1 and 1000' }, { status: 400 });
+      }
+
+      if (!Number.isFinite(minPendingMinutes) || minPendingMinutes < 1 || minPendingMinutes > 120) {
+        return NextResponse.json({ success: false, error: 'minPendingMinutes must be between 1 and 120' }, { status: 400 });
+      }
+
+      if (!Number.isFinite(staleMinutes) || staleMinutes < 1 || staleMinutes > 1440) {
+        return NextResponse.json({ success: false, error: 'staleMinutes must be between 1 and 1440' }, { status: 400 });
+      }
+
       const result = await runPaymentReconciliation({
         source: `admin:${adminEmail}`,
-        limit: Number(body?.limit || 150),
-        minPendingMinutes: Number(body?.minPendingMinutes || 2),
-        staleMinutes: Number(body?.staleMinutes || 30),
+        limit,
+        minPendingMinutes,
+        staleMinutes,
       });
+
+      invalidateAdminCacheByTags(['payments', 'dashboard', 'health']);
 
       return NextResponse.json({ success: true, result });
     }
@@ -125,6 +136,7 @@ export async function POST(request: Request) {
       }
 
       const result = await retryPaymentIncidentOrder(orderId, `admin-retry:${adminEmail}`);
+      invalidateAdminCacheByTags(['payments', 'dashboard', 'health']);
       return NextResponse.json({ success: true, result });
     }
 
@@ -135,6 +147,14 @@ export async function POST(request: Request) {
 
       if (!incidentId || !['open', 'resolved', 'ignored'].includes(status)) {
         return NextResponse.json({ success: false, error: 'incidentId and valid status are required' }, { status: 400 });
+      }
+
+      if (!ObjectId.isValid(incidentId)) {
+        return NextResponse.json({ success: false, error: 'incidentId is invalid' }, { status: 400 });
+      }
+
+      if (note.length > 1000) {
+        return NextResponse.json({ success: false, error: 'note must be 1000 characters or less' }, { status: 400 });
       }
 
       const now = new Date();
@@ -164,6 +184,8 @@ export async function POST(request: Request) {
         } as any
       );
 
+      invalidateAdminCacheByTags(['payments', 'dashboard', 'health']);
+
       return NextResponse.json({ success: true });
     }
 
@@ -174,7 +196,7 @@ export async function POST(request: Request) {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to process action',
       },
-      { status: error instanceof Error && error.message === 'Access denied' ? 403 : 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

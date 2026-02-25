@@ -1,41 +1,19 @@
-import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(
-    `https://api.clerk.com/v1/users/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-      },
-    }
-  );
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ subscriptionId: string; action: string }> }
 ) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'subscriptions:write',
+      rateLimitKey: 'subscriptions:action:post',
+      limit: 40,
+      windowMs: 60_000,
+    });
 
     const { subscriptionId, action } = await params;
     const { db } = await connectToDatabase();
@@ -57,6 +35,7 @@ export async function POST(
           }
         }
       );
+      invalidateAdminCacheByTags(['subscriptions', 'dashboard', 'analytics']);
       return new Response(JSON.stringify({ success: true, message: 'Subscription cancelled' }), { status: 200 });
     } else if (action === 'extend') {
       const body = await request.json();
@@ -82,12 +61,14 @@ export async function POST(
         }
       );
 
+      invalidateAdminCacheByTags(['subscriptions', 'dashboard', 'analytics']);
+
       return new Response(JSON.stringify({ success: true, message: `Subscription extended by ${months} month(s)` }), { status: 200 });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 });
   } catch (error) {
     console.error('Error updating subscription:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update subscription' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'Failed to update subscription' }), { status: getAdminErrorStatus(error) });
   }
 }

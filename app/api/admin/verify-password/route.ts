@@ -1,44 +1,31 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
+import crypto from 'crypto';
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 if (!ADMIN_PASSWORD) {
   throw new Error('ADMIN_PASSWORD environment variable must be set');
 }
 
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
+function timingSafeEqualText(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+
+  if (left.length !== right.length) {
+    return false;
   }
 
-  // Fetch user details from Clerk API
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: {
-      Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-    },
-  });
-
-  if (!userResponse.ok) {
-    throw new Error('Failed to fetch user details');
-  }
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
+  return crypto.timingSafeEqual(left, right);
 }
 
 export async function POST(request: Request) {
   try {
-    // First verify the user is admin by email
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'dashboard:read',
+      rateLimitKey: 'verify-password:post',
+      limit: 15,
+      windowMs: 60_000,
+    });
 
     // Then verify the password
     const { password } = await request.json();
@@ -50,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (password !== ADMIN_PASSWORD) {
+    if (!timingSafeEqualText(password, ADMIN_PASSWORD)) {
       return NextResponse.json(
         { success: false, error: 'Invalid password' },
         { status: 401 }
@@ -68,7 +55,7 @@ export async function POST(request: Request) {
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to verify password' 
       },
-      { status: error instanceof Error && error.message === 'Access denied' ? 403 : 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

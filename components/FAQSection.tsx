@@ -6,35 +6,51 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 const faqs = [
   {
     question: 'What is LoanPro and how does it work?',
-    answer: 'LoanPro is a Windows desktop loan management platform. It keeps day-to-day data local for speed and control, with optional cloud backup for protection and access when needed.'
+    answer: 'LoanPro is a Windows desktop loan management platform. It Allow Local lenders to Add, Remove, Delete Loans; Add Deposits; View Reports, Track Investments, Returns and Interest collection over a Period Of Time.'
   },
   {
     question: 'Can I cancel my subscription anytime?',
-    answer: 'Yes. You can cancel at any time. Your subscription stays active until the end of the billing period, and you can export your data if needed.'
+    answer: 'Yes. You can cancel at any time and refund will be calculated as per pro rata basis and will be manually refunded within 3-4 days.Your subscription stays active until the end of the billing period, and you can export your data if needed.'
   },
   {
     question: 'What features are included in each plan?',
-    answer: 'Every plan includes core loan tracking, collections, and reporting. Higher tiers add cloud backup, biometrics, and priority support. See the pricing section for full details.'
+    answer: 'Every plan includes core loan operations, Adding new Loan Record, Adding Deposits to Existing Loans, Closing Loans when repaid. Basic Reports and cash Flow Statements are also Stored. Higher tiers add cloud backup, biometrics, and priority support. See the pricing section for full details.'
   },
   {
     question: 'How secure is my data with LoanPro?',
-    answer: 'LoanPro uses strong access controls and secure storage practices. If you use cloud backup, data is encrypted in transit. Contact us for a full security overview.'
+    answer: 'In LoanPro your data is stored in your own system locally and even we dont have access to your data. Also In cloud Backup your data is synced in your own google Account. So Complete Safety and Security to your data is maintained.'
   },
   {
     question: 'Do you offer customer support?',
-    answer: 'Yes. We provide email support for all plans and priority support for Pro and Enterprise.'
+    answer: 'Yes. We Offer Contact Form Support For Everyone. Navigate to Our support page and fill up the contact form. Our support team will reach out to you as soon as possible. '
   },
   {
-    question: 'Can I integrate LoanPro with my existing systems?',
-    answer: 'Integration options depend on your plan and requirements. Contact us to discuss payment or accounting integrations.'
+    question: 'Can I Start using LoanPro immediately?',
+    answer: 'LoanPro is a ready to use desktop application that you can start using immediately. However Your existing past records needs to entered manually for the system to work at full potential.'
   },
   {
     question: 'Is there a free trial available?',
-    answer: 'Yes. We offer a 1-month Pro trial so you can explore the full workflow before subscribing.'
+    answer: 'Yes. We offer a 1-month Pro trial so users can explore the full workflow before any payment. Also free one month trial does not require any kind of payment set-up or credit card details so you can start using immediately. '
   },
   {
-    question: 'How does the hybrid database system work?',
-    answer: 'Your primary data stays on your device for speed and control. Cloud backup is optional and designed for recovery and remote access.'
+    question: 'How is my Data Secured?',
+    answer: 'You can Set up a Auto backup Functionality at any location on your PC at the selected time interval lets say every 1 hour or 6 hour and save changes. Now the system will automatically backup your complete data at your choosen location.'
+  },
+  {
+    question: 'How to OnBoard as the first time users',
+    answer: 'Activate the subscription (paid or premium), then download the App from downloads Page and Install it, giving all required permissions. After that Go to your profile page, copy the access token and then enter the access token and give your office name, and device ID. Wait for some time for onboarding to be completed and here Your app is ready to use.       '
+  },
+  {
+    question: 'Why Should I opt for Biometric Functionality',
+    answer: 'Biometric Functionality Offers an extra layer of security as well as easy search optimization. Shop Owners will add customers fingerprint while adding new loan records. Now at the time of repayment they will directly search and match fingerprint of customer. And hence this eases the process of searching for customer records and also adds an extra layer of safety.'
+  },
+  {
+    question: 'How can I raise my concerns about the software',
+    answer: 'There is a support ticket page which user can access from menubar. First choose your concern type, its priority and then explain it in detail and submit it. Our Support will reply to your requested concern and will contact you. user can directly chat with our support system there itself.'
+  },
+  {
+    question: 'How does the Cloud database system work?',
+    answer: 'First You need to connect your google account with us and give required permissions for drive backup(We only write our backup file into your google drive. Our system Cannot access other files in your drive). The select your backup interval and auto cloud sync is finally set up and completed.'
   }
 ];
 

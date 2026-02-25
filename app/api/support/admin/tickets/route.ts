@@ -1,24 +1,9 @@
-import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
-
-  const userResponse = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-    headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
-  });
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) throw new Error('Access denied');
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 /**
  * GET /api/support/admin/tickets
@@ -27,7 +12,18 @@ async function verifyAdmin() {
 export async function GET(req: NextRequest) {
   try {
     // Check admin authentication
-    await verifyAdmin();
+    await enforceAdminAccess(req, {
+      permission: 'support:read',
+      rateLimitKey: 'support-tickets:get',
+      limit: 80,
+      windowMs: 60_000,
+    });
+
+    const cacheKey = `admin:support:list:v1:${new URL(req.url).searchParams.toString()}`;
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
@@ -101,7 +97,7 @@ export async function GET(req: NextRequest) {
       hasUnreadResponses: !ticket.viewedByAdmin && ticket.lastUpdatedBy === 'user'
     }));
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       tickets: ticketsWithCount,
       stats: statusCounts,
@@ -111,13 +107,17 @@ export async function GET(req: NextRequest) {
         totalTickets,
         totalPages: Math.ceil(totalTickets / limit)
       }
-    });
+    };
+
+    setAdminCachedResponse(cacheKey, payload, 15_000, ['support']);
+
+    return NextResponse.json(payload);
 
   } catch (error: any) {
     console.error('Error fetching admin tickets:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch tickets', details: error.message },
-      { status: 500 }
+      { status: getAdminErrorStatus(error) }
     );
   }
 }

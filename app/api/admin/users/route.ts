@@ -1,37 +1,24 @@
-import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
-
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
-
-async function verifyAdmin() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  const userResponse = await fetch(
-    `https://api.clerk.com/v1/users/${userId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
-      },
-    }
-  );
-
-  const user = await userResponse.json();
-  const userEmail = user.email_addresses[0]?.email_address;
-
-  if (userEmail !== ADMIN_EMAIL) {
-    throw new Error('Access denied');
-  }
-
-  return userEmail;
-}
+import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
 export async function GET(request: Request) {
   try {
-    await verifyAdmin();
+    await enforceAdminAccess(request, {
+      permission: 'users:read',
+      rateLimitKey: 'users:get',
+      limit: 80,
+      windowMs: 60_000,
+    });
+
+    const cacheKey = 'admin:users:list:v1';
+    const cached = getAdminCachedResponse<any>(cacheKey);
+    if (cached) {
+      return new Response(JSON.stringify(cached), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     const { db } = await connectToDatabase();
 
@@ -82,14 +69,17 @@ export async function GET(request: Request) {
       ])
       .toArray();
 
-    return new Response(JSON.stringify({ success: true, users }), { 
+    const payload = { success: true, users };
+    setAdminCachedResponse(cacheKey, payload, 20_000, ['users', 'dashboard']);
+
+    return new Response(JSON.stringify(payload), { 
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('Error fetching users:', error);
     return new Response(JSON.stringify({ success: false, error: 'Failed to fetch users' }), { 
-      status: 500,
+      status: getAdminErrorStatus(error),
       headers: { 'Content-Type': 'application/json' }
     });
   }
