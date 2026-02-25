@@ -1,24 +1,9 @@
 import { NextResponse } from 'next/server';
-import Razorpay from 'razorpay';
 import { auth } from '@clerk/nextjs/server';
 import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateOrderRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
-
-// Initialize Razorpay with environment variables
-let razorpay: Razorpay;
-try {
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    console.error('[CREATE-ORDER] Missing Razorpay credentials in environment variables');
-  }
-  razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID || '',
-    key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-  });
-  console.log('[CREATE-ORDER] Razorpay initialized successfully');
-} catch (error) {
-  console.error('[CREATE-ORDER] Failed to initialize Razorpay:', error);
-}
+import { getRazorpayClient } from '@/lib/razorpayClient';
 
 // Plan pricing configuration (monthly price in paise)
 // Note: For Razorpay test mode, yearly plans should not exceed ₹10,000 total
@@ -32,15 +17,19 @@ export async function POST(req: Request) {
   console.log('[CREATE-ORDER] API route called');
   
   try {
+    const { client: razorpay, error: razorpayInitError, keyId } = getRazorpayClient();
+
     // Check if Razorpay is initialized
     if (!razorpay) {
       console.error('[CREATE-ORDER] Razorpay not initialized');
       return errorResponse({
         code: 'PAYMENT_CONFIG_ERROR',
-        message: 'Payment system is not configured',
+        message: razorpayInitError || 'Payment system is not configured',
         statusCode: 500,
       });
     }
+
+    console.log('[CREATE-ORDER] Razorpay initialized', { keyType: keyId.includes('test') ? 'test' : 'live' });
 
     // Check authentication
     const { userId } = await auth();
@@ -238,7 +227,7 @@ export async function POST(req: Request) {
       console.error('[CREATE-ORDER] Razorpay API error:', error.error);
       return errorResponse({
         code: error.error.code || 'PAYMENT_ERROR',
-        message: error.error.description || 'Failed to create payment order',
+        message: error.error.description || 'Failed to create payment order. Verify Razorpay key/secret pair and account mode.',
         statusCode: error.statusCode || 500,
       });
     }

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import clientPromise from '@/lib/mongodb';
-import crypto from 'crypto';
 import { logger } from '@/lib/logger';
+
+export const runtime = 'nodejs';
 
 /**
  * Clerk Webhook Handler
@@ -43,16 +44,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get and verify the webhook body
-    const payload = await req.json();
-    const body = JSON.stringify(payload);
+    // Get and verify webhook body using raw text (required for Svix signature verification)
+    const rawBody = await req.text();
 
     // Verify webhook signature using Svix
     const wh = new Webhook(WEBHOOK_SECRET);
     let evt: any;
 
     try {
-      evt = wh.verify(body, {
+      evt = wh.verify(rawBody, {
         'svix-id': svix_id,
         'svix-timestamp': svix_timestamp,
         'svix-signature': svix_signature,
@@ -67,8 +67,8 @@ export async function POST(req: Request) {
 
     logger.info('Webhook verified successfully', 'CLERK_WEBHOOK', { type: evt.type });
 
-    // Handle user.created event
-    if (evt.type === 'user.created') {
+    // Handle user.created / user.updated events
+    if (evt.type === 'user.created' || evt.type === 'user.updated') {
       const {
         id,
         email_addresses,
@@ -108,52 +108,80 @@ export async function POST(req: Request) {
       // Create MongoDB user record (WITHOUT accessToken)
       // Access token will be generated ONLY after subscription payment
       const db = (await clientPromise).db('AdminDB');
-      
-      const result = await db.collection('users').updateOne(
-        { userId: id },
-        {
-          $setOnInsert: {
-            userId: id,
-            username: userName,
-            email: userEmail,
-            fullName: resolvedFullName,
-            // accessToken is NOT generated on signup - only after successful payment
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            devices: [],
-            dataUsage: 0
-          }
-        },
-        { upsert: true }
-      );
 
-      const duration = Date.now() - startTime;
+      const now = new Date();
+      const existingUser = await db.collection('users').findOne({ userId: id });
 
-      if (result.upsertedCount > 0) {
-        logger.info('MongoDB user created successfully', 'CLERK_WEBHOOK', { 
+      if (!existingUser) {
+        await db.collection('users').insertOne({
+          userId: id,
+          username: userName,
+          email: userEmail,
+          fullName: resolvedFullName,
+          createdAt: now,
+          updatedAt: now,
+          devices: [],
+          dataUsage: 0,
+        });
+
+        const duration = Date.now() - startTime;
+        logger.info('MongoDB user created successfully', 'CLERK_WEBHOOK', {
           userId: id,
           email: userEmail,
-          duration 
+          username: userName,
+          duration,
         });
-        
-        return NextResponse.json({ 
+
+        return NextResponse.json({
           success: true,
           message: 'User created in MongoDB',
-          userId: id
-        });
-      } else {
-        // User already existed in MongoDB
-        logger.info('MongoDB user already exists', 'CLERK_WEBHOOK', { 
           userId: id,
-          duration 
-        });
-        
-        return NextResponse.json({ 
-          success: true,
-          message: 'User already exists',
-          userId: id
         });
       }
+
+      const existingEmailPrefix = typeof existingUser.email === 'string' ? existingUser.email.split('@')[0] : '';
+      const shouldUpdateUsername =
+        !existingUser.username ||
+        existingUser.username === existingEmailPrefix ||
+        existingUser.username === existingUser.userId;
+
+      const updatePayload: Record<string, unknown> = {
+        updatedAt: now,
+      };
+
+      if (userEmail && userEmail !== existingUser.email) {
+        updatePayload.email = userEmail;
+      }
+
+      if (resolvedFullName && resolvedFullName !== existingUser.fullName) {
+        updatePayload.fullName = resolvedFullName;
+      }
+
+      if (userName && shouldUpdateUsername && userName !== existingUser.username) {
+        updatePayload.username = userName;
+      }
+
+      if (Object.keys(updatePayload).length > 1) {
+        await db.collection('users').updateOne(
+          { userId: id },
+          { $set: updatePayload }
+        );
+      }
+
+      const duration = Date.now() - startTime;
+      logger.info('MongoDB user synced successfully', 'CLERK_WEBHOOK', {
+        userId: id,
+        email: userEmail,
+        username: userName,
+        eventType: evt.type,
+        duration,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'User synced in MongoDB',
+        userId: id,
+      });
     }
 
     // Handle other webhook events (if needed in future)

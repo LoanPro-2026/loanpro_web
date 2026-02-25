@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import Razorpay from 'razorpay';
 import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateUpgradeRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
-import { logger } from '@/lib/logger';import { getSubscriptionEndDate, getBillingPeriod } from '@/lib/subscriptionHelpers';
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+import { logger } from '@/lib/logger';
+import { getSubscriptionEndDate, getBillingPeriod } from '@/lib/subscriptionHelpers';
+import { getRazorpayClient } from '@/lib/razorpayClient';
 
 // Plan pricing (monthly rates in rupees) - matching create-order API
 const PLAN_PRICES = {
@@ -124,6 +121,18 @@ export async function POST(request: NextRequest) {
   console.log('[UPGRADE-PLAN POST] Request received');
   
   try {
+    const { client: razorpay, error: razorpayInitError, keyId } = getRazorpayClient();
+    if (!razorpay) {
+      return NextResponse.json(
+        { error: razorpayInitError || 'Payment system is not configured' },
+        { status: 500 }
+      );
+    }
+
+    logger.info('Upgrade Razorpay client initialized', 'UPGRADE_PLAN', {
+      keyType: keyId.includes('test') ? 'test' : 'live',
+    });
+
     // Authentication check
     const { userId } = await auth();
     console.log('[UPGRADE-PLAN POST] User authenticated:', userId);
@@ -372,6 +381,18 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[UPGRADE-PLAN POST] Error:', error);
     console.error('[UPGRADE-PLAN POST] Error stack:', error.stack);
+    const razorpayError = error?.error || error;
+    const statusCode = error?.statusCode || error?.error?.statusCode;
+    if (statusCode === 401 || razorpayError?.description === 'Authentication failed') {
+      return NextResponse.json(
+        {
+          error: 'Razorpay authentication failed. Verify that RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are a matching pair from the same account/mode.',
+          details: razorpayError?.description || 'Authentication failed',
+        },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json(
       { 
         error: error.message || 'Failed to process upgrade request',

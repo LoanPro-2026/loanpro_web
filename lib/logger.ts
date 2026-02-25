@@ -38,6 +38,10 @@ interface LogEntry {
  */
 function createLogger(): winston.Logger {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const isServerless =
+    process.env.VERCEL === '1' ||
+    process.env.AWS_EXECUTION_ENV !== undefined ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined;
   const logsDir = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
 
   const baseFormat = winston.format.combine(
@@ -64,16 +68,15 @@ function createLogger(): winston.Logger {
       )
     : baseFormat;
 
-  const transports: winston.transport[] = [
-    // Console output
-    new winston.transports.Console({
-      format: consoleFormat,
-      level: isDevelopment ? 'debug' : 'info',
-    }),
-  ];
+  const consoleTransport = new winston.transports.Console({
+    format: consoleFormat,
+    level: isDevelopment ? 'debug' : 'info',
+  });
 
-  // File transports only in production
-  if (!isDevelopment) {
+  const transports: winston.transport[] = [consoleTransport];
+
+  // File transports only in non-serverless production environments
+  if (!isDevelopment && !isServerless) {
     // Combined logs (all levels)
     transports.push(
       new DailyRotateFile({
@@ -102,8 +105,8 @@ function createLogger(): winston.Logger {
     format: baseFormat,
     defaultMeta: { service: 'loanpro-api' },
     transports,
-    exceptionHandlers: transports,
-    rejectionHandlers: transports,
+    exceptionHandlers: [consoleTransport],
+    rejectionHandlers: [consoleTransport],
   });
 }
 

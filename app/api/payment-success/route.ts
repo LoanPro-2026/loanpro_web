@@ -4,23 +4,27 @@ import { headers } from 'next/headers';
 import { SubscriptionService } from '@/services/subscriptionService';
 import clientPromise from '@/lib/mongodb';
 import crypto from 'crypto';
-import Razorpay from 'razorpay';
 import { successResponse, errorResponse } from '@/lib/apiResponse';
 import { validatePaymentResponse } from '@/lib/validation';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { logger } from '@/lib/logger';
 import emailService from '@/services/emailService';
-
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-});
+import { getRazorpayClient } from '@/lib/razorpayClient';
 
 export async function POST(req: Request) {
   const startTime = Date.now();
   logger.info('Payment webhook received', 'PAYMENT_SUCCESS');
   
   try {
+    const { client: razorpay, error: razorpayInitError, keyId } = getRazorpayClient();
+    if (!razorpay) {
+      return errorResponse({
+        code: 'PAYMENT_CONFIG_ERROR',
+        message: razorpayInitError || 'Payment system is not configured',
+        statusCode: 500,
+      });
+    }
+
     const body = await req.json();
     const normalizedPlan = typeof body.plan === 'string' && body.plan.length > 0
       ? body.plan.charAt(0).toUpperCase() + body.plan.slice(1).toLowerCase()
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
     const isDirectCall = !isWebhookCall;
     
     // Check if we're using Razorpay test mode (regardless of NODE_ENV)
-    const isRazorpayTestMode = process.env.RAZORPAY_KEY_ID?.includes('test') || false;
+    const isRazorpayTestMode = keyId.includes('test');
     
     logger.info('Payment environment check', 'PAYMENT_SUCCESS', {
       NODE_ENV: process.env.NODE_ENV,
