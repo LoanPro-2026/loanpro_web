@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-if (!ADMIN_PASSWORD) {
-  throw new Error('ADMIN_PASSWORD environment variable must be set');
-}
 
 function timingSafeEqualText(a: string, b: string): boolean {
   const left = Buffer.from(a);
@@ -37,7 +32,15 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!timingSafeEqualText(password, ADMIN_PASSWORD)) {
+    const adminPassword = process.env.ADMIN_PASSWORD ?? '';
+    if (!adminPassword) {
+      return NextResponse.json(
+        { success: false, error: 'Admin password is not configured' },
+        { status: 500 }
+      );
+    }
+
+    if (!timingSafeEqualText(password, adminPassword)) {
       return NextResponse.json(
         { success: false, error: 'Invalid password' },
         { status: 401 }
