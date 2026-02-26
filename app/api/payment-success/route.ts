@@ -435,7 +435,6 @@ export async function POST(req: Request) {
               lastSubscribedAt: new Date()
             },
             $setOnInsert: {
-                userId,
                 username: generatedUsername,
                 createdAt: new Date(),
                 devices: [],
