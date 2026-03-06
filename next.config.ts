@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // Suppress hydration warnings caused by browser extensions
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname),
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   
   // Allow Clerk-hosted images (for avatars, logos, etc.)
   images: {

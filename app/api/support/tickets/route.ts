@@ -4,6 +4,57 @@ import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import { connectToDatabase } from '@/lib/mongodb';
+
+type VerifiedSupportUser = {
+  userId: string;
+  email: string;
+  fullName: string;
+};
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+async function verifySupportUserIdentity(params: {
+  userId?: string;
+  userEmail?: string;
+  accessToken?: string;
+}): Promise<VerifiedSupportUser | null> {
+  const { db } = await connectToDatabase();
+  const normalizedUserId = (params.userId || '').trim();
+  const normalizedEmail = (params.userEmail || '').trim().toLowerCase();
+  const normalizedToken = (params.accessToken || '').trim();
+
+  if (normalizedToken) {
+    const user = await db.collection('users').findOne({ accessToken: normalizedToken });
+    if (!user) return null;
+
+    const tokenUserId = String(user.userId || '');
+    const tokenEmail = String(user.email || '').trim().toLowerCase();
+    if (!tokenUserId || !tokenEmail) return null;
+
+    if (normalizedUserId && normalizedUserId !== tokenUserId) return null;
+    if (normalizedEmail && normalizedEmail !== tokenEmail) return null;
+
+    return {
+      userId: tokenUserId,
+      email: tokenEmail,
+      fullName: String(user.fullName || user.username || '').trim(),
+    };
+  }
+
+  if (!normalizedUserId || !normalizedEmail) {
+    return null;
+  }
+
+  const user = await db.collection('users').findOne({ userId: normalizedUserId, email: normalizedEmail });
+  if (!user) return null;
+
+  return {
+    userId: normalizedUserId,
+    email: normalizedEmail,
+    fullName: String(user.fullName || user.username || '').trim(),
+  };
+}
 
 /**
  * OPTIONS /api/support/tickets
@@ -47,11 +98,20 @@ export async function POST(req: NextRequest) {
       accessToken
     } = body;
 
+    const normalizedAccessToken = typeof accessToken === 'string' ? accessToken.trim() : '';
+
     // Validation
-    if (!userId || !userEmail || !userName || !subject || !description || !issueType || !appVersion) {
+    if (!userId || !userEmail || !subject || !description || !issueType || !appVersion) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
+      );
+    }
+
+    if (isProduction && !normalizedAccessToken) {
+      return NextResponse.json(
+        { success: false, error: 'Access token is required in production.' },
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -81,16 +141,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Optional: Verify access token if provided
-    // TODO: Add token verification logic here
+    const verifiedUser = await verifySupportUserIdentity({ userId, userEmail, accessToken: normalizedAccessToken });
+    if (!verifiedUser) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid authentication context. Please sign in again.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
 
     await connectMongoose();
 
     // Create ticket
     const ticket = new SupportTicket({
-      userId,
-      userEmail,
-      userName,
+      userId: verifiedUser.userId,
+      userEmail: verifiedUser.email,
+      userName: userName?.trim() || verifiedUser.fullName || verifiedUser.email,
       subject: subject.trim(),
       description: description.trim(),
       issueType,
@@ -155,20 +220,37 @@ export async function GET(req: NextRequest) {
   
   try {
     const { searchParams } = new URL(req.url);
-    const userEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId');
+    const requestedUserEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId');
+    const requestedUserId = searchParams.get('userId') || undefined;
+    const queryAccessToken = searchParams.get('accessToken') || undefined;
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+    const accessToken = queryAccessToken || bearerToken;
     const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
 
-    if (!userEmail) {
+    if (!requestedUserEmail && !requestedUserId) {
       return NextResponse.json(
         { success: false, error: 'userEmail or userId is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Reject invalid userId (from incomplete auth setup)
-    if (userEmail === 'unknown' || userEmail.trim() === '') {
+    if (isProduction && !accessToken) {
+      return NextResponse.json(
+        { success: false, error: 'Access token is required in production.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    const verifiedUser = await verifySupportUserIdentity({
+      userId: requestedUserId,
+      userEmail: requestedUserEmail || undefined,
+      accessToken,
+    });
+
+    if (!verifiedUser) {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -177,8 +259,8 @@ export async function GET(req: NextRequest) {
 
     await connectMongoose();
 
-    // Build query - use userEmail instead of userId since that's where the email is stored
-    const query: any = { userEmail: userEmail }; // userId param may contain the email value
+    // Query by verified identity to prevent cross-account ticket reads.
+    const query: any = { userEmail: verifiedUser.email };
     if (status && status !== 'all') {
       query.status = status;
     }

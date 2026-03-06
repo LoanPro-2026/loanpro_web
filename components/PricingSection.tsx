@@ -31,7 +31,7 @@ const plans = [
     features: [
       'Everything in Basic',
       'Google Drive Cloud Backup',
-      'Biometric access',
+      'Android photo capture',
       'Daily automatic sync',
       'Advanced analytics & reports',
       'Priority support',

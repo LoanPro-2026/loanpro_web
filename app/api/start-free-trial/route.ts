@@ -16,24 +16,32 @@ export async function POST(req: Request) {
     // Check if user already has an active trial or subscription
     const db = (await clientPromise).db('AdminDB');
     const existingUser = await db.collection('users').findOne({ userId });
+    const now = new Date();
+
+    // Canonical state check from subscriptions collection
+    const activeSubscription = await db.collection('subscriptions').findOne(
+      {
+        userId,
+        status: { $in: ['active', 'trial', 'active_subscription'] },
+        endDate: { $gt: now },
+      },
+      { sort: { endDate: -1, createdAt: -1 } }
+    );
+
+    if (activeSubscription) {
+      const activeKind = String(activeSubscription.status || '').toLowerCase() === 'trial' ? 'trial period' : 'subscription';
+      return NextResponse.json(
+        {
+          error: `You already have an active ${activeKind}`,
+          expiresAt: activeSubscription.endDate,
+        },
+        { status: 400 }
+      );
+    }
     
     // Prevent duplicate trials - check if user has EVER used trial before
     if (existingUser) {
       // Check if currently has active trial/subscription
-      const now = new Date();
-      if (existingUser.trialExpiresAt && new Date(existingUser.trialExpiresAt) > now) {
-        return NextResponse.json({ 
-          error: 'You already have an active trial period',
-          expiresAt: existingUser.trialExpiresAt
-        }, { status: 400 });
-      }
-      if (existingUser.subscriptionExpiresAt && new Date(existingUser.subscriptionExpiresAt) > now) {
-        return NextResponse.json({ 
-          error: 'You already have an active subscription',
-          expiresAt: existingUser.subscriptionExpiresAt
-        }, { status: 400 });
-      }
-      
       // IMPORTANT: Check if user has used trial before (historical check)
       if (existingUser.hasUsedTrial === true || existingUser.trialStartedAt) {
         return NextResponse.json({ 

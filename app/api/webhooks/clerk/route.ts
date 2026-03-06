@@ -135,16 +135,24 @@ export async function POST(req: Request) {
       const existingUser = await db.collection('users').findOne({ userId: id });
 
       if (!existingUser) {
-        await db.collection('users').insertOne({
-          userId: id,
-          username: userName,
-          email: userEmail,
-          fullName: resolvedFullName,
-          createdAt: now,
-          updatedAt: now,
-          devices: [],
-          dataUsage: 0,
-        });
+        await db.collection('users').updateOne(
+          { userId: id },
+          {
+            $set: {
+              username: userName,
+              email: userEmail,
+              fullName: resolvedFullName,
+              updatedAt: now,
+            },
+            $setOnInsert: {
+              userId: id,
+              createdAt: now,
+              devices: [],
+              dataUsage: 0,
+            },
+          },
+          { upsert: true }
+        );
 
         const duration = Date.now() - startTime;
         logger.info('MongoDB user created successfully', 'CLERK_WEBHOOK', {

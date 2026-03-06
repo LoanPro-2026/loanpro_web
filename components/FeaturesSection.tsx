@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ChartBarIcon,
-  FingerPrintIcon,
+  CameraIcon,
   CloudIcon,
   CreditCardIcon,
   ServerIcon,
@@ -15,9 +15,9 @@ const features = [
     description: 'Comprehensive analytics and reporting with real-time insights into your lending operations and portfolio performance.',
   },
   {
-    title: 'Biometric Security',
-    icon: FingerPrintIcon,
-    description: 'Secure fingerprint authentication using Secu-Hamster Pro 20-AP scanner for enhanced security and customer verification.',
+    title: 'Photo Verification',
+    icon: CameraIcon,
+    description: 'Capture and view customer photos while adding or removing records using your Android phone as a companion camera.',
   },
   {
     title: 'Cloud Sync & Backup',

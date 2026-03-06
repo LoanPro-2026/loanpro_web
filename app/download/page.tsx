@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { ArrowDownTrayIcon, CheckCircleIcon, ComputerDesktopIcon, ShieldCheckIcon, RocketLaunchIcon, ClockIcon, FingerPrintIcon, ChevronDownIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, CheckCircleIcon, ComputerDesktopIcon, ShieldCheckIcon, RocketLaunchIcon, ClockIcon, DevicePhoneMobileIcon, ChevronDownIcon, CheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import HowToSetup from '../../components/HowToSetup';
 
 const features = [
@@ -10,9 +10,9 @@ const features = [
 		icon: RocketLaunchIcon,
 	},
 	{
-		title: 'Biometric Security',
-		description: 'Fingerprint authentication with Secu-Hamster Pro 20-AP scanner',
-		icon: FingerPrintIcon,
+		title: 'Photo Verification Workflow',
+		description: 'Capture and review customer photos from your Android phone during add and removal actions',
+		icon: DevicePhoneMobileIcon,
 	},
 	{
 		title: 'Local Database',
@@ -41,7 +41,7 @@ const systemRequirements = [
 	'4 GB RAM minimum (8 GB recommended)',
 	'500 MB free disk space',
 	'Internet connection for cloud sync',
-	'Secu-Hamster Pro 20-AP Fingerprint Scanner (Pro/Enterprise)',
+	'Android phone with camera (for companion photo capture)',
 	'Active subscription plan',
 ];
 
@@ -117,8 +117,8 @@ const DownloadPage = () => {
 			answer: 'Currently, LoanPro is only available for Windows (10 and later). We are working on Mac and Linux versions - check back soon!'
 		},
 		{
-			question: 'Do I need a fingerprint scanner?',
-			answer: 'The Secu-Hamster Pro 20-AP fingerprint scanner is required only for the Pro and Enterprise plans for biometric authentication. The Basic plan uses password authentication.'
+			question: 'Do I need an Android phone for photos?',
+			answer: 'No. Fingerprint scanner support has been replaced by Android companion photo capture. Use your own Android phone camera to take customer photos during loan workflows.'
 		},
 		{
 			question: 'What if I lose my internet connection?',
@@ -156,7 +156,7 @@ const DownloadPage = () => {
 						Download LoanPro for Windows
 					</h1>
 					<p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-						Install the desktop application to manage loans locally with optional cloud backup and biometric access.
+						Install the desktop application to manage loans locally with optional cloud backup and Android photo capture support.
 					</p>
 
 					<div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -371,18 +371,18 @@ const DownloadPage = () => {
 					<h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 mb-10 text-center font-display">Bind your device</h2>
 					<div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
 						<div className="flex items-start gap-3 mb-6">
-							<FingerPrintIcon className="w-6 h-6 text-blue-600 flex-shrink-0" />
+							<DevicePhoneMobileIcon className="w-6 h-6 text-blue-600 flex-shrink-0" />
 							<div>
-								<h3 className="text-lg font-semibold text-slate-900">Device binding for biometric access</h3>
-								<p className="text-sm text-slate-600">Required for Pro and Enterprise plans that use fingerprint login.</p>
+								<h3 className="text-lg font-semibold text-slate-900">Device binding for Android photo capture</h3>
+								<p className="text-sm text-slate-600">Required for plans using customer photo capture from your own mobile phone.</p>
 							</div>
 						</div>
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 							{[
-								{ title: 'Connect scanner', text: 'Plug in the SecuGen Hamster Pro 20-AP via USB.' },
-								{ title: 'Enroll fingerprints', text: 'Scan 4-5 fingers in the setup flow.' },
-								{ title: 'Bind device', text: 'Confirm the device in Settings → Devices.' },
-								{ title: 'Start using', text: 'Use fingerprint login for secure access.' }
+								{ title: 'Install Android app', text: 'Install the LoanPro companion app on your Android phone.' },
+								{ title: 'Pair phone', text: 'Pair your phone from Settings → Devices in the desktop app.' },
+								{ title: 'Allow camera', text: 'Grant camera permission to capture customer photos.' },
+								{ title: 'Start using', text: 'Capture during add record and view the same photo during record removal.' }
 							].map((item, idx) => (
 								<div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
 									<div className="text-xs font-semibold text-slate-500">Step {idx + 1}</div>

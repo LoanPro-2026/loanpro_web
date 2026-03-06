@@ -62,7 +62,7 @@ export default function SignInPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-slate-900">Secure access</p>
-                  <p className="text-slate-600 text-sm">Role-based access and optional biometrics.</p>
+                  <p className="text-slate-600 text-sm">Role-based access and Android photo-based customer verification.</p>
                 </div>
               </div>
 

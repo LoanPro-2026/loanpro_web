@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ComputerDesktopIcon,
-  FingerPrintIcon,
+  DevicePhoneMobileIcon,
   CloudIcon
 } from '@heroicons/react/24/outline';
 
@@ -13,9 +13,9 @@ const requirements = [
     required: true
   },
   {
-    title: 'SecuGen Hamster Pro 20-AP Scanner',
-    description: 'Required for Pro and Enterprise plans to enable biometric access.',
-    icon: FingerPrintIcon,
+    title: 'Android Phone With Camera',
+    description: 'Required for mobile photo capture so shop owners can add and verify customer photos from their own phone.',
+    icon: DevicePhoneMobileIcon,
     required: true
   },
   {

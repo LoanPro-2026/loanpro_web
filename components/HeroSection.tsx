@@ -19,7 +19,7 @@ const HeroSection = () => {
             </h1>
 
             <p className="mt-5 text-lg text-slate-600 max-w-xl">
-              LoanPro is a Windows desktop platform for tracking loans, collections, and portfolios with optional cloud backup and biometric access for secured workflows.
+              LoanPro is a Windows desktop platform for tracking loans, collections, and portfolios with optional cloud backup and Android photo capture for customer verification workflows.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -51,7 +51,7 @@ const HeroSection = () => {
             </div>
 
             <div className="mt-6 text-sm text-slate-500">
-              Windows 10+ required. Biometric scanner supported for Pro and Enterprise plans.
+              Windows desktop app plus Android companion photo capture support.
             </div>
           </div>
 

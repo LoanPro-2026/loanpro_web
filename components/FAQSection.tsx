@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     question: 'What features are included in each plan?',
-    answer: 'Every plan includes core loan operations, Adding new Loan Record, Adding Deposits to Existing Loans, Closing Loans when repaid. Basic Reports and cash Flow Statements are also Stored. Higher tiers add cloud backup, biometrics, and priority support. See the pricing section for full details.'
+    answer: 'Every plan includes core loan operations, Adding new Loan Record, Adding Deposits to Existing Loans, Closing Loans when repaid. Basic Reports and cash Flow Statements are also Stored. Higher tiers add cloud backup, Android photo capture workflow, and priority support. See the pricing section for full details.'
   },
   {
     question: 'How secure is my data with LoanPro?',
@@ -41,8 +41,8 @@ const faqs = [
     answer: 'Activate the subscription (paid or premium), then download the App from downloads Page and Install it, giving all required permissions. After that Go to your profile page, copy the access token and then enter the access token and give your office name, and device ID. Wait for some time for onboarding to be completed and here Your app is ready to use.       '
   },
   {
-    question: 'Why Should I opt for Biometric Functionality',
-    answer: 'Biometric Functionality Offers an extra layer of security as well as easy search optimization. Shop Owners will add customers fingerprint while adding new loan records. Now at the time of repayment they will directly search and match fingerprint of customer. And hence this eases the process of searching for customer records and also adds an extra layer of safety.'
+    question: 'Why should I use photo functionality?',
+    answer: 'Photo functionality helps shop owners capture a customer image while creating a loan record and quickly view the same image while removing or closing records. This improves verification, reduces confusion between similar names, and works through your own Android phone camera.'
   },
   {
     question: 'How can I raise my concerns about the software',

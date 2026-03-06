@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { logger } from './logger';
+import { ensureDbIndexes } from './dbIndexes';
 
 if (!process.env.MONGODB_URI) {
   const error = 'MONGODB_URI environment variable is not set. Please add it to .env.local';
@@ -16,6 +17,15 @@ const options = {
 
 let client: MongoClient | null = null;
 let clientPromise: Promise<MongoClient>;
+let indexesEnsuredPromise: Promise<void> | null = null;
+
+async function ensureIndexesOnce(client: MongoClient) {
+  if (!indexesEnsuredPromise) {
+    indexesEnsuredPromise = ensureDbIndexes(client.db('AdminDB'));
+  }
+
+  await indexesEnsuredPromise;
+}
 
 if (process.env.NODE_ENV === 'development') {
   // In development mode, use a global variable so that the value
@@ -53,14 +63,19 @@ if (process.env.NODE_ENV === 'development') {
     });
 }
 
-export default clientPromise;
+const readyClientPromise = clientPromise.then(async (connectedClient) => {
+  await ensureIndexesOnce(connectedClient);
+  return connectedClient;
+});
+
+export default readyClientPromise;
 
 /**
  * Helper function for getting database connection
  */
 export async function connectToDatabase() {
   try {
-    const client = await clientPromise;
+    const client = await readyClientPromise;
     return {
       client,
       db: client.db('AdminDB'),

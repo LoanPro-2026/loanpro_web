@@ -128,7 +128,7 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
       price: 899, 
       description: 'Great for growing companies',
       icon: '🚀',
-      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Biometric Auth']
+      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Android Photo Capture']
     },
     { 
       name: 'enterprise', 
@@ -611,7 +611,7 @@ const RenewModal: React.FC<RenewModalProps> = ({ isOpen, onClose, currentPlan, c
       price: 899,
       description: 'Great for growing companies',
       icon: '🚀',
-      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Biometric Auth']
+      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Android Photo Capture']
     },
     {
       name: 'enterprise',
@@ -1230,7 +1230,23 @@ const ProfilePage = () => {
         }),
       });
       
-      if (!orderResponse.ok) throw new Error('Failed to create renewal order. Please try again.');
+      if (!orderResponse.ok) {
+        let orderErrorMessage = 'Failed to create renewal order. Please try again.';
+        try {
+          const errorPayload = await orderResponse.json();
+          if (orderResponse.status === 401 || errorPayload?.code === 'UNAUTHORIZED') {
+            orderErrorMessage = 'Please sign in again to continue renewal.';
+          } else if (errorPayload?.code === 'RAZORPAY_AUTH_FAILED') {
+            orderErrorMessage = 'Payment gateway is temporarily misconfigured. Please contact support.';
+          } else {
+            orderErrorMessage = errorPayload?.error || errorPayload?.message || orderErrorMessage;
+          }
+        } catch {
+          // Keep generic message if payload parsing fails.
+        }
+
+        throw new Error(orderErrorMessage);
+      }
       
       const orderPayload = await orderResponse.json();
       const orderData = orderPayload.data || orderPayload;
@@ -1596,7 +1612,7 @@ const ProfilePage = () => {
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6">
                 <ShieldCheckIcon className="w-6 h-6 text-blue-600 mx-auto mb-3" />
                 <h3 className="font-semibold text-slate-900 mb-2">Advanced access</h3>
-                <p className="text-sm text-slate-600">Biometric access and secure tokens.</p>
+                <p className="text-sm text-slate-600">Android photo verification and secure tokens.</p>
               </div>
             </div>
 

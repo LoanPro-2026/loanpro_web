@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 import emailService from '@/services/emailService';
+import { getDeviceLimitForPlan, resolveEffectivePlanForUser } from '@/lib/subscriptionPlan';
 
 export function OPTIONS(req: Request) {
   return handleCorsPreFlight(req); // ✅ Returns only a Response
@@ -28,21 +29,8 @@ export async function POST(req: Request) {
       user.username ||
       (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
 
-    // Check device limits based on subscription plan
-    const getDeviceLimit = (plan: string) => {
-      switch (plan?.toLowerCase()) {
-        case 'basic':
-        case 'pro':
-          return 1;
-        case 'enterprise':
-          return 2;
-        default:
-          return 1; // Default to 1 for safety
-      }
-    };
-
-    const subscriptionPlan = user.subscriptionPlan || 'basic';
-    const deviceLimit = getDeviceLimit(subscriptionPlan);
+    const subscriptionPlan = await resolveEffectivePlanForUser(db, user);
+    const deviceLimit = getDeviceLimitForPlan(subscriptionPlan);
     const activeDevices = (user.devices || []).filter((d: any) => d.status === 'active');
 
     // Check if device already exists (update case)

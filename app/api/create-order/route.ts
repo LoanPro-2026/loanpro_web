@@ -190,18 +190,28 @@ export async function POST(req: Request) {
     console.log('[CREATE-ORDER] Order created successfully:', order.id);
 
     // Store order intent for idempotency and abandoned cart tracking
-    await db.collection('order_intents').insertOne({
-      userId,
-      orderId: order.id,
-      plan,
-      billingPeriod,
-      paymentContext: normalizedPaymentContext,
-      amount: orderAmount,
-      status: 'pending',
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      reminderSent: false
-    });
+    const now = new Date();
+    await db.collection('order_intents').updateOne(
+      { orderId: order.id },
+      {
+        $set: {
+          userId,
+          plan,
+          billingPeriod,
+          paymentContext: normalizedPaymentContext,
+          amount: orderAmount,
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          reminderSent: false,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          orderId: order.id,
+          createdAt: now,
+        },
+      },
+      { upsert: true }
+    );
 
     return successResponse({
       orderId: order.id,
@@ -224,11 +234,23 @@ export async function POST(req: Request) {
 
     // Handle Razorpay API errors
     if (error?.error?.code) {
+      const razorpayError = error.error;
+      const statusCode = error?.statusCode || razorpayError?.statusCode;
+      const description = String(razorpayError?.description || '').trim();
+
+      if (statusCode === 401 || description === 'Authentication failed') {
+        return errorResponse({
+          code: 'RAZORPAY_AUTH_FAILED',
+          message: 'Razorpay authentication failed. Verify RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are a valid matching pair from the same account and mode (test/live).',
+          statusCode: 502,
+        });
+      }
+
       console.error('[CREATE-ORDER] Razorpay API error:', error.error);
       return errorResponse({
-        code: error.error.code || 'PAYMENT_ERROR',
-        message: error.error.description || 'Failed to create payment order. Verify Razorpay key/secret pair and account mode.',
-        statusCode: error.statusCode || 500,
+        code: razorpayError.code || 'PAYMENT_ERROR',
+        message: description || 'Failed to create payment order. Verify Razorpay key/secret pair and account mode.',
+        statusCode: statusCode || 500,
       });
     }
 

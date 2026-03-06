@@ -126,6 +126,9 @@ const SupportTicketSchema = new Schema<ISupportTicket>({
 SupportTicketSchema.index({ createdAt: -1 });
 SupportTicketSchema.index({ status: 1, createdAt: -1 });
 SupportTicketSchema.index({ userId: 1, createdAt: -1 });
+SupportTicketSchema.index({ userEmail: 1, createdAt: -1 });
+SupportTicketSchema.index({ userEmail: 1, status: 1, createdAt: -1 });
+SupportTicketSchema.index({ status: 1, priority: 1, issueType: 1, createdAt: -1 });
 
 // Generate unique ticket ID
 SupportTicketSchema.pre('validate', async function() {

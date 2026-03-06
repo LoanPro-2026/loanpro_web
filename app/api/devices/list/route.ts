@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import { getDeviceLimitForPlan, resolveEffectivePlanForUser } from '@/lib/subscriptionPlan';
 
 export function OPTIONS(req: Request) {
   return handleCorsPreFlight(req);
@@ -30,21 +31,8 @@ export async function POST(req: Request) {
     const devices = user.devices || [];
     const activeDevices = devices.filter((device: any) => device.status === 'active');
 
-    // Get device limits based on subscription plan
-    const getDeviceLimit = (plan: string) => {
-      switch (plan?.toLowerCase()) {
-        case 'basic':
-        case 'pro':
-          return 1;
-        case 'enterprise':
-          return 2;
-        default:
-          return 1; // Default to 1 for safety
-      }
-    };
-
-    const subscriptionPlan = user.subscriptionPlan || 'basic';
-    const deviceLimit = getDeviceLimit(subscriptionPlan);
+    const subscriptionPlan = await resolveEffectivePlanForUser(db, user);
+    const deviceLimit = getDeviceLimitForPlan(subscriptionPlan);
 
     return NextResponse.json({
       success: true,

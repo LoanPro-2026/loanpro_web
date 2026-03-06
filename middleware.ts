@@ -80,6 +80,7 @@ export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   const pathname = req.nextUrl.pathname;
   const origin = req.headers.get('origin');
+  const isApiRoute = pathname.startsWith('/api/');
 
   // Get CORS and security headers
   const corsHeaders = getCorsHeaders(origin);
@@ -98,8 +99,16 @@ export default clerkMiddleware(async (auth, req) => {
   // Check if current route requires authentication
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
 
-  // Only redirect to sign-in if accessing a protected route without authentication
+  // For API routes, return JSON 401 instead of redirecting HTML to avoid client-side flow breaks.
   if (isProtectedRoute && !userId) {
+    if (isApiRoute) {
+      const allHeaders = { ...corsHeaders, ...securityHeaders };
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401, headers: allHeaders }
+      );
+    }
+
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   ArrowDownTrayIcon,
   KeyIcon,
-  FingerPrintIcon
+  DevicePhoneMobileIcon
 } from '@heroicons/react/24/outline';
 
 const setupSteps = [
@@ -20,9 +20,9 @@ const setupSteps = [
   },
   {
     step: 3,
-    title: 'Configure your workspace',
-    description: 'Go through Settings and COnfigure Your WorkSpace as Per Your Requirements',
-    icon: FingerPrintIcon
+    title: 'Enable Android photo capture',
+    description: 'Pair your Android phone and allow camera access so you can capture customer photos while adding and removing records.',
+    icon: DevicePhoneMobileIcon
   }
 ];
 

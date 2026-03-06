@@ -141,8 +141,8 @@ export default function SignUpPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900 text-sm">Biometric access</p>
-                    <p className="text-slate-600 text-xs mt-1">Available for supported plans and devices.</p>
+                    <p className="font-semibold text-slate-900 text-sm">Android photo capture</p>
+                    <p className="text-slate-600 text-xs mt-1">Capture and verify customer photos using your own mobile phone.</p>
                   </div>
                 </div>
             </div>

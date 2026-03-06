@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { getDeviceLimitForPlan, resolveEffectivePlanForUser } from '@/lib/subscriptionPlan';
 
 async function cleanupDevices(accessToken: string) {
   try {
@@ -57,22 +58,9 @@ async function testDeviceLimit(accessToken: string) {
       return { error: 'User not found' };
     }
 
-    const subscriptionPlan = user.subscriptionPlan || 'basic';
+    const subscriptionPlan = await resolveEffectivePlanForUser(db, user);
     const activeDevices = (user.devices || []).filter((d: any) => d.status === 'active');
-    
-    const getDeviceLimit = (plan: string) => {
-      switch (plan?.toLowerCase()) {
-        case 'basic':
-        case 'pro':
-          return 1;
-        case 'enterprise':
-          return 2;
-        default:
-          return 1;
-      }
-    };
-    
-    const deviceLimit = getDeviceLimit(subscriptionPlan);
+    const deviceLimit = getDeviceLimitForPlan(subscriptionPlan);
     
     return {
       subscriptionPlan,

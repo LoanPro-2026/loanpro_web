@@ -246,20 +246,39 @@ export async function GET() {
       // Token will only be created after successful payment
       logger.info('New Clerk user, creating MongoDB user record', 'USER_PROFILE', { userId });
       
+      const now = new Date();
       const newUser = {
         userId,
         username: resolvedIdentity.username,
         email: resolvedIdentity.email,
         fullName: resolvedIdentity.fullName,
         // accessToken is NOT created at signup - only after payment
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: now,
+        updatedAt: now,
         devices: [],
         dataUsage: 0
       };
       
-      const insertResult = await db.collection('users').insertOne(newUser);
-      user = { ...newUser, _id: insertResult.insertedId };
+      await db.collection('users').updateOne(
+        { userId },
+        {
+          $set: {
+            username: newUser.username,
+            email: newUser.email,
+            fullName: newUser.fullName,
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            userId,
+            createdAt: now,
+            devices: [],
+            dataUsage: 0,
+          },
+        },
+        { upsert: true }
+      );
+
+      user = await db.collection('users').findOne({ userId });
       
       logger.info('New user created successfully', 'USER_PROFILE', { userId });
     } else {
@@ -287,6 +306,11 @@ export async function GET() {
           updatedKeys: Object.keys(updates),
         });
       }
+    }
+
+    if (!user) {
+      logger.error('User record missing after initialization', new Error('USER_RECORD_MISSING'), 'USER_PROFILE', { userId });
+      return errorResponse(ApiErrors.INTERNAL_ERROR);
     }
 
     // Recover pending successful payments if user closed tab before payment-success callback

@@ -39,7 +39,7 @@ const plans: SubscriptionPlan[] = [
     ],
     limitations: [
       'No cloud facility',
-      'No biometric authentication',
+      'No Android photo capture',
       'Limited customer support',
       'Single device support only'
     ],
@@ -57,7 +57,7 @@ const plans: SubscriptionPlan[] = [
       'Advanced analytics & reports',
       'Limited cloud database (1GB)',
       'Priority support',
-      'Biometrics Available',
+      'Android photo capture enabled',
       'Daily Cloud Sync'
     ],
     limitations: [
@@ -79,7 +79,7 @@ const plans: SubscriptionPlan[] = [
       'Unlimited cloud support',
       'Dual device support (2 devices)',
       'Automatic sync enabled',
-      'Biometric authentication',
+      'Advanced photo workflow',
       'White-label solution',
       '24/7 phone support',
       'Dedicated Analytics manager'
@@ -239,7 +239,18 @@ export default function SubscribePage() {
 
       if (!response.ok) {
         console.error('API Error Response:', data);
-        throw new Error(data.error || data.message || `Failed to create order: ${response.status}`);
+        const apiError = data?.error || data?.message || '';
+        const apiCode = data?.code || '';
+
+        if (response.status === 401 || apiCode === 'UNAUTHORIZED') {
+          throw new Error('Please sign in again to continue your subscription.');
+        }
+
+        if (apiCode === 'RAZORPAY_AUTH_FAILED') {
+          throw new Error('Payment gateway is temporarily misconfigured. Please contact support or try again shortly.');
+        }
+
+        throw new Error(apiError || `Failed to create order: ${response.status}`);
       }
       
       // Unwrap API response if it's wrapped in { success, data } structure
@@ -404,7 +415,7 @@ export default function SubscribePage() {
                 {!trialLoading && <ArrowRightIcon className="w-4 h-4" />}
               </button>
               <p className="text-sm text-slate-500 mt-3">
-                Includes biometrics, analytics, and priority support.
+                Includes Android photo capture, analytics, and priority support.
               </p>
             </div>
 
@@ -659,8 +670,8 @@ export default function SubscribePage() {
                   <div className="flex gap-3 items-start p-3 bg-slate-50 border border-slate-200 rounded-lg">
                     <div className="flex-shrink-0 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-semibold text-sm mt-0.5">2</div>
                     <div>
-                      <p className="font-semibold text-slate-900">Bind Your Device</p>
-                      <p className="text-slate-600 text-sm">Register your device for secure biometric authentication</p>
+                      <p className="font-semibold text-slate-900">Pair Your Android Phone</p>
+                      <p className="text-slate-600 text-sm">Connect your phone camera for customer photo capture and verification</p>
                     </div>
                   </div>
                   <div className="flex gap-3 items-start p-3 bg-slate-50 border border-slate-200 rounded-lg">

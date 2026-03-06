@@ -147,6 +147,8 @@ const ContactRequestSchema = new Schema<IContactRequest>(
 ContactRequestSchema.index({ createdAt: -1 });
 ContactRequestSchema.index({ status: 1, createdAt: -1 });
 ContactRequestSchema.index({ inquiryType: 1, createdAt: -1 });
+ContactRequestSchema.index({ status: 1, inquiryType: 1, createdAt: -1 });
+ContactRequestSchema.index({ status: 1, priority: 1, createdAt: -1 });
 
 ContactRequestSchema.pre('validate', async function preValidate() {
   if (!this.isNew || this.requestId) {
