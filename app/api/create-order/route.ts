@@ -4,14 +4,8 @@ import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateOrderRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { getRazorpayClient } from '@/lib/razorpayClient';
-
-// Plan pricing configuration (monthly price in paise)
-// Note: For Razorpay test mode, yearly plans should not exceed ₹10,000 total
-const PLAN_PRICES: Record<string, number> = {
-  'Basic': 59900,      // ₹599/month (yearly with 15% discount: ₹6,117)
-  'Pro': 89900,        // ₹899/month (yearly with 15% discount: ₹9,179)
-  'Enterprise': 139900, // ₹1399/month (yearly with 15% discount: ₹14,287)
-};
+import { getEffectivePlanPricing } from '@/lib/planConfig';
+import { connectToDatabase } from '@/lib/mongodb';
 
 export async function POST(req: Request) {
   console.log('[CREATE-ORDER] API route called');
@@ -76,7 +70,6 @@ export async function POST(req: Request) {
     const normalizedPaymentContext = allowedContexts.includes(paymentContext) ? paymentContext : 'new';
 
     // IDEMPOTENCY: Check for existing pending order (prevent duplicate orders)
-    const { connectToDatabase } = await import('@/lib/mongodb');
     const { db } = await connectToDatabase();
     
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -101,8 +94,12 @@ export async function POST(req: Request) {
       }, 'Existing order found', 200);
     }
 
-    // Get monthly price from configuration
-    const monthlyPrice = PLAN_PRICES[plan];
+    const pricing = await getEffectivePlanPricing(db);
+
+    // Get monthly price from configuration, converted to paise for Razorpay
+    const monthlyPrice = (pricing as Record<string, number>)[plan]
+      ? Math.round((pricing as Record<string, number>)[plan] * 100)
+      : 0;
     if (!monthlyPrice) {
       return errorResponse({
         code: 'INVALID_PLAN',

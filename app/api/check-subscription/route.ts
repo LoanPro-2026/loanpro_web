@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getUserWithSubscription, getSubscriptionStatus } from '@/lib/subscriptionHelpers';
 import { getPlanFeatures } from '@/lib/planFeatures';
+import { getEffectivePlanFeatures } from '@/lib/planConfig';
 
 export async function POST(req: Request) {
   try {
@@ -65,15 +66,16 @@ export async function POST(req: Request) {
     let daysRemaining = 0;
     let features = {};
     let isInGracePeriod = false;
+    let resolvedPlanFeatures: Awaited<ReturnType<typeof getEffectivePlanFeatures>> | null = null;
 
     if (subscription) {
       subscriptionStatus = getSubscriptionStatus(subscription);
       daysRemaining = subscription.daysRemaining || 0;
       isInGracePeriod = subscription.isInGracePeriod || false;
 
-      // Get features from plan configuration
-      const planFeatures = getPlanFeatures(subscription.plan);
-      features = planFeatures.features;
+      // Resolve features from DB-backed config with static fallback.
+      resolvedPlanFeatures = await getEffectivePlanFeatures(db, subscription.plan);
+      features = resolvedPlanFeatures.features;
 
       // During grace period, provide read-only access
       if (isInGracePeriod) {
@@ -117,8 +119,8 @@ export async function POST(req: Request) {
       daysRemaining,
       isInGracePeriod,
       features,
-      maxDevices: subscription ? getPlanFeatures(subscription.plan).maxDevices : 0,
-      cloudStorageLimit: subscription ? getPlanFeatures(subscription.plan).cloudStorageGB : 0,
+      maxDevices: subscription ? (resolvedPlanFeatures?.maxDevices ?? getPlanFeatures(subscription.plan).maxDevices) : 0,
+      cloudStorageLimit: subscription ? (resolvedPlanFeatures?.cloudStorageGB ?? getPlanFeatures(subscription.plan).cloudStorageGB) : 0,
       dataUsage: user.dataUsage || 0,
       devices: user.devices || [],
       user: {

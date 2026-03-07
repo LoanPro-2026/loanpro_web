@@ -59,37 +59,77 @@ export async function GET(request: Request) {
       // Revenue calculations
       db.collection('payments')
         .aggregate([
-          { $match: { status: 'completed' } },
-          { $group: { _id: null, total: { $sum: '$amount' } } }
+          { $match: { status: { $in: ['completed', 'captured', 'success'] } } },
+          {
+            $group: {
+              _id: null,
+              total: {
+                $sum: {
+                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
+                }
+              }
+            }
+          }
         ])
         .toArray(),
       db.collection('payments')
         .aggregate([
-          { $match: { status: 'completed', createdAt: { $gte: monthStart } } },
-          { $group: { _id: null, total: { $sum: '$amount' } } }
+          { $match: { status: { $in: ['completed', 'captured', 'success'] }, createdAt: { $gte: monthStart } } },
+          {
+            $group: {
+              _id: null,
+              total: {
+                $sum: {
+                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
+                }
+              }
+            }
+          }
         ])
         .toArray(),
       db.collection('payments')
         .aggregate([
-          { $match: { status: 'completed', createdAt: { $gte: weekStart } } },
-          { $group: { _id: null, total: { $sum: '$amount' } } }
+          { $match: { status: { $in: ['completed', 'captured', 'success'] }, createdAt: { $gte: weekStart } } },
+          {
+            $group: {
+              _id: null,
+              total: {
+                $sum: {
+                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
+                }
+              }
+            }
+          }
         ])
         .toArray(),
       db.collection('payments')
         .aggregate([
-          { $match: { status: 'completed', createdAt: { $gte: dayStart } } },
-          { $group: { _id: null, total: { $sum: '$amount' } } }
+          { $match: { status: { $in: ['completed', 'captured', 'success'] }, createdAt: { $gte: dayStart } } },
+          {
+            $group: {
+              _id: null,
+              total: {
+                $sum: {
+                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
+                }
+              }
+            }
+          }
         ])
         .toArray(),
 
       // Revenue by month for trend
       db.collection('payments')
         .aggregate([
-          { $match: { status: 'completed' } },
+          { $match: { status: { $in: ['completed', 'captured', 'success'] } } },
           {
             $group: {
               _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
-              revenue: { $sum: '$amount' },
+              revenue: {
+                $sum: {
+                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
+                }
+              },
               count: { $sum: 1 }
             }
           },
@@ -112,9 +152,23 @@ export async function GET(request: Request) {
           {
             $lookup: {
               from: 'subscriptions',
-              let: { userId: '$_id' },
+              let: { userId: '$userId', userObjectId: '$_id' },
               pipeline: [
-                { $match: { $expr: { $eq: ['$userId', '$$userId'] }, status: 'active' } },
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        {
+                          $or: [
+                            { $eq: ['$userId', '$$userId'] },
+                            { $eq: [{ $toString: '$userId' }, { $toString: '$$userObjectId' }] }
+                          ]
+                        },
+                        { $eq: ['$status', 'active'] }
+                      ]
+                    }
+                  }
+                },
                 { $limit: 1 }
               ],
               as: 'currentSubscription'

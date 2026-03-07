@@ -31,23 +31,49 @@ export async function GET(request: Request) {
       filter.status = status;
     }
 
-    // Fetch payments with user details
+    // Fetch payments with resilient user/subscription lookups.
+    // Some historical records use string userId, others may reference ObjectId-like values.
     const payments = await db.collection('payments')
       .aggregate([
         { $match: filter },
         {
           $lookup: {
             from: 'users',
-            localField: 'userId',
-            foreignField: '_id',
+            let: { paymentUserId: '$userId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: ['$userId', '$$paymentUserId'] },
+                      { $eq: [{ $toString: '$_id' }, { $toString: '$$paymentUserId' }] }
+                    ]
+                  }
+                }
+              },
+              { $limit: 1 }
+            ],
             as: 'user'
           }
         },
         {
           $lookup: {
             from: 'subscriptions',
-            localField: 'subscriptionId',
-            foreignField: '_id',
+            let: { subId: '$subscriptionId', paymentUserId: '$userId' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $or: [
+                      { $eq: [{ $toString: '$_id' }, { $toString: '$$subId' }] },
+                      { $eq: ['$userId', '$$paymentUserId'] }
+                    ]
+                  }
+                }
+              },
+              { $sort: { createdAt: -1 } },
+              { $limit: 1 }
+            ],
             as: 'subscription'
           }
         },
@@ -56,10 +82,31 @@ export async function GET(request: Request) {
             id: { $toString: '$_id' },
             userId: { $toString: '$userId' },
             subscriptionId: { $toString: '$subscriptionId' },
-            userName: { $arrayElemAt: ['$user.name', 0] },
+            userName: {
+              $ifNull: [
+                { $arrayElemAt: ['$user.username', 0] },
+                { $arrayElemAt: ['$user.name', 0] }
+              ]
+            },
             userEmail: { $arrayElemAt: ['$user.email', 0] },
-            plan: { $arrayElemAt: ['$subscription.plan', 0] },
-            amount: 1,
+            plan: {
+              $ifNull: [
+                '$plan',
+                {
+                  $ifNull: [
+                    { $arrayElemAt: ['$subscription.plan', 0] },
+                    { $arrayElemAt: ['$subscription.subscriptionPlan', 0] }
+                  ]
+                }
+              ]
+            },
+            amount: {
+              $cond: {
+                if: { $gt: ['$amount', 1000] },
+                then: { $divide: ['$amount', 100] },
+                else: '$amount'
+              }
+            },
             currency: 1,
             status: 1,
             razorpayOrderId: 1,

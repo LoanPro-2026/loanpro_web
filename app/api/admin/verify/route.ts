@@ -8,7 +8,16 @@ export async function GET(request: Request) {
       limit: 120,
       windowMs: 60_000,
     });
-    return new Response(JSON.stringify({ admin: true, email: result.email, source: result.source }), { status: 200 });
+    return new Response(
+      JSON.stringify({
+        admin: true,
+        email: result.email,
+        source: result.source,
+        role: result.role,
+        permissions: result.permissions,
+      }),
+      { status: 200 }
+    );
   } catch (error) {
     console.error('[ADMIN VERIFY] Error:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';

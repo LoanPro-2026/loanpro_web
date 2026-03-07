@@ -107,7 +107,10 @@ export async function verifyAdminRequest(request: Request): Promise<AdminAuthRes
       ? (decoded.permissions.filter((permission) => typeof permission === 'string') as AdminPermission[])
       : [];
 
-    const permissions = tokenPermissions.length > 0 ? tokenPermissions : ROLE_PERMISSIONS[role];
+    // Admin tokens always map to full admin permission set to keep control surface complete.
+    const permissions = role === 'admin'
+      ? ROLE_PERMISSIONS.admin
+      : (tokenPermissions.length > 0 ? tokenPermissions : ROLE_PERMISSIONS[role]);
 
     return { email: tokenEmail, source: 'jwt', role, permissions };
   }
