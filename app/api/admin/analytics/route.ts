@@ -64,9 +64,7 @@ export async function GET(request: Request) {
             $group: {
               _id: null,
               total: {
-                $sum: {
-                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
-                }
+                $sum: '$amount'
               }
             }
           }
@@ -79,9 +77,7 @@ export async function GET(request: Request) {
             $group: {
               _id: null,
               total: {
-                $sum: {
-                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
-                }
+                $sum: '$amount'
               }
             }
           }
@@ -94,9 +90,7 @@ export async function GET(request: Request) {
             $group: {
               _id: null,
               total: {
-                $sum: {
-                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
-                }
+                $sum: '$amount'
               }
             }
           }
@@ -109,9 +103,7 @@ export async function GET(request: Request) {
             $group: {
               _id: null,
               total: {
-                $sum: {
-                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
-                }
+                $sum: '$amount'
               }
             }
           }
@@ -126,9 +118,7 @@ export async function GET(request: Request) {
             $group: {
               _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
               revenue: {
-                $sum: {
-                  $cond: [{ $gt: ['$amount', 1000] }, { $divide: ['$amount', 100] }, '$amount']
-                }
+                $sum: '$amount'
               },
               count: { $sum: 1 }
             }

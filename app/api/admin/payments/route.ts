@@ -100,13 +100,7 @@ export async function GET(request: Request) {
                 }
               ]
             },
-            amount: {
-              $cond: {
-                if: { $gt: ['$amount', 1000] },
-                then: { $divide: ['$amount', 100] },
-                else: '$amount'
-              }
-            },
+            amount: '$amount',
             currency: 1,
             status: 1,
             razorpayOrderId: 1,

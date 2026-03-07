@@ -36,11 +36,10 @@ export async function GET(request: Request) {
       status: { $in: ['completed', 'captured', 'success'] }
     }).toArray();
 
-    // Convert amounts from paise to rupees (Razorpay stores in paise)
+    // Amounts in payments collection are stored in rupees.
     const totalRevenue = payments.reduce((sum, p) => {
-      const amount = p.amount || 0;
-      // If amount is in paise (> 1000), convert to rupees
-      return sum + (amount > 1000 ? amount / 100 : amount);
+      const amount = Number(p.amount || 0);
+      return sum + (Number.isFinite(amount) ? amount : 0);
     }, 0);
 
     // Get this month's revenue
@@ -54,8 +53,8 @@ export async function GET(request: Request) {
     });
     
     const monthlyRevenue = monthlyPayments.reduce((sum, p) => {
-      const amount = p.amount || 0;
-      return sum + (amount > 1000 ? amount / 100 : amount);
+      const amount = Number(p.amount || 0);
+      return sum + (Number.isFinite(amount) ? amount : 0);
     }, 0);
 
     // Get active users this month

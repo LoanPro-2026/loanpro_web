@@ -47,13 +47,7 @@ export async function GET(request: Request) {
           $project: {
             _id: 1,
             userId: 1,
-            amount: {
-              $cond: {
-                if: { $gt: ['$amount', 1000] },
-                then: { $divide: ['$amount', 100] },
-                else: '$amount'
-              }
-            },
+            amount: '$amount',
             status: 1,
             plan: 1,
             createdAt: 1,
