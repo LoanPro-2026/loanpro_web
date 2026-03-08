@@ -121,21 +121,21 @@ const UpgradeModal: React.FC<UpgradeModalProps> = ({ isOpen, onClose, currentPla
       price: 599, 
       description: 'Perfect for small businesses',
       icon: '📦',
-      features: ['1 Device', 'Local Storage', 'Email Support']
+      features: ['Unlimited active records', '1 app device', 'Email support']
     },
     { 
       name: 'pro', 
       price: 899, 
       description: 'Great for growing companies',
       icon: '🚀',
-      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Android Photo Capture']
+      features: ['Unlimited active records', 'Mobile sync', 'Cloud backup', 'Priority support']
     },
     { 
       name: 'enterprise', 
       price: 1399, 
       description: 'For large organizations',
       icon: '⚡',
-      features: ['2 Devices', 'Unlimited Cloud', '24/7 Support', 'Auto Sync', 'White Label']
+      features: ['Everything in Pro', '2 app devices per token', 'Custom workflows', 'Phone support']
     }
   ];
 
@@ -604,21 +604,21 @@ const RenewModal: React.FC<RenewModalProps> = ({ isOpen, onClose, currentPlan, c
       price: 599,
       description: 'Perfect for small businesses',
       icon: '📦',
-      features: ['1 Device', 'Local Storage', 'Email Support']
+      features: ['Unlimited active records', '1 app device', 'Email support']
     },
     {
       name: 'pro',
       price: 899,
       description: 'Great for growing companies',
       icon: '🚀',
-      features: ['1 Device', '1GB Cloud', 'Priority Support', 'Android Photo Capture']
+      features: ['Unlimited active records', 'Mobile sync', 'Cloud backup', 'Priority support']
     },
     {
       name: 'enterprise',
       price: 1399,
       description: 'For large organizations',
       icon: '⚡',
-      features: ['2 Devices', 'Unlimited Cloud', '24/7 Support', 'Auto Sync', 'White Label']
+      features: ['Everything in Pro', '2 app devices per token', 'Custom workflows', 'Phone support']
     }
   ];
   

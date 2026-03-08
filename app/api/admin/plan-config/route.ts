@@ -35,6 +35,8 @@ function sanitizePlanOverride(input: unknown): Partial<PlanFeatures> | null {
     out.cloudStorageGB = cloudStorageGB;
   }
 
+  // Active records are unlimited across all plans and cannot be overridden.
+
   if (raw.features !== undefined) {
     if (!raw.features || typeof raw.features !== 'object') return null;
     const featureEntries = Object.entries(raw.features as Record<string, unknown>);

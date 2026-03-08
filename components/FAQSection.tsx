@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     question: 'What features are included in each plan?',
-    answer: 'Every plan includes core loan operations, Adding new Loan Record, Adding Deposits to Existing Loans, Closing Loans when repaid. Basic Reports and cash Flow Statements are also Stored. Higher tiers add cloud backup, Android photo capture workflow, and priority support. See the pricing section for full details.'
+    answer: 'Every plan includes core loan operations with unlimited active records. Pro adds mobile sync and cloud backup. Enterprise includes everything in Pro and allows 2 app devices on the same access token.'
   },
   {
     question: 'How secure is my data with LoanPro?',

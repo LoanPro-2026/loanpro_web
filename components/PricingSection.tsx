@@ -8,11 +8,12 @@ const plans = [
     name: 'Basic',
     price: '₹599',
     period: '/month',
-    description: 'Essential tools for small Shop Owners',
+    description: 'Core loan operations for individual lenders and small shops',
     deviceLimit: 1,
     storage: 'Local only',
     features: [
       'Core loan tracking and collections',
+      'Unlimited active records',
       'Local data storage',
       'Basic analytics dashboard',
       'Standard reports',
@@ -25,17 +26,18 @@ const plans = [
     name: 'Pro',
     price: '₹899',
     period: '/month',
-    description: 'For growing Shop owners with Large Number of Loans',
+    description: 'For growing operations that need sync and backup reliability',
     deviceLimit: 1,
-    storage: 'Drive Backup Support(upto 15GB)',
+    storage: 'Cloud backup (up to 15GB)',
     features: [
       'Everything in Basic',
+      'Unlimited active records',
       'Google Drive Cloud Backup',
-      'Android photo capture',
-      'Daily automatic sync',
-      'Advanced analytics & reports',
+      'Mobile sync support',
+      'Android photo capture workflow',
+      'Daily cloud sync',
       'Priority support',
-      'Feature request'
+      'Faster feature request queue'
     ],
     popular: true,
     tone: 'border-blue-600'
@@ -44,18 +46,15 @@ const plans = [
     name: 'Enterprise',
     price: '₹1,399',
     period: '/month',
-    description: 'Advanced controls for large Shop Owners',
+    description: 'Pro capabilities with controlled multi-device access',
     deviceLimit: 2,
-    storage: 'Drive Backup + Additional Cloud Support',
+    storage: 'Cloud backup (up to 15GB)',
     features: [
       'Everything in Pro',
-      'Additional cloud backup',
-      'Additional Customization',
-      'Dual device support',
-      'Custom sync schedules',
-      'Dedicated onboarding',
-      'Phone support',
-      'Dedicated Support Ticket System',
+      '2 app devices on same access token',
+      'Unlimited active records',
+      'Enterprise onboarding priority',
+      'Priority issue handling',
       ],
     popular: false,
     tone: 'border-slate-200'
@@ -73,7 +72,7 @@ const PricingSection = () => (
           Simple, transparent pricing
         </h2>
         <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-          All plans include core loan management features. Choose the level of backup and support your team needs.
+          All plans include core loan management features with unlimited records. Upgrade for mobile sync, cloud backup, and multi-device access.
         </p>
         <div className="mt-6 flex justify-center">
           <Link

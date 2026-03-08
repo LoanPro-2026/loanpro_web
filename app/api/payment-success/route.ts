@@ -261,6 +261,8 @@ export async function POST(req: Request) {
           biometrics: false,
           autoSync: false,
           cloudDatabase: false,
+          mobileSync: false,
+          cloudBackup: false,
           analytics: true,
           prioritySupport: false,
           customSubdomain: false,
@@ -272,30 +274,32 @@ export async function POST(req: Request) {
       case 'Pro':
         features = {
           biometrics: false,
-          autoSync: false,
+          autoSync: true,
           cloudDatabase: true,
+          mobileSync: true,
+          cloudBackup: true,
           analytics: true,
           prioritySupport: true,
           customSubdomain: true,
           apiAccess: true
         };
         maxDevices = 1;
-        cloudStorageLimit = 1024 * 1024 * 1024; // 1GB
+        cloudStorageLimit = 15 * 1024 * 1024 * 1024; // 15GB
         break;
       case 'Enterprise':
         features = {
-          biometrics: true,
+          biometrics: false,
           autoSync: true,
           cloudDatabase: true,
+          mobileSync: true,
+          cloudBackup: true,
           analytics: true,
           prioritySupport: true,
           customSubdomain: true,
-          apiAccess: true,
-          whiteLabel: true,
-          dedicatedSupport: true
+          apiAccess: true
         };
         maxDevices = 2;
-        cloudStorageLimit = -1; // Unlimited
+        cloudStorageLimit = 15 * 1024 * 1024 * 1024; // 15GB
         break;
       default:
         subscriptionPlan = 'Basic';
@@ -303,6 +307,8 @@ export async function POST(req: Request) {
           biometrics: false,
           autoSync: false,
           cloudDatabase: false,
+          mobileSync: false,
+          cloudBackup: false,
           analytics: true,
           prioritySupport: false,
           customSubdomain: false,

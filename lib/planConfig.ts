@@ -4,9 +4,9 @@ import { PLAN_FEATURES, type PlanFeatures } from '@/lib/planFeatures';
 export type PlanName = 'Basic' | 'Pro' | 'Enterprise' | 'trial';
 
 export const DEFAULT_PLAN_PRICING: Record<Exclude<PlanName, 'trial'>, number> = {
-  Basic: 699,
-  Pro: 833,
-  Enterprise: 979,
+  Basic: 599,
+  Pro: 899,
+  Enterprise: 1399,
 };
 
 export const MANAGED_PLANS: PlanName[] = ['Basic', 'Pro', 'Enterprise', 'trial'];

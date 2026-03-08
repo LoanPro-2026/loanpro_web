@@ -10,16 +10,16 @@ export default function SignUpPage() {
   const plans = [
     {
       name: "Basic",
-      features: ["Single device", "Basic analytics", "Email support"]
+      features: ["Unlimited active records", "Single app device", "Email support"]
     },
     {
       name: "Pro",
-      features: ["Dual devices", "Advanced analytics", "Priority support", "Cloud backup"],
+      features: ["Unlimited active records", "Mobile sync", "Cloud backup", "Priority support"],
       highlighted: true
     },
     {
       name: "Enterprise",
-      features: ["Multi-device", "Custom workflows", "Phone support", "Unlimited cloud"]
+      features: ["All Pro features", "2 app devices per access token", "Custom workflows", "Phone support"]
     }
   ];
 

@@ -126,7 +126,7 @@ const AdminDashboard = () => {
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [prices, setPrices] = useState({ Basic: 699, Pro: 833, Enterprise: 979 });
+  const [prices, setPrices] = useState({ Basic: 599, Pro: 899, Enterprise: 1399 });
   const [editingPrices, setEditingPrices] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1162,7 +1162,7 @@ const AdminDashboard = () => {
                     <button
                       onClick={() => {
                         setEditingPrices(false);
-                        setPrices({ Basic: 699, Pro: 833, Enterprise: 979 });
+                        setPrices({ Basic: 599, Pro: 899, Enterprise: 1399 });
                       }}
                       className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors"
                     >

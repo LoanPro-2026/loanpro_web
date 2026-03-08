@@ -27,20 +27,20 @@ const plans: SubscriptionPlan[] = [
     name: 'Basic',
     price: 599,
     period: 'month',
-    description: 'Essential features for small loan businesses',
+    description: 'Core plan for daily loan operations',
     deviceLimit: 1,
     storage: 'Local only',
     features: [
       'All core features included',
+      'Unlimited active records',
       'Basic analytics dashboard',
-      'Standard templates',
+      'Standard reports',
       'Local data storage',
       'Email support'
     ],
     limitations: [
-      'No cloud facility',
-      'No Android photo capture',
-      'Limited customer support',
+      'No mobile sync',
+      'No cloud backup',
       'Single device support only'
     ],
     gradient: 'from-blue-500 to-blue-600'
@@ -49,19 +49,19 @@ const plans: SubscriptionPlan[] = [
     name: 'Pro',
     price: 899,
     period: 'month',
-    description: 'Most popular choice for growing loan businesses',
+    description: 'Most popular for growing operations',
     deviceLimit: 1,
-    storage: '1 GB cloud',
+    storage: '15 GB cloud backup',
     features: [
-      'All features included',
-      'Advanced analytics & reports',
-      'Limited cloud database (1GB)',
-      'Priority support',
+      'Everything in Basic',
+      'Unlimited active records',
+      'Cloud backup support',
+      'Mobile sync support',
       'Android photo capture enabled',
-      'Daily Cloud Sync'
+      'Daily cloud sync',
+      'Priority support'
     ],
     limitations: [
-      'No automatic sync',
       'Single device support only'
     ],
     recommended: true,
@@ -71,21 +71,17 @@ const plans: SubscriptionPlan[] = [
     name: 'Enterprise',
     price: 1399,
     period: 'month',
-    description: 'Complete solution for large organizations',
+    description: 'Pro plan with 2-device token access',
     deviceLimit: 2,
-    storage: 'Unlimited cloud',
+    storage: '15 GB cloud backup',
     features: [
-      'All features included',
-      'Unlimited cloud support',
-      'Dual device support (2 devices)',
-      'Automatic sync enabled',
-      'Advanced photo workflow',
-      'White-label solution',
-      '24/7 phone support',
-      'Dedicated Analytics manager'
+      'Everything in Pro',
+      'Unlimited active records',
+      '2 app devices on same access token',
+      'Enterprise onboarding priority',
+      'Priority issue handling'
     ],
-    gradient: 'from-pink-500 to-pink-600',
-    comingSoon: true
+    gradient: 'from-pink-500 to-pink-600'
   }
 ];
 

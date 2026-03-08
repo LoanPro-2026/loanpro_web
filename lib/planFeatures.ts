@@ -10,6 +10,8 @@ export interface PlanFeatures {
     biometrics: boolean;
     autoSync: boolean;
     cloudDatabase: boolean;
+    mobileSync: boolean;
+    cloudBackup: boolean;
     analytics: boolean;
     prioritySupport: boolean;
     customSubdomain: boolean;
@@ -27,6 +29,8 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
       biometrics: false,
       autoSync: false,
       cloudDatabase: false,
+      mobileSync: false,
+      cloudBackup: false,
       analytics: true,
       prioritySupport: false,
       customSubdomain: false,
@@ -35,11 +39,13 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
   },
   Pro: {
     maxDevices: 1,
-    cloudStorageGB: 1,
+    cloudStorageGB: 15,
     features: {
       biometrics: false,
-      autoSync: false,
+      autoSync: true,
       cloudDatabase: true,
+      mobileSync: true,
+      cloudBackup: true,
       analytics: true,
       prioritySupport: true,
       customSubdomain: true,
@@ -48,26 +54,28 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
   },
   Enterprise: {
     maxDevices: 2,
-    cloudStorageGB: -1, // unlimited
+    cloudStorageGB: 15,
     features: {
-      biometrics: true,
+      biometrics: false,
       autoSync: true,
       cloudDatabase: true,
+      mobileSync: true,
+      cloudBackup: true,
       analytics: true,
       prioritySupport: true,
       customSubdomain: true,
       apiAccess: true,
-      whiteLabel: true,
-      dedicatedSupport: true,
     },
   },
   trial: {
     maxDevices: 1,
-    cloudStorageGB: 0,
+    cloudStorageGB: 15,
     features: {
       biometrics: true,
-      autoSync: false,
-      cloudDatabase: false,
+      autoSync: true,
+      cloudDatabase: true,
+      mobileSync: true,
+      cloudBackup: true,
       analytics: true,
       prioritySupport: true,
       customSubdomain: true,

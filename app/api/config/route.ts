@@ -71,8 +71,8 @@ async function getConfigForPlan(plan: string, appVersion: string) {
       apiAccess: false,
     } as any,
     limits: {
-      maxCustomers: 1000,
-      maxLoans: 5000,
+      maxCustomers: -1,
+      maxLoans: -1,
       maxBackups: 10,
     },
     ui: {
@@ -92,8 +92,8 @@ async function getConfigForPlan(plan: string, appVersion: string) {
   switch (plan) {
     case '6months':
       baseConfig.features.advancedReports = true;
-      baseConfig.limits.maxCustomers = 5000;
-      baseConfig.limits.maxLoans = 25000;
+      baseConfig.limits.maxCustomers = -1;
+      baseConfig.limits.maxLoans = -1;
       baseConfig.ui.advancedFilters = true;
       baseConfig.integrations.paymentGateway = true;
       break;
