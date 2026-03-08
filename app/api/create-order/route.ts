@@ -7,6 +7,18 @@ import { getRazorpayClient } from '@/lib/razorpayClient';
 import { getEffectivePlanPricing } from '@/lib/planConfig';
 import { connectToDatabase } from '@/lib/mongodb';
 
+async function resolveUserIdFromRequest(req: Request): Promise<string | null> {
+  const { userId } = await auth();
+  if (userId) return userId;
+
+  const desktopAccessToken = req.headers.get('x-desktop-access-token')?.trim();
+  if (!desktopAccessToken) return null;
+
+  const { db } = await connectToDatabase();
+  const user = await db.collection('users').findOne({ accessToken: desktopAccessToken }, { projection: { userId: 1 } });
+  return typeof user?.userId === 'string' ? user.userId : null;
+}
+
 export async function POST(req: Request) {
   console.log('[CREATE-ORDER] API route called');
   
@@ -26,7 +38,7 @@ export async function POST(req: Request) {
     console.log('[CREATE-ORDER] Razorpay initialized', { keyType: keyId.includes('test') ? 'test' : 'live' });
 
     // Check authentication
-    const { userId } = await auth();
+    const userId = await resolveUserIdFromRequest(req);
     console.log('[CREATE-ORDER] User ID:', userId);
     
     if (!userId) {

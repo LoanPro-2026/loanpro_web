@@ -8,6 +8,18 @@ import { logger } from '@/lib/logger';
 import { getSubscriptionEndDate, getBillingPeriod } from '@/lib/subscriptionHelpers';
 import { getRazorpayClient } from '@/lib/razorpayClient';
 
+async function resolveUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  const { userId } = await auth();
+  if (userId) return userId;
+
+  const desktopAccessToken = request.headers.get('x-desktop-access-token')?.trim();
+  if (!desktopAccessToken) return null;
+
+  const { db } = await connectToDatabase();
+  const user = await db.collection('users').findOne({ accessToken: desktopAccessToken }, { projection: { userId: 1 } });
+  return typeof user?.userId === 'string' ? user.userId : null;
+}
+
 // Plan pricing (monthly rates in rupees) - matching create-order API
 const PLAN_PRICES = {
   Basic: 599,       // ₹599/month
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Authentication check
-    const { userId } = await auth();
+    const userId = await resolveUserIdFromRequest(request);
     console.log('[UPGRADE-PLAN POST] User authenticated:', userId);
     
     if (!userId) {
@@ -407,7 +419,7 @@ export async function GET(request: NextRequest) {
   const startTime = Date.now();
   
   try {
-    const { userId } = await auth();
+    const userId = await resolveUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

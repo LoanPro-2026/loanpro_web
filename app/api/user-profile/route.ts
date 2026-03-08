@@ -212,14 +212,29 @@ async function attemptPendingPaymentRecovery(userId: string, user: any, db: any)
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const startTime = Date.now();
   let userId: string | null = null;
+  let isDesktopTokenAuth = false;
   
   try {
-    // Authentication check
+    // Authentication check (Clerk session OR desktop access token bridge)
     const authResult = await auth();
     userId = authResult.userId;
+
+    const desktopAccessToken = request.headers.get('x-desktop-access-token')?.trim();
+    let desktopUser: any = null;
+
+    if (!userId && desktopAccessToken) {
+      const client = await clientPromise;
+      const db = client.db('AdminDB');
+      desktopUser = await db.collection('users').findOne({ accessToken: desktopAccessToken });
+      if (desktopUser?.userId) {
+        userId = desktopUser.userId;
+        isDesktopTokenAuth = true;
+      }
+    }
+
     if (!userId) {
       logger.warn('Unauthorized access attempt', 'USER_PROFILE');
       return errorResponse(ApiErrors.UNAUTHORIZED);
@@ -238,10 +253,21 @@ export async function GET() {
     const db = client.db('AdminDB');
 
     // Fetch user info or create new user
-    let user = await db.collection('users').findOne({ userId });
-    const resolvedIdentity = await resolveUserIdentity(userId, authResult);
+    let user = desktopUser || await db.collection('users').findOne({ userId });
+    const resolvedIdentity = isDesktopTokenAuth
+      ? {
+          email: typeof user?.email === 'string' ? user.email : '',
+          username: typeof user?.username === 'string' ? user.username : userId,
+          fullName: typeof user?.fullName === 'string' ? user.fullName : '',
+        }
+      : await resolveUserIdentity(userId, authResult);
     
     if (!user) {
+      if (isDesktopTokenAuth) {
+        logger.warn('Desktop token user lookup failed', 'USER_PROFILE', { userId });
+        return errorResponse(ApiErrors.UNAUTHORIZED);
+      }
+
       // Create new user WITHOUT accessToken if not found
       // Token will only be created after successful payment
       logger.info('New Clerk user, creating MongoDB user record', 'USER_PROFILE', { userId });

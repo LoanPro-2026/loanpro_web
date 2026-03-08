@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   UserCircleIcon, 
   CreditCardIcon, 
@@ -884,6 +884,7 @@ const ProfilePage = () => {
   const [showAccessToken, setShowAccessToken] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentLoadingMessage, setPaymentLoadingMessage] = useState('');
+  const [desktopIntentHandled, setDesktopIntentHandled] = useState(false);
   const [statusModal, setStatusModal] = useState<StatusModalState>({
     isOpen: false,
     title: '',
@@ -893,6 +894,27 @@ const ProfilePage = () => {
   const { user, isLoaded: clerkLoaded } = useUser();
   const { openUserProfile } = useClerk();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [desktopSessionToken] = useState(() => (searchParams.get('desktopToken') || '').trim());
+  const isDesktopBridge = (searchParams.get('source') || '').toLowerCase() === 'desktop_app' && !!desktopSessionToken;
+
+  const getDesktopHeaders = () => {
+    if (!isDesktopBridge || !desktopSessionToken) return {};
+    return {
+      'x-desktop-access-token': desktopSessionToken,
+      'x-desktop-source': 'electron_app',
+    };
+  };
+
+  const authFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+    return fetch(input, {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        ...getDesktopHeaders(),
+      },
+    });
+  };
 
   const openStatusModal = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setStatusModal({ isOpen: true, title, message, type });
@@ -904,17 +926,17 @@ const ProfilePage = () => {
 
   // Protect route - redirect if not authenticated
   useEffect(() => {
-    if (clerkLoaded && !user) {
+    if (clerkLoaded && !user && !isDesktopBridge) {
       router.push('/sign-in');
     }
-  }, [clerkLoaded, user, router]);
+  }, [clerkLoaded, user, router, isDesktopBridge]);
 
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/user-profile');
+        const res = await authFetch('/api/user-profile');
         if (!res.ok) throw new Error('Failed to fetch profile');
         const json = await res.json();
         // Extract data from the API response wrapper
@@ -927,7 +949,7 @@ const ProfilePage = () => {
       }
     };
     fetchProfile();
-  }, []);
+  }, [isDesktopBridge, desktopSessionToken]);
 
   useEffect(() => {
     if (data?.paymentHistory) {
@@ -983,7 +1005,7 @@ const ProfilePage = () => {
       const capitalizedPlan = newPlan.charAt(0).toUpperCase() + newPlan.slice(1).toLowerCase();
       
       // Get upgrade calculation
-      const calcResponse = await fetch(`/api/upgrade-plan?newPlan=${capitalizedPlan}&billingPeriod=${billingPeriod}`);
+      const calcResponse = await authFetch(`/api/upgrade-plan?newPlan=${capitalizedPlan}&billingPeriod=${billingPeriod}`);
       if (!calcResponse.ok) throw new Error('Failed to calculate upgrade cost. Please try again.');
       
       const { calculation } = await calcResponse.json();
@@ -991,7 +1013,7 @@ const ProfilePage = () => {
       setPaymentLoadingMessage('Creating payment order...');
       
       // Create upgrade order
-      const orderResponse = await fetch('/api/upgrade-plan', {
+      const orderResponse = await authFetch('/api/upgrade-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPlan: capitalizedPlan, billingPeriod }),
@@ -1125,7 +1147,7 @@ const ProfilePage = () => {
   const handleCancelRequest = async () => {
     try {
       // Get cancellation details
-      const response = await fetch('/api/cancel-subscription');
+      const response = await authFetch('/api/cancel-subscription');
       if (!response.ok) throw new Error('Failed to get cancellation details');
       
       const data = await response.json();
@@ -1146,7 +1168,7 @@ const ProfilePage = () => {
     try {
       setProcessing(true);
       
-      const response = await fetch('/api/cancel-subscription', {
+      const response = await authFetch('/api/cancel-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
@@ -1206,6 +1228,37 @@ const ProfilePage = () => {
     setRefundInfo(null);
   };
 
+  useEffect(() => {
+    if (desktopIntentHandled || loading) return;
+
+    // Allow intent handling for either Clerk-authenticated sessions or desktop token bridge sessions.
+    if (!isDesktopBridge && (!clerkLoaded || !user)) return;
+
+    const source = (searchParams.get('source') || '').toLowerCase();
+    const intent = (searchParams.get('intent') || '').toLowerCase();
+
+    // Only auto-open profile actions for desktop-origin links.
+    if (source !== 'desktop_app') return;
+
+    setDesktopIntentHandled(true);
+    setActiveTab(0);
+
+    if (intent === 'update') {
+      setUpgradeModalOpen(true);
+    } else if (intent === 'cancel') {
+      void handleCancelRequest();
+    }
+
+    // Remove one-time intent params so refresh does not reopen dialogs.
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('source');
+      url.searchParams.delete('intent');
+      url.searchParams.delete('desktopToken');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  }, [desktopIntentHandled, clerkLoaded, user, loading, searchParams, isDesktopBridge]);
+
   const handleRenew = async (plan: string, billingPeriod: 'monthly' | 'annually' = 'monthly') => {
     try {
       setProcessing(true);
@@ -1220,7 +1273,7 @@ const ProfilePage = () => {
       const capitalizedSelectedPlan = selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1);
 
       // Create renewal order using create-order API
-      const orderResponse = await fetch('/api/create-order', {
+      const orderResponse = await authFetch('/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

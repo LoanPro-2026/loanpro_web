@@ -13,6 +13,18 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
+async function resolveUserIdFromRequest(request: NextRequest): Promise<string | null> {
+  const { userId } = await auth();
+  if (userId) return userId;
+
+  const desktopAccessToken = request.headers.get('x-desktop-access-token')?.trim();
+  if (!desktopAccessToken) return null;
+
+  const { db } = await connectToDatabase();
+  const user = await db.collection('users').findOne({ accessToken: desktopAccessToken }, { projection: { userId: 1 } });
+  return typeof user?.userId === 'string' ? user.userId : null;
+}
+
 // Plan pricing (monthly rates)
 const PLAN_PRICES = {
   basic: 599,
@@ -74,7 +86,7 @@ export async function POST(request: NextRequest) {
   
   try {
     // Authentication check
-    const { userId } = await auth();
+    const userId = await resolveUserIdFromRequest(request);
     if (!userId) {
       logger.warn('Unauthorized cancellation attempt', 'CANCEL_SUBSCRIPTION');
       return errorResponse(ApiErrors.UNAUTHORIZED);
@@ -585,8 +597,7 @@ export async function GET(request: NextRequest) {
   let userId: string | null = null;
   
   try {
-    const authResult = await auth();
-    userId = authResult.userId;
+    userId = await resolveUserIdFromRequest(request);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
