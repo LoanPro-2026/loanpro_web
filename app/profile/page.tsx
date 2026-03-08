@@ -898,21 +898,17 @@ const ProfilePage = () => {
   const [desktopSessionToken] = useState(() => (searchParams.get('desktopToken') || '').trim());
   const isDesktopBridge = (searchParams.get('source') || '').toLowerCase() === 'desktop_app' && !!desktopSessionToken;
 
-  const getDesktopHeaders = () => {
-    if (!isDesktopBridge || !desktopSessionToken) return {};
-    return {
-      'x-desktop-access-token': desktopSessionToken,
-      'x-desktop-source': 'electron_app',
-    };
-  };
-
   const authFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+
+    if (isDesktopBridge && desktopSessionToken) {
+      headers.set('x-desktop-access-token', desktopSessionToken);
+      headers.set('x-desktop-source', 'electron_app');
+    }
+
     return fetch(input, {
       ...init,
-      headers: {
-        ...(init.headers || {}),
-        ...getDesktopHeaders(),
-      },
+      headers,
     });
   };
 
