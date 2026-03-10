@@ -212,7 +212,7 @@ export async function POST(request: Request) {
       status: rawStatus,
       startDate,
       endDate: computedEndDate,
-      gracePeriodEndsAt: new Date(computedEndDate.getTime() + 10 * 24 * 60 * 60 * 1000),
+      gracePeriodEndsAt: new Date(computedEndDate.getTime() + 15 * 24 * 60 * 60 * 1000),
       amount: Number.isFinite(Number(body?.amount)) ? Number(body.amount) : 0,
       paymentId: normalizeText(body?.paymentId) || null,
       createdAt: now,

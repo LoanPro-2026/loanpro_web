@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import jwt from 'jsonwebtoken';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'your-admin-email@gmail.com').trim().toLowerCase();
 
 interface AdminJwtPayload extends jwt.JwtPayload {
   email?: string;
@@ -69,12 +69,23 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
 
 export interface AdminAuthResult {
   email: string;
-  source: 'jwt' | 'clerk';
+  source: 'jwt' | 'clerk' | 'api-key';
   role: AdminRole;
   permissions: AdminPermission[];
 }
 
 export async function verifyAdminRequest(request: Request): Promise<AdminAuthResult> {
+  const adminApiKey = (request.headers.get('x-admin-api-key') || '').trim();
+  const configuredAdminApiKey = (process.env.ADMIN_API_KEY || '').trim();
+  if (configuredAdminApiKey && adminApiKey && adminApiKey === configuredAdminApiKey) {
+    return {
+      email: ADMIN_EMAIL,
+      source: 'api-key',
+      role: 'admin',
+      permissions: ROLE_PERMISSIONS.admin,
+    };
+  }
+
   const authHeader = request.headers.get('authorization') || '';
   const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
 
@@ -98,7 +109,7 @@ export async function verifyAdminRequest(request: Request): Promise<AdminAuthRes
       throw new Error('Access denied');
     }
 
-    const tokenEmail = decoded.email || '';
+    const tokenEmail = String(decoded.email || '').trim().toLowerCase();
     if (!tokenEmail || tokenEmail !== ADMIN_EMAIL) {
       throw new Error('Access denied');
     }
@@ -136,7 +147,7 @@ export async function verifyAdminRequest(request: Request): Promise<AdminAuthRes
   }
 
   const user = await userResponse.json();
-  const userEmail = user.email_addresses?.[0]?.email_address;
+  const userEmail = String(user.email_addresses?.[0]?.email_address || '').trim().toLowerCase();
 
   if (!userEmail || userEmail !== ADMIN_EMAIL) {
     throw new Error('Access denied');

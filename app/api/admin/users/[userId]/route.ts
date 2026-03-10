@@ -1,4 +1,5 @@
 import { ObjectId } from 'mongodb';
+import { clerkClient } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
@@ -193,6 +194,13 @@ export async function DELETE(
       });
     } finally {
       await session.endSession();
+    }
+
+    // Keep identity provider in sync, but do not fail hard if Clerk delete errors.
+    try {
+      await (await clerkClient()).users.deleteUser(existing.userId);
+    } catch (clerkDeleteError) {
+      console.error('Failed to delete Clerk user during admin delete:', clerkDeleteError);
     }
 
     await writeAdminAuditLog({

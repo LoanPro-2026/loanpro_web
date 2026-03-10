@@ -77,16 +77,7 @@ export async function POST(req: Request) {
       resolvedPlanFeatures = await getEffectivePlanFeatures(db, subscription.plan);
       features = resolvedPlanFeatures.features;
 
-      // During grace period, provide read-only access
-      if (isInGracePeriod) {
-        features = {
-          ...features,
-          readOnly: true,
-          canCreateNew: false,
-          canEdit: false,
-          canDelete: false
-        };
-      } else if ((subscription.daysRemaining || 0) <= 0) {
+      if ((subscription.daysRemaining || 0) <= 0 && !isInGracePeriod) {
         // Grace period expired - schedule for deletion
         subscriptionStatus = 'expired';
         
@@ -117,6 +108,8 @@ export async function POST(req: Request) {
       subscriptionStatus,
       subscriptionPlan: subscription?.plan || 'none',
       daysRemaining,
+      expiresAt: subscription?.endDate || null,
+      gracePeriodEndsAt: subscription?.gracePeriodEndsAt || null,
       isInGracePeriod,
       features,
       maxDevices: subscription ? (resolvedPlanFeatures?.maxDevices ?? getPlanFeatures(subscription.plan).maxDevices) : 0,

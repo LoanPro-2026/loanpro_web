@@ -19,12 +19,15 @@ const ALLOWED_ORIGINS = [
   'https://loanpro.tech',
 ];
 
+const LOCALHOST_ORIGIN_REGEX = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
 /**
  * Check if origin is allowed
  */
 function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
-  return ALLOWED_ORIGINS.includes(origin);
+  if (!origin) return true;
+  if (origin === 'null' || origin.startsWith('file://')) return true;
+  return ALLOWED_ORIGINS.includes(origin) || LOCALHOST_ORIGIN_REGEX.test(origin);
 }
 
 /**
@@ -34,9 +37,9 @@ function getCorsHeaders(origin: string | null) {
   const isAllowed = isOriginAllowed(origin);
   
   return {
-    'Access-Control-Allow-Origin': isAllowed && origin ? origin : 'null',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Origin': isAllowed ? (origin || '*') : 'null',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-admin-api-key, x-admin-token',
     'Access-Control-Max-Age': '86400', // 24 hours
   };
 }

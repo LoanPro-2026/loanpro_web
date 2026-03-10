@@ -342,9 +342,9 @@ export async function POST(req: Request) {
     };
     const subscriptionType = subscriptionTypeMap[billingPeriod] || 'monthly';
 
-    // Calculate grace period expiry (10 days after subscription ends)
+    // Calculate grace period expiry (15 days after subscription ends)
     const gracePeriodExpiresAt = new Date(subscriptionExpiresAt);
-    gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 10);
+    gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 15);
 
     // Generate username from email
     const generatedUsername = email?.split('@')[0].replace(/\./g, '') || '';
@@ -497,7 +497,7 @@ export async function POST(req: Request) {
             }
             
             subscriptionUpdate.endDate = newExpiryDate;
-            subscriptionUpdate.gracePeriodEndsAt = new Date(newExpiryDate.getTime() + (10 * 24 * 60 * 60 * 1000)); // 10 days grace period
+            subscriptionUpdate.gracePeriodEndsAt = new Date(newExpiryDate.getTime() + (15 * 24 * 60 * 60 * 1000)); // 15 days grace period
             subscriptionUpdate.isRenewed = true;
             subscriptionUpdate.renewedDate = new Date();
             subscriptionUpdate.lastRenewalDate = new Date();

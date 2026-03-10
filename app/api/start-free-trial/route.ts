@@ -72,9 +72,9 @@ export async function POST(req: Request) {
     const trialExpiresAt = new Date();
     trialExpiresAt.setMonth(trialExpiresAt.getMonth() + 1);
 
-    // Calculate grace period expiry (10 days after trial ends)
+    // Calculate grace period expiry (15 days after trial ends)
     const gracePeriodExpiresAt = new Date(trialExpiresAt);
-    gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 10);
+    gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 15);
 
     // Upsert user in users collection (only user-specific data, no subscription data)
     // IMPORTANT: Always set accessToken on trial activation (existing users need desktop access during trial)

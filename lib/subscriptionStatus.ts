@@ -29,7 +29,7 @@ export const SubscriptionStatus = {
   
   /**
    * Subscription past end date, in grace period
-   * User has read-only access (10 days grace period)
+    * Grace window before forced sign-out/deprovision (15 days)
    */
   EXPIRED: 'expired',
   

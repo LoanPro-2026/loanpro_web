@@ -35,6 +35,26 @@ function json(data: unknown, status = 200) {
   });
 }
 
+async function revokeUserAccessIfNoActiveSubscription(db: any, userId: string) {
+  const activeCount = await db.collection('subscriptions').countDocuments({
+    userId,
+    status: { $in: ['active', 'trial', 'active_subscription'] },
+  });
+
+  if (activeCount === 0) {
+    await db.collection('users').updateOne(
+      { userId },
+      {
+        $set: {
+          accessToken: null,
+          status: 'cancelled_subscription',
+          cancelledDate: new Date(),
+        },
+      }
+    );
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ subscriptionId: string }> }
@@ -186,6 +206,10 @@ export async function PATCH(
       );
     }
 
+    if (['cancelled', 'expired', 'superseded'].includes(String(nextStatus).toLowerCase())) {
+      await revokeUserAccessIfNoActiveSubscription(db, String(nextUserId));
+    }
+
     await writeAdminAuditLog({
       actorEmail: admin.email,
       action: 'subscriptions.update',
@@ -227,6 +251,8 @@ export async function DELETE(
     }
 
     await db.collection('subscriptions').deleteOne({ _id: dbId });
+
+    await revokeUserAccessIfNoActiveSubscription(db, String(existing.userId));
 
     await writeAdminAuditLog({
       actorEmail: admin.email,

@@ -3,6 +3,26 @@ import { ObjectId } from 'mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 
+async function revokeUserAccessIfNoActiveSubscription(db: any, userId: string) {
+  const activeCount = await db.collection('subscriptions').countDocuments({
+    userId,
+    status: { $in: ['active', 'trial', 'active_subscription'] },
+  });
+
+  if (activeCount === 0) {
+    await db.collection('users').updateOne(
+      { userId },
+      {
+        $set: {
+          accessToken: null,
+          status: 'cancelled_subscription',
+          cancelledDate: new Date(),
+        },
+      }
+    );
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ subscriptionId: string; action: string }> }
@@ -25,16 +45,25 @@ export async function POST(
     const subId = new ObjectId(subscriptionId);
 
     if (action === 'cancel') {
+      const existing = await db.collection('subscriptions').findOne({ _id: subId });
+      if (!existing) {
+        return new Response(JSON.stringify({ error: 'Subscription not found' }), { status: 404 });
+      }
+
       await db.collection('subscriptions').updateOne(
         { _id: subId },
         {
           $set: {
             status: 'cancelled',
             cancelledAt: new Date(),
-            cancelledByAdmin: true
+            cancelledByAdmin: true,
+            updatedAt: new Date(),
           }
         }
       );
+
+      await revokeUserAccessIfNoActiveSubscription(db, String(existing.userId));
+
       invalidateAdminCacheByTags(['subscriptions', 'dashboard', 'analytics']);
       return new Response(JSON.stringify({ success: true, message: 'Subscription cancelled' }), { status: 200 });
     } else if (action === 'extend') {

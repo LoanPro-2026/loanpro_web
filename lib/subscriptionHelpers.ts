@@ -30,11 +30,15 @@ export async function getActiveSubscription(
   userId: string,
   db: Db
 ): Promise<any | null> {
+  const now = new Date();
   return await db.collection('subscriptions').findOne(
     {
       userId,
-      status: { $in: ['active', 'trial'] },
-      endDate: { $gt: new Date() },
+      status: { $nin: ['superseded'] },
+      $or: [
+        { endDate: { $gt: now } },
+        { gracePeriodEndsAt: { $gt: now } },
+      ],
     },
     {
       sort: { createdAt: -1 },

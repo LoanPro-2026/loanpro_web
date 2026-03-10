@@ -1,4 +1,5 @@
 import { connectToDatabase } from '@/lib/mongodb';
+import { clerkClient } from '@clerk/nextjs/server';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 import { writeAdminAuditLog } from '@/lib/adminAudit';
@@ -151,19 +152,62 @@ export async function POST(request: Request) {
     const { db } = await connectToDatabase();
 
     const existing = await db.collection('users').findOne({
-      $or: [{ userId }, { email }, { username }],
+      $or: [{ email }, { username }],
     });
 
     if (existing) {
       return new Response(
-        JSON.stringify({ success: false, error: 'User with same userId, username, or email already exists' }),
+        JSON.stringify({ success: false, error: 'User with same username or email already exists' }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const shouldSyncClerk = body?.syncWithClerk !== false;
+    let effectiveUserId = userId;
+    if (shouldSyncClerk) {
+      const clerk = await clerkClient();
+      try {
+        if (userId.startsWith('user_')) {
+          // If the caller already provides a Clerk user id, verify it exists.
+          const existingClerkUser = await clerk.users.getUser(userId);
+          effectiveUserId = existingClerkUser.id;
+        } else {
+          const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
+          const lastName = rest.join(' ');
+          const createdClerkUser = await clerk.users.createUser({
+            emailAddress: [email],
+            username,
+            firstName: firstName || undefined,
+            lastName: lastName || undefined,
+            skipPasswordChecks: true,
+            skipPasswordRequirement: true,
+            unsafeMetadata: {
+              source: 'admin-panel',
+              requestedUserId: userId,
+            },
+          } as any);
+          effectiveUserId = createdClerkUser.id;
+        }
+      } catch (clerkError: any) {
+        const clerkErrorMessage = clerkError?.errors?.[0]?.message || clerkError?.message || 'Clerk sync failed';
+        return new Response(
+          JSON.stringify({ success: false, error: `Failed to sync Clerk user: ${clerkErrorMessage}` }),
+          { status: 502, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    const userIdConflict = await db.collection('users').findOne({ userId: effectiveUserId });
+    if (userIdConflict) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'User with same userId already exists' }),
         { status: 409, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     const now = new Date();
     const doc = {
-      userId,
+      userId: effectiveUserId,
       username,
       email,
       fullName,
@@ -183,7 +227,7 @@ export async function POST(request: Request) {
       action: 'users.create',
       targetType: 'user',
       targetId: result.insertedId.toString(),
-      details: { userId, email },
+      details: { userId: effectiveUserId, email, clerkSynced: shouldSyncClerk },
     });
 
     invalidateAdminCacheByTags(['users', 'dashboard', 'analytics']);
