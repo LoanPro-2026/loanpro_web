@@ -376,6 +376,32 @@ export async function POST(request: NextRequest) {
     
     console.log('[UPGRADE-PLAN POST] Order created successfully:', { orderId: order.id, amount: order.amount });
     
+    // Store order intent for payment processing (CRITICAL: this ensures amount is available in payment-success route)
+    const now = new Date();
+    await db.collection('order_intents').updateOne(
+      { orderId: order.id },
+      {
+        $set: {
+          userId,
+          plan: normalizedNewPlan,
+          billingPeriod,
+          paymentContext: 'upgrade',
+          amount: order.amount, // Store the exact amount from Razorpay (in paise)
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+          reminderSent: false,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          orderId: order.id,
+          createdAt: now,
+        },
+      },
+      { upsert: true }
+    );
+    
+    console.log('[UPGRADE-PLAN POST] Order intent saved:', { orderId: order.id, amount: order.amount });
+    
     return NextResponse.json({
       orderId: order.id,
       amount: order.amount, // Return Razorpay order amount (already in paise)
