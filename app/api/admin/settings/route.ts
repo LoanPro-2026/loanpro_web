@@ -200,7 +200,7 @@ export async function PATCH(request: NextRequest) {
           vercel: {
             projectId: String(providers?.vercel?.projectId ?? existing?.providers?.vercel?.projectId ?? ''),
             teamId: String(providers?.vercel?.teamId ?? existing?.providers?.vercel?.teamId ?? ''),
-            apiToken: resolveSecretInput(providers?.vercel?.apiToken, String(existing?.providers?.vercel?.apiToken || '')),
+            hasApiToken: Boolean(providers?.vercel?.apiToken ?? existing?.providers?.vercel?.apiToken),
           },
           cloudRun: {
             projectId: String(providers?.cloudRun?.projectId ?? existing?.providers?.cloudRun?.projectId ?? ''),
@@ -212,10 +212,10 @@ export async function PATCH(request: NextRequest) {
             ),
           },
           clerk: {
-            secretKey: resolveSecretInput(providers?.clerk?.secretKey, String(existing?.providers?.clerk?.secretKey || '')),
+            hasSecretKey: Boolean(providers?.clerk?.secretKey ?? existing?.providers?.clerk?.secretKey),
           },
           brevo: {
-            apiKey: resolveSecretInput(providers?.brevo?.apiKey, String(existing?.providers?.brevo?.apiKey || '')),
+            hasApiKey: Boolean(providers?.brevo?.apiKey ?? existing?.providers?.brevo?.apiKey),
           },
         },
       };
