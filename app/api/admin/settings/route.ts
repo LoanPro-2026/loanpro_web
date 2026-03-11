@@ -206,10 +206,7 @@ export async function PATCH(request: NextRequest) {
             projectId: String(providers?.cloudRun?.projectId ?? existing?.providers?.cloudRun?.projectId ?? ''),
             region: String(providers?.cloudRun?.region ?? existing?.providers?.cloudRun?.region ?? ''),
             serviceName: String(providers?.cloudRun?.serviceName ?? existing?.providers?.cloudRun?.serviceName ?? ''),
-            serviceAccountJson: resolveSecretInput(
-              providers?.cloudRun?.serviceAccountJson,
-              String(existing?.providers?.cloudRun?.serviceAccountJson || '')
-            ),
+            hasServiceAccountJson: Boolean(providers?.cloudRun?.serviceAccountJson ?? existing?.providers?.cloudRun?.serviceAccountJson),
           },
           clerk: {
             hasSecretKey: Boolean(providers?.clerk?.secretKey ?? existing?.providers?.clerk?.secretKey),
@@ -254,16 +251,16 @@ export async function PATCH(request: NextRequest) {
             vercel: {
               projectId: sanitizedMonitoring.providers.vercel.projectId,
               teamId: sanitizedMonitoring.providers.vercel.teamId,
-              hasApiToken: Boolean(sanitizedMonitoring.providers.vercel.apiToken),
+              hasApiToken: sanitizedMonitoring.providers.vercel.hasApiToken,
             },
             cloudRun: {
               projectId: sanitizedMonitoring.providers.cloudRun.projectId,
               region: sanitizedMonitoring.providers.cloudRun.region,
               serviceName: sanitizedMonitoring.providers.cloudRun.serviceName,
-              hasServiceAccountJson: Boolean(sanitizedMonitoring.providers.cloudRun.serviceAccountJson),
+              hasServiceAccountJson: sanitizedMonitoring.providers.cloudRun.hasServiceAccountJson,
             },
-            clerk: { hasSecretKey: Boolean(sanitizedMonitoring.providers.clerk.secretKey) },
-            brevo: { hasApiKey: Boolean(sanitizedMonitoring.providers.brevo.apiKey) },
+            clerk: { hasSecretKey: sanitizedMonitoring.providers.clerk.hasSecretKey },
+            brevo: { hasApiKey: sanitizedMonitoring.providers.brevo.hasApiKey },
           },
         },
       });
