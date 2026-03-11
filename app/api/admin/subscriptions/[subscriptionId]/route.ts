@@ -3,6 +3,9 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { invalidateAdminCacheByTags } from '@/lib/adminResponseCache';
 import { writeAdminAuditLog } from '@/lib/adminAudit';
+import { getEffectivePlanPricing } from '@/lib/planConfig';
+import { getCouponQuote } from '@/lib/couponUtils';
+import { calculatePlanAmountRupees, type PaidPlanName } from '@/lib/pricing';
 
 const ALLOWED_PLANS = ['basic', 'pro', 'enterprise', 'trial'];
 const ALLOWED_BILLING_PERIODS = ['monthly', 'annually'];
@@ -165,6 +168,10 @@ export async function PATCH(
       patch.paymentId = normalizeText(body.paymentId) || null;
     }
 
+    if (body?.couponCode !== undefined) {
+      patch.couponCode = normalizeText(body.couponCode).toUpperCase() || null;
+    }
+
     if (Object.keys(patch).length === 0) {
       return json({ success: false, error: 'No updatable fields provided' }, 400);
     }
@@ -179,6 +186,43 @@ export async function PATCH(
       const userExists = await db.collection('users').findOne({ userId: patch.userId });
       if (!userExists) {
         return json({ success: false, error: 'Target userId does not exist' }, 404);
+      }
+    }
+
+    const shouldReprice = body?.plan !== undefined || body?.billingPeriod !== undefined || body?.couponCode !== undefined || body?.amount !== undefined;
+    if (shouldReprice) {
+      const nextPlan = String(patch.plan || existing.plan || 'Basic');
+      const nextBillingPeriod = String(patch.billingPeriod || existing.billingPeriod || 'monthly').toLowerCase();
+      const nextCouponCode = String(patch.couponCode ?? existing.couponCode ?? '').trim().toUpperCase();
+
+      if (nextPlan !== 'trial') {
+        const pricing = await getEffectivePlanPricing(db);
+        const monthlyPrice = Number((pricing as Record<PaidPlanName, number>)[nextPlan as PaidPlanName] || 0);
+        if (!monthlyPrice) {
+          return json({ success: false, error: 'Unable to resolve live price for selected plan' }, 400);
+        }
+
+        const baseAmount = calculatePlanAmountRupees(monthlyPrice, nextBillingPeriod as 'monthly' | 'annually');
+        const couponQuote = await getCouponQuote(db, {
+          couponCode: nextCouponCode,
+          plan: nextPlan,
+          billingPeriod: nextBillingPeriod as 'monthly' | 'annually',
+          subtotal: baseAmount,
+        });
+
+        if (nextCouponCode && !couponQuote.applied) {
+          return json({ success: false, error: couponQuote.message || 'Coupon could not be applied' }, 400);
+        }
+
+        patch.amount = couponQuote.totalAmount;
+        patch.baseAmount = baseAmount;
+        patch.discountAmount = couponQuote.discountAmount;
+        patch.couponCode = couponQuote.coupon?.code || null;
+      } else {
+        patch.amount = 0;
+        patch.baseAmount = 0;
+        patch.discountAmount = 0;
+        patch.couponCode = null;
       }
     }
 

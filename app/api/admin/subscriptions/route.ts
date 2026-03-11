@@ -2,6 +2,9 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 import { writeAdminAuditLog } from '@/lib/adminAudit';
+import { getEffectivePlanPricing } from '@/lib/planConfig';
+import { getCouponQuote } from '@/lib/couponUtils';
+import { calculatePlanAmountRupees, type PaidPlanName } from '@/lib/pricing';
 
 const ALLOWED_PLANS = ['basic', 'pro', 'enterprise', 'trial'];
 const ALLOWED_BILLING_PERIODS = ['monthly', 'annually'];
@@ -88,6 +91,9 @@ export async function GET(request: Request) {
             endDate: 1,
             billingPeriod: 1,
             amount: 1,
+              baseAmount: 1,
+              discountAmount: 1,
+              couponCode: 1,
               paymentId: 1,
               updatedAt: 1,
               gracePeriodEndsAt: 1,
@@ -166,11 +172,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedPlan = normalizePlan(rawPlan);
+
     const computedEndDate = endDate && !Number.isNaN(endDate.getTime())
       ? endDate
       : (() => {
           const date = new Date(startDate);
-          if (billingPeriod === 'annually') date.setFullYear(date.getFullYear() + 1);
+          if (normalizedPlan === 'trial') date.setMonth(date.getMonth() + 6);
+          else if (billingPeriod === 'annually') date.setFullYear(date.getFullYear() + 1);
           else date.setMonth(date.getMonth() + 1);
           return date;
         })();
@@ -184,9 +193,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const now = new Date();
-    const normalizedPlan = normalizePlan(rawPlan);
+  const now = new Date();
     const replaceExistingActive = body?.replaceExistingActive !== false;
+    const pricing = await getEffectivePlanPricing(db);
+    const couponCode = normalizeText(body?.couponCode).toUpperCase();
+    const computedPlanAmount = normalizedPlan === 'trial'
+      ? 0
+      : (() => {
+          const monthly = pricing[normalizedPlan as PaidPlanName];
+          if (!Number.isFinite(monthly) || monthly <= 0) return 0;
+          return calculatePlanAmountRupees(monthly, billingPeriod as 'monthly' | 'annually');
+        })();
+    const couponQuote = await getCouponQuote(db, {
+      couponCode,
+      plan: normalizedPlan,
+      billingPeriod: billingPeriod as 'monthly' | 'annually',
+      subtotal: computedPlanAmount,
+    });
+
+    if (couponCode && !couponQuote.applied) {
+      return new Response(
+        JSON.stringify({ success: false, error: couponQuote.message || 'Coupon could not be applied' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const finalAmount = normalizedPlan === 'trial' ? 0 : couponQuote.totalAmount;
 
     if (replaceExistingActive && ['active', 'trial', 'active_subscription'].includes(rawStatus)) {
       await db.collection('subscriptions').updateMany(
@@ -213,7 +245,10 @@ export async function POST(request: Request) {
       startDate,
       endDate: computedEndDate,
       gracePeriodEndsAt: new Date(computedEndDate.getTime() + 15 * 24 * 60 * 60 * 1000),
-      amount: Number.isFinite(Number(body?.amount)) ? Number(body.amount) : 0,
+      amount: finalAmount,
+      baseAmount: computedPlanAmount,
+      discountAmount: couponQuote.discountAmount,
+      couponCode: couponQuote.coupon?.code || null,
       paymentId: normalizeText(body?.paymentId) || null,
       createdAt: now,
       updatedAt: now,
@@ -233,6 +268,8 @@ export async function POST(request: Request) {
         plan: subscription.plan,
         status: subscription.status,
         billingPeriod,
+        couponCode: subscription.couponCode,
+        amount: subscription.amount,
         replaceExistingActive,
       },
     });

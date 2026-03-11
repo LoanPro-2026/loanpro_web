@@ -134,10 +134,25 @@ export async function POST(request: Request) {
     const username = normalizeText(body?.username);
     const email = normalizeText(body?.email).toLowerCase();
     const fullName = normalizeText(body?.fullName);
+    const shouldSyncClerk = body?.syncWithClerk !== false;
 
-    if (!userId || !username || !email) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ success: false, error: 'userId, username and email are required' }),
+        JSON.stringify({ success: false, error: 'email is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!shouldSyncClerk && (!userId || !username)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'userId and username are required when syncWithClerk is false' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (shouldSyncClerk && !userId && !username) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'username is required when creating a new Clerk user' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -151,9 +166,10 @@ export async function POST(request: Request) {
 
     const { db } = await connectToDatabase();
 
-    const existing = await db.collection('users').findOne({
-      $or: [{ email }, { username }],
-    });
+    const duplicateChecks: Array<Record<string, unknown>> = [{ email }];
+    if (username) duplicateChecks.push({ username });
+
+    const existing = await db.collection('users').findOne({ $or: duplicateChecks });
 
     if (existing) {
       return new Response(
@@ -162,8 +178,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const shouldSyncClerk = body?.syncWithClerk !== false;
     let effectiveUserId = userId;
+    let effectiveUsername = username;
+
     if (shouldSyncClerk) {
       const clerk = await clerkClient();
       try {
@@ -171,22 +188,30 @@ export async function POST(request: Request) {
           // If the caller already provides a Clerk user id, verify it exists.
           const existingClerkUser = await clerk.users.getUser(userId);
           effectiveUserId = existingClerkUser.id;
+          const clerkUsername = normalizeText(existingClerkUser.username);
+          if (!effectiveUsername && clerkUsername) {
+            effectiveUsername = clerkUsername;
+          }
         } else {
           const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
           const lastName = rest.join(' ');
           const createdClerkUser = await clerk.users.createUser({
             emailAddress: [email],
-            username,
+            username: effectiveUsername || undefined,
             firstName: firstName || undefined,
             lastName: lastName || undefined,
             skipPasswordChecks: true,
             skipPasswordRequirement: true,
             unsafeMetadata: {
               source: 'admin-panel',
-              requestedUserId: userId,
+              requestedUserId: userId || null,
             },
           } as any);
           effectiveUserId = createdClerkUser.id;
+          const createdUsername = normalizeText(createdClerkUser.username);
+          if (createdUsername) {
+            effectiveUsername = createdUsername;
+          }
         }
       } catch (clerkError: any) {
         const clerkErrorMessage = clerkError?.errors?.[0]?.message || clerkError?.message || 'Clerk sync failed';
@@ -195,6 +220,14 @@ export async function POST(request: Request) {
           { status: 502, headers: { 'Content-Type': 'application/json' } }
         );
       }
+    }
+
+    if (!effectiveUsername) {
+      effectiveUsername = email.split('@')[0] || `user_${Date.now()}`;
+    }
+
+    if (!effectiveUserId) {
+      effectiveUserId = `local_${Date.now()}`;
     }
 
     const userIdConflict = await db.collection('users').findOne({ userId: effectiveUserId });
@@ -208,7 +241,7 @@ export async function POST(request: Request) {
     const now = new Date();
     const doc = {
       userId: effectiveUserId,
-      username,
+      username: effectiveUsername,
       email,
       fullName,
       accessToken: normalizeText(body?.accessToken) || null,

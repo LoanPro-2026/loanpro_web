@@ -54,10 +54,10 @@ type ReleaseInfo = {
 };
 
 const FALLBACK_RELEASE: ReleaseInfo = {
-	version: '1.0.3',
+	version: 'latest',
 	publishedAt: 'latest',
-	assetName: 'LoanPro.Setup.1.0.3.exe',
-	downloadUrl: 'https://github.com/jakshat296/loanpro_web/releases/download/v1.0.3/LoanPro.Setup.1.0.3.exe',
+	assetName: 'LoanPro.Setup.latest.exe',
+	downloadUrl: 'https://github.com/jakshat296/loanpro_web/releases/latest',
 	assetSizeBytes: 130 * 1024 * 1024,
 };
 
@@ -70,10 +70,7 @@ const DownloadPage = () => {
 	useEffect(() => {
 		const fetchLatestRelease = async () => {
 			try {
-				const response = await fetch('https://api.github.com/repos/jakshat296/loanpro_web/releases/latest', {
-					headers: {
-						Accept: 'application/vnd.github+json',
-					},
+				const response = await fetch(`/api/releases/latest?ts=${Date.now()}`, {
 					cache: 'no-store',
 				});
 
@@ -82,20 +79,17 @@ const DownloadPage = () => {
 				}
 
 				const data = await response.json();
-				const exeAsset = (data.assets || []).find((asset: any) =>
-					typeof asset?.name === 'string' && asset.name.toLowerCase().endsWith('.exe')
-				);
-
-				if (!exeAsset) {
-					throw new Error('No .exe asset found in latest release');
+				if (!data?.success || !data?.release) {
+					throw new Error(data?.error || 'No latest release found');
 				}
 
+				const release = data.release;
 				setReleaseInfo({
-					version: String(data.tag_name || '').replace(/^v/i, '') || FALLBACK_RELEASE.version,
-					publishedAt: data.published_at || FALLBACK_RELEASE.publishedAt,
-					assetName: exeAsset.name,
-					downloadUrl: exeAsset.browser_download_url,
-					assetSizeBytes: exeAsset.size || FALLBACK_RELEASE.assetSizeBytes,
+					version: String(release.version || FALLBACK_RELEASE.version),
+					publishedAt: String(release.publishedAt || FALLBACK_RELEASE.publishedAt),
+					assetName: String(release.assetName || FALLBACK_RELEASE.assetName),
+					downloadUrl: String(release.downloadUrl || FALLBACK_RELEASE.downloadUrl),
+					assetSizeBytes: Number(release.assetSizeBytes || FALLBACK_RELEASE.assetSizeBytes),
 				});
 			} catch {
 				setReleaseInfo(FALLBACK_RELEASE);
@@ -142,6 +136,8 @@ const DownloadPage = () => {
 		const mb = bytes / (1024 * 1024);
 		return `${mb.toFixed(1)} MB`;
 	};
+
+	const installerName = releaseInfo.assetName || 'LoanPro installer';
 
 	return (
 		<div className="min-h-screen bg-slate-50 pt-20">
@@ -335,7 +331,7 @@ const DownloadPage = () => {
 								</div>
 								<div>
 									<p className="text-slate-900 font-semibold">Run</p>
-									<p className="text-sm text-slate-600">Open LoanPro-Setup-1.0.1.exe from your Downloads folder.</p>
+									<p className="text-sm text-slate-600">Open {installerName} from your Downloads folder.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">

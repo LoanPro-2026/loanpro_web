@@ -2,6 +2,19 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
 
+const SUCCESS_STATUS_REGEX = /^(completed|captured|success|paid)$/i;
+
+function buildStatusFilter(status: string | null) {
+  if (!status || status === 'all') return null;
+
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'completed' || normalized === 'successful') {
+    return { $regex: SUCCESS_STATUS_REGEX };
+  }
+
+  return { $regex: new RegExp(`^${normalized}$`, 'i') };
+}
+
 export async function GET(request: Request) {
   try {
     await enforceAdminAccess(request, {
@@ -27,8 +40,9 @@ export async function GET(request: Request) {
 
     // Build filter
     const filter: any = {};
-    if (status && status !== 'all') {
-      filter.status = status;
+    const statusFilter = buildStatusFilter(status);
+    if (statusFilter) {
+      filter.status = statusFilter;
     }
 
     // Fetch payments with resilient user/subscription lookups.

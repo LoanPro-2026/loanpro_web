@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Script from 'next/script';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/components/ToastProvider';
-import { useDialog } from '@/components/DialogProvider';
 import ProgressBar from '@/components/ProgressBar';
 import { CheckIcon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
@@ -101,6 +99,10 @@ interface PostPurchaseData {
   amount: number;
 }
 
+interface PricingQuoteResponse {
+  plans?: Record<string, { monthly: number; annually: number; monthlyBase: number }>;
+}
+
 export default function SubscribePage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
@@ -108,11 +110,38 @@ export default function SubscribePage() {
   const [selectedPlan, setSelectedPlan] = useState<string>('Pro');
   const [showPostPurchasePanel, setShowPostPurchasePanel] = useState(false);
   const [postPurchaseData, setPostPurchaseData] = useState<PostPurchaseData | null>(null);
+  const [livePricing, setLivePricing] = useState<Record<string, { monthly: number; annually: number; monthlyBase: number }>>({});
   const router = useRouter();
   const { user } = useUser();
   const { showToast } = useToast();
-  const dialog = useDialog();
-  const selectedPlanData = plans.find((p) => p.name === selectedPlan) || plans[1];
+  const displayPlans = plans.map((plan) => ({
+    ...plan,
+    price: livePricing[plan.name]?.monthlyBase ?? plan.price,
+  }));
+  const selectedPlanData = displayPlans.find((p) => p.name === selectedPlan) || displayPlans[1];
+
+  useEffect(() => {
+    let disposed = false;
+
+    const fetchLivePricing = async () => {
+      try {
+        const response = await fetch('/api/pricing/quote', { credentials: 'include' });
+        const data = await response.json() as PricingQuoteResponse;
+        if (!disposed && data.plans) {
+          setLivePricing(data.plans);
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error('Failed to fetch live pricing', error);
+        }
+      }
+    };
+
+    void fetchLivePricing();
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   // Auto-close modal and redirect after 10 seconds
   useEffect(() => {
@@ -183,7 +212,7 @@ export default function SubscribePage() {
         throw new Error(data.error || 'Failed to start free trial');
       }
 
-      showToast('1-month Pro trial started successfully!', 'success');
+      showToast('6-month Pro trial started successfully!', 'success');
       setTimeout(() => {
         router.push('/download');
       }, 1200);
@@ -196,192 +225,13 @@ export default function SubscribePage() {
   };
 
   const handleSubscribe = async (planName: string, billingPeriod: 'monthly' | 'annually' = 'monthly') => {
-    try {
-      setLoading(planName);
-      
-      const selectedPlan = plans.find(plan => plan.name === planName);
-      if (!selectedPlan) {
-        throw new Error('Plan not found');
-      }
-      
-      const finalAmount = calculateFinalAmount(selectedPlan.price, billingPeriod);
-      
-      // Create order
-      const response = await fetch('/api/create-order', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          plan: planName, 
-          billingPeriod: billingPeriod,
-          amount: finalAmount,
-          paymentContext: 'new'
-        }),
-      });
-
-      // Parse response - handle both JSON and HTML error responses
-      const contentType = response.headers.get('content-type');
-      let data;
-      
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        console.error('Non-JSON API Response:', text.substring(0, 200));
-        throw new Error('Server returned an invalid response. Please try again.');
-      }
-
-      if (!response.ok) {
-        console.error('API Error Response:', data);
-        const apiError = data?.error || data?.message || '';
-        const apiCode = data?.code || '';
-
-        if (response.status === 401 || apiCode === 'UNAUTHORIZED') {
-          throw new Error('Please sign in again to continue your subscription.');
-        }
-
-        if (apiCode === 'RAZORPAY_AUTH_FAILED') {
-          throw new Error('Payment gateway is temporarily misconfigured. Please contact support or try again shortly.');
-        }
-
-        throw new Error(apiError || `Failed to create order: ${response.status}`);
-      }
-      
-      // Unwrap API response if it's wrapped in { success, data } structure
-      const orderData = data.data || data;
-      
-      console.log('[SUBSCRIBE] Order data received:', orderData);
-      
-      if (!orderData.orderId) {
-        console.error('[SUBSCRIBE] Invalid order data:', orderData);
-        throw new Error('Invalid response from server');
-      }
-
-      // Initialize Razorpay with enhanced UI options
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: 'LoanPro',
-        description: `${planName} Subscription - ${billingPeriod === 'monthly' ? 'Monthly' : 'Annual'}`,
-        image: '/logo.png', // Add your logo for better branding
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
-          try {
-            console.log('Razorpay payment response:', response);
-            
-            // Prepare user data
-            const userData = {
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              userId: user?.id || user?.primaryEmailAddress?.emailAddress,
-              email: user?.primaryEmailAddress?.emailAddress || '',
-              fullName: user?.fullName || '',
-              username: user?.username || user?.fullName || user?.primaryEmailAddress?.emailAddress,
-              plan: planName,
-              billingPeriod: billingPeriod,
-            };
-            
-            console.log('Sending payment data to backend:', userData);
-
-            // Send payment details to our backend
-            const paymentResponse = await fetch('/api/payment-success', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(userData),
-            });
-
-            console.log('Payment response status:', paymentResponse.status);
-            
-            if (!paymentResponse.ok) {
-              const errorData = await paymentResponse.json();
-              console.error('Payment verification failed:', errorData);
-              throw new Error(`Payment verification failed: ${errorData.error || 'Unknown error'}`);
-            }
-
-            const result = await paymentResponse.json();
-            console.log('Payment verification successful:', result);
-
-            // Show post-purchase success panel instead of immediate redirect
-            setPostPurchaseData({
-              planName,
-              billingPeriod,
-              amount: finalAmount
-            });
-            setShowPostPurchasePanel(true);
-            setLoading(null);
-          } catch (error) {
-            console.error('Error verifying payment:', error);
-            await dialog.alert('Payment successful but verification failed. Please contact support.', {
-              title: 'Payment Verification Issue',
-              type: 'error',
-            });
-          }
-        },
-        prefill: {
-          name: user?.fullName || '',
-          email: user?.primaryEmailAddress?.emailAddress || '',
-        },
-        theme: {
-          color: '#8B5CF6', // Purple theme to match your brand
-          backdrop_color: 'rgba(139, 92, 246, 0.1)' // Light purple backdrop
-        },
-        modal: {
-          backdropclose: false, // Prevent accidental closes
-          escape: true,
-          handleback: true,
-          confirm_close: true, // Ask for confirmation before closing
-          ondismiss: function() {
-            setLoading(null);
-            showToast('Payment cancelled', 'info');
-          },
-          animation: true // Smooth animations
-        },
-        retry: {
-          enabled: true,
-          max_count: 3
-        },
-        timeout: 900, // 15 minutes timeout
-        remember_customer: false,
-        readonly: {
-          email: true,
-          name: true,
-          contact: false
-        }
-      };
-
-      const razorpay = new window.Razorpay(options);
-      
-      // Open Razorpay and immediately stop loading indicator
-      razorpay.on('payment.submit', function() {
-        setLoading(null); // Stop loading when payment form is submitted
-      });
-      
-      razorpay.open();
-      
-      // Stop loading indicator after modal opens
-      setLoading(null);
-      
-    } catch (error: any) {
-      console.error('Error:', error);
-      showToast(error.message || 'Something went wrong. Please try again.', 'error');
-      setLoading(null);
-    }
+    setLoading(planName);
+    router.push(`/checkout?plan=${encodeURIComponent(planName)}&billingPeriod=${billingPeriod}&context=new`);
   };
 
   return (
     <>
       <ProgressBar show={!!loading} />
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="lazyOnload"
-      />
-      
       <div className="min-h-screen bg-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -400,7 +250,7 @@ export default function SubscribePage() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
               <h3 className="text-xl font-semibold text-slate-900 mb-3">Start with a free trial</h3>
               <p className="text-slate-600 mb-4">
-                Try the Pro plan for 1 month. No credit card required.
+                Try the Pro plan for 6 months. No credit card required.
               </p>
               <button
                 onClick={handleFreeTrial}
@@ -446,7 +296,7 @@ export default function SubscribePage() {
 
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
-            {plans.map((plan) => (
+            {displayPlans.map((plan) => (
               <div
                 key={plan.name}
                 className="relative"
@@ -583,7 +433,7 @@ export default function SubscribePage() {
                   onClick={handleFreeTrial}
                   className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:border-slate-300 transition-colors font-semibold"
                 >
-                  Start 1-month trial
+                  Start 6-month trial
                 </button>
               </div>
             </div>
@@ -605,7 +455,7 @@ export default function SubscribePage() {
                 </button>
               </div>
               <p className="text-slate-500 text-sm mt-4">
-                1-month free trial available • Secure payment via Razorpay
+                6-month free trial available • Secure payment via Razorpay
               </p>
             </div>
           </div>

@@ -4,8 +4,10 @@ import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateOrderRequest } from '@/lib/validation';
 import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { getRazorpayClient } from '@/lib/razorpayClient';
-import { getEffectivePlanPricing } from '@/lib/planConfig';
+import { getEffectivePlanPricing, normalizePlanName } from '@/lib/planConfig';
 import { connectToDatabase } from '@/lib/mongodb';
+import { getCouponQuote } from '@/lib/couponUtils';
+import { calculatePlanAmountPaise, calculatePlanAmountRupees, type PaidPlanName } from '@/lib/pricing';
 
 async function resolveUserIdFromRequest(req: Request): Promise<string | null> {
   const { userId } = await auth();
@@ -77,6 +79,16 @@ export async function POST(req: Request) {
     }
 
     const { plan, billingPeriod = 'monthly', amount, paymentContext = 'new' } = body;
+    const normalizedPlan = normalizePlanName(plan);
+    const normalizedCouponCode = String(body?.couponCode || '').trim().toUpperCase();
+
+    if (normalizedPlan === 'trial') {
+      return errorResponse({
+        code: 'INVALID_PLAN',
+        message: 'Trial does not require payment order creation.',
+        statusCode: 400,
+      });
+    }
 
     const allowedContexts = ['new', 'renewal', 'upgrade'];
     const normalizedPaymentContext = allowedContexts.includes(paymentContext) ? paymentContext : 'new';
@@ -87,9 +99,10 @@ export async function POST(req: Request) {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const existingOrder = await db.collection('order_intents').findOne({
       userId,
-      plan,
+      plan: normalizedPlan,
       billingPeriod,
       paymentContext: normalizedPaymentContext,
+      couponCode: normalizedCouponCode || null,
       status: 'pending',
       createdAt: { $gt: fiveMinutesAgo }
     });
@@ -100,38 +113,52 @@ export async function POST(req: Request) {
         orderId: existingOrder.orderId,
         amount: existingOrder.amount,
         currency: 'INR',
-        plan,
+        plan: normalizedPlan,
         billingPeriod,
-        reused: true
+        reused: true,
+        breakdown: {
+          basePrice: Math.round(Number(existingOrder.baseAmount || existingOrder.amount || 0) / 100),
+          discountAmount: Math.round(Number(existingOrder.discountAmount || 0) / 100),
+          total: Math.round(Number(existingOrder.amount || 0) / 100),
+          currency: 'INR',
+        },
+        coupon: existingOrder.coupon || null,
       }, 'Existing order found', 200);
     }
 
     const pricing = await getEffectivePlanPricing(db);
 
-    // Get monthly price from configuration, converted to paise for Razorpay
-    const monthlyPrice = (pricing as Record<string, number>)[plan]
-      ? Math.round((pricing as Record<string, number>)[plan] * 100)
-      : 0;
-    if (!monthlyPrice) {
+    const monthlyPriceRupees = Number((pricing as Record<PaidPlanName, number>)[normalizedPlan as PaidPlanName] || 0);
+    if (!monthlyPriceRupees) {
       return errorResponse({
         code: 'INVALID_PLAN',
-        message: `Plan '${plan}' is not available`,
+        message: `Plan '${normalizedPlan}' is not available`,
         statusCode: 400,
       });
     }
 
-    // Calculate final amount based on billing period
-    let finalAmount = monthlyPrice;
-    if (billingPeriod === 'annually') {
-      // Annual billing with 15% discount
-      finalAmount = Math.round(monthlyPrice * 12 * 0.85);
+    const subtotalRupees = calculatePlanAmountRupees(monthlyPriceRupees, billingPeriod as 'monthly' | 'annually');
+    const subtotalPaise = calculatePlanAmountPaise(monthlyPriceRupees, billingPeriod as 'monthly' | 'annually');
+    const couponQuote = await getCouponQuote(db, {
+      couponCode: normalizedCouponCode,
+      plan: normalizedPlan,
+      billingPeriod: billingPeriod as 'monthly' | 'annually',
+      subtotal: subtotalRupees,
+    });
+
+    if (normalizedCouponCode && !couponQuote.applied) {
+      return errorResponse({
+        code: 'INVALID_COUPON',
+        message: couponQuote.message || 'Coupon could not be applied.',
+        statusCode: 400,
+        details: { reason: couponQuote.reason, couponCode: normalizedCouponCode },
+      });
     }
 
-    // SECURITY: NEVER trust frontend pricing - always use server-calculated amount
-    const orderAmount = finalAmount;
+    const orderAmount = couponQuote.totalAmount * 100;
 
     // If frontend sent an amount, validate it matches (within 1% tolerance for rounding)
-    if (amount && Math.abs(amount - finalAmount) > finalAmount * 0.01) {
+    if (amount && Math.abs(amount - orderAmount) > Math.max(100, orderAmount * 0.01)) {
       return errorResponse({
         code: 'AMOUNT_MISMATCH',
         message: 'Price mismatch detected. Please refresh and try again.',
@@ -160,10 +187,12 @@ export async function POST(req: Request) {
 
     console.log('[CREATE-ORDER] Processing order:', { 
       userId,
-      plan, 
+      plan: normalizedPlan,
       billingPeriod, 
-      monthlyPrice, 
-      finalAmount, 
+      monthlyPriceRupees,
+      subtotalRupees,
+      couponCode: normalizedCouponCode || null,
+      discountAmount: couponQuote.discountAmount,
       orderAmount 
     });
 
@@ -185,9 +214,10 @@ export async function POST(req: Request) {
         receipt: receiptId,
         notes: {
           userId,
-          plan,
+          plan: normalizedPlan,
           billingPeriod,
           paymentContext: normalizedPaymentContext,
+          couponCode: normalizedCouponCode || '',
         },
       });
       console.log('[CREATE-ORDER] Razorpay order created:', order.id);
@@ -205,9 +235,13 @@ export async function POST(req: Request) {
       {
         $set: {
           userId,
-          plan,
+          plan: normalizedPlan,
           billingPeriod,
           paymentContext: normalizedPaymentContext,
+          couponCode: normalizedCouponCode || null,
+          coupon: couponQuote.coupon,
+          baseAmount: subtotalPaise,
+          discountAmount: couponQuote.discountAmount * 100,
           amount: orderAmount,
           status: 'pending',
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
@@ -226,14 +260,15 @@ export async function POST(req: Request) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      plan,
+      plan: normalizedPlan,
       billingPeriod,
       breakdown: {
-        basePrice: orderAmount / 100,
-        gatewayFee: Math.round(orderAmount / 100 * 0.025 + 3),
+        basePrice: subtotalPaise / 100,
+        discountAmount: couponQuote.discountAmount,
         total: orderAmount / 100,
         currency: 'INR'
-      }
+      },
+      coupon: couponQuote.coupon,
     }, 'Order created successfully', 201);
 
   } catch (error: any) {

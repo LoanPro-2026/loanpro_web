@@ -1257,154 +1257,14 @@ const ProfilePage = () => {
 
   const handleRenew = async (plan: string, billingPeriod: 'monthly' | 'annually' = 'monthly') => {
     try {
-      setProcessing(true);
-      setPaymentLoading(true);
-      setPaymentLoadingMessage('Preparing renewal order...');
-      
       const currentPlan = data?.subscription?.plan;
       const selectedPlan = plan || currentPlan;
       if (!selectedPlan) {
         throw new Error('No active subscription found');
       }
       const capitalizedSelectedPlan = selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1);
-
-      // Create renewal order using create-order API
-      const orderResponse = await authFetch('/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          plan: capitalizedSelectedPlan,
-          billingPeriod,
-          paymentContext: 'renewal'
-        }),
-      });
-      
-      if (!orderResponse.ok) {
-        let orderErrorMessage = 'Failed to create renewal order. Please try again.';
-        try {
-          const errorPayload = await orderResponse.json();
-          if (orderResponse.status === 401 || errorPayload?.code === 'UNAUTHORIZED') {
-            orderErrorMessage = 'Please sign in again to continue renewal.';
-          } else if (errorPayload?.code === 'RAZORPAY_AUTH_FAILED') {
-            orderErrorMessage = 'Payment gateway is temporarily misconfigured. Please contact support.';
-          } else {
-            orderErrorMessage = errorPayload?.error || errorPayload?.message || orderErrorMessage;
-          }
-        } catch {
-          // Keep generic message if payload parsing fails.
-        }
-
-        throw new Error(orderErrorMessage);
-      }
-      
-      const orderPayload = await orderResponse.json();
-      const orderData = orderPayload.data || orderPayload;
-
-      if (!orderData.orderId || !orderData.amount) {
-        throw new Error('Invalid renewal order response from server. Please try again.');
-      }
-      
-      setPaymentLoadingMessage('Opening secure payment gateway...');
-      
-      // Close modal before opening Razorpay
       setRenewModalOpen(false);
-      
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Initialize Razorpay with improved UX
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: 'INR',
-        name: 'LoanPro',
-        description: `Renew ${capitalizedSelectedPlan} Plan`,
-        image: '/logo.svg',
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
-          setPaymentLoading(true);
-          setPaymentLoadingMessage('Verifying payment...');
-          
-          try {
-            console.log('[Razorpay] Renewal payment successful:', response.razorpay_payment_id);
-            
-            const paymentResponse = await fetch('/api/payment-success', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                userId: user?.id,
-                username: user?.fullName || user?.username,
-                plan: capitalizedSelectedPlan,
-                billingPeriod: billingPeriod,
-                isRenewal: true
-              }),
-            });
-            
-            if (paymentResponse.ok) {
-              console.log('[Payment] Renewal verification successful');
-              setPaymentLoadingMessage('Success! Refreshing your account...');
-              setTimeout(() => {
-                window.location.reload();
-              }, 1500);
-            } else {
-              const errorData = await paymentResponse.json();
-              throw new Error(errorData.error || 'Payment verification failed');
-            }
-          } catch (error: any) {
-            console.error('[Payment] Renewal verification error:', error);
-            setPaymentLoading(false);
-            openStatusModal(
-              'Payment Verification Issue',
-              `Your payment was processed successfully, but we couldn't verify it automatically.\n\nPayment ID: ${response.razorpay_payment_id}\n\nPlease contact support with this Payment ID. We'll activate your renewal manually.`,
-              'error'
-            );
-          }
-        },
-        modal: {
-          ondismiss: function() {
-            setPaymentLoading(false);
-            setPaymentLoadingMessage('');
-            console.log('[Razorpay] Renewal cancelled by user');
-          },
-          escape: true,
-          animation: true,
-          confirm_close: true
-        },
-        prefill: {
-          name: user?.fullName || '',
-          email: user?.primaryEmailAddress?.emailAddress || '',
-        },
-        notes: {
-          user_id: user?.id || '',
-          plan: capitalizedSelectedPlan,
-          billing_period: billingPeriod,
-          action: 'renewal'
-        },
-        theme: { 
-          color: '#10B981', // Green for renewal
-          backdrop_color: 'rgba(0, 0, 0, 0.7)'
-        },
-        retry: {
-          enabled: true,
-          max_count: 3
-        }
-      };
-      
-      setPaymentLoading(false);
-      const razorpay = new (window as any).Razorpay(options);
-      
-      razorpay.on('payment.failed', function (response: any){
-        console.error('[Razorpay] Renewal payment failed:', response.error);
-        openStatusModal(
-          'Payment Failed',
-          `${response.error.description || 'Transaction was declined'}\n\nError Code: ${response.error.code}\n\nPlease try again or contact support if the issue persists.`,
-          'error'
-        );
-      });
-      
-      razorpay.open();
+      router.push(`/checkout?plan=${encodeURIComponent(capitalizedSelectedPlan)}&billingPeriod=${billingPeriod}&context=renewal`);
       
     } catch (error: any) {
       console.error('[Renewal] Error:', error);
@@ -1413,8 +1273,6 @@ const ProfilePage = () => {
         `${error.message || 'An unexpected error occurred'}\n\nPlease try again or contact support if the issue persists.`,
         'error'
       );
-      setPaymentLoading(false);
-      setPaymentLoadingMessage('');
     } finally {
       setProcessing(false);
     }
@@ -1675,7 +1533,7 @@ const ProfilePage = () => {
               </Link>
               
               <p className="text-sm text-slate-500">
-                1-month free trial available - no credit card required
+                6-month free trial available - no credit card required
               </p>
             </div>
 
@@ -1777,7 +1635,7 @@ const ProfilePage = () => {
                       <div className="flex items-start gap-3">
                         <SparklesIcon className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <p className="font-semibold text-blue-900 mb-1">1-Month Pro Trial Active</p>
+                          <p className="font-semibold text-blue-900 mb-1">6-Month Pro Trial Active</p>
                           <p className="text-sm text-blue-800">
                             You're enjoying full Pro features. Upgrade anytime to continue after your trial ends on{' '}
                             {data.subscription.endDate ? new Date(data.subscription.endDate).toLocaleDateString() : 'trial end date'}.

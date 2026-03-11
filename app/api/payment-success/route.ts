@@ -11,6 +11,8 @@ import { logger } from '@/lib/logger';
 import emailService from '@/services/emailService';
 import { getRazorpayClient } from '@/lib/razorpayClient';
 
+const SUCCESSFUL_PAYMENT_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
+
 export async function POST(req: Request) {
   const startTime = Date.now();
   logger.info('Payment webhook received', 'PAYMENT_SUCCESS');
@@ -159,6 +161,11 @@ export async function POST(req: Request) {
     const orderIntent = await db.collection('order_intents').findOne({
       orderId: razorpay_order_id
     });
+    const orderCoupon = orderIntent?.coupon && typeof orderIntent.coupon === 'object'
+      ? orderIntent.coupon
+      : null;
+    const baseAmountRupees = Math.round(Number(orderIntent?.baseAmount || orderIntent?.amount || 0) / 100);
+    const discountAmountRupees = Math.round(Number(orderIntent?.discountAmount || 0) / 100);
     
     const paymentAmount = orderIntent?.amount || 0; // Amount in paise from Razorpay
     
@@ -171,7 +178,10 @@ export async function POST(req: Request) {
     const existingPayment = await db.collection('payments').findOne({
       paymentId: razorpay_payment_id,
       userId,
-      status: { $in: ['captured', 'processing'] }
+      $or: [
+        { status: { $in: ['captured', 'processing', 'completed', 'success', 'successful', 'paid'] } },
+        { status: { $regex: SUCCESSFUL_PAYMENT_STATUS_REGEX } },
+      ],
     });
 
     if (existingPayment) {
@@ -522,6 +532,10 @@ export async function POST(req: Request) {
       plan: subscriptionPlan,
       billingPeriod,
       amount: Math.round(paymentAmount / 100), // Convert paise to rupees for storage and refund calculations
+      baseAmount: baseAmountRupees,
+      discountAmount: discountAmountRupees,
+      couponCode: orderCoupon?.code || null,
+      coupon: orderCoupon,
       currency: 'INR',
       status: 'captured',
       paymentMethod: 'razorpay',
@@ -534,10 +548,29 @@ export async function POST(req: Request) {
         
         await db.collection('payments').insertOne(paymentRecord, { session });
 
+                if (orderCoupon?.code) {
+                  await db.collection('coupons').updateOne(
+                    { code: String(orderCoupon.code).toUpperCase() },
+                    {
+                      $inc: { usedCount: 1 },
+                      $set: { updatedAt: new Date(), lastUsedAt: new Date() },
+                    },
+                    { session }
+                  );
+                }
+
         // Mark order intent as completed
         await db.collection('order_intents').updateOne(
           { orderId: razorpay_order_id },
-          { $set: { status: 'completed', completedAt: new Date() } },
+                  {
+                    $set: {
+                      status: 'completed',
+                      completedAt: new Date(),
+                      paymentId: razorpay_payment_id,
+                      couponCode: orderCoupon?.code || null,
+                      coupon: orderCoupon,
+                    },
+                  },
           { session }
         );
       }); // End transaction

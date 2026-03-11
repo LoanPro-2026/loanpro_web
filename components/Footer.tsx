@@ -82,7 +82,7 @@ const Footer = () => (
       <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
         <h3 className="text-lg font-semibold text-white">Ready to streamline loan operations?</h3>
         <p className="mt-2 text-sm text-slate-400">
-          Start with a 1-month Pro trial or download the desktop app today.
+          Start with a 6-month Pro trial or download the desktop app today.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
           <SignedOut>

@@ -45,12 +45,14 @@ export async function GET(request: Request) {
       .limit(limit)
       .toArray();
 
-    const [openCount, criticalCount, highCount, stalePendingCount, capturedNotFinalizedCount, latestRun] = await Promise.all([
+    const [openCount, criticalCount, highCount, stalePendingCount, capturedNotFinalizedCount, completedNotActivatedCount, reconciliationCheckFailedCount, latestRun] = await Promise.all([
       db.collection('payment_incidents').countDocuments({ status: 'open' }),
       db.collection('payment_incidents').countDocuments({ status: 'open', severity: 'critical' }),
       db.collection('payment_incidents').countDocuments({ status: 'open', severity: 'high' }),
       db.collection('payment_incidents').countDocuments({ status: 'open', type: 'STALE_PENDING_ORDER' }),
       db.collection('payment_incidents').countDocuments({ status: 'open', type: 'CAPTURED_PAYMENT_NOT_FINALIZED' }),
+      db.collection('payment_incidents').countDocuments({ status: 'open', type: 'COMPLETED_ORDER_NOT_ACTIVATED' }),
+      db.collection('payment_incidents').countDocuments({ status: 'open', type: 'RECONCILIATION_CHECK_FAILED' }),
       db.collection('payment_reconciliation_runs').find().sort({ createdAt: -1 }).limit(1).next(),
     ]);
 
@@ -63,6 +65,8 @@ export async function GET(request: Request) {
         highCount,
         stalePendingCount,
         capturedNotFinalizedCount,
+        completedNotActivatedCount,
+        reconciliationCheckFailedCount,
       },
       lastRun: latestRun || null,
       config: {
@@ -129,15 +133,72 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, result });
     }
 
-    if (action === 'retry-incident') {
+    if (action === 'retry-incident' || action === 'verify-and-finalize') {
       const orderId = String(body?.orderId || '');
+      const localOnly = Boolean(body?.localOnly);
+      const note = String(body?.note || '').trim();
       if (!orderId) {
         return NextResponse.json({ success: false, error: 'orderId is required' }, { status: 400 });
       }
 
-      const result = await retryPaymentIncidentOrder(orderId, `admin-retry:${adminEmail}`);
+      if (action === 'verify-and-finalize' && note.length < 5) {
+        return NextResponse.json({ success: false, error: 'A verification note with at least 5 characters is required' }, { status: 400 });
+      }
+
+      if (note.length > 1000) {
+        return NextResponse.json({ success: false, error: 'note must be 1000 characters or less' }, { status: 400 });
+      }
+
+      const recoverySource = action === 'verify-and-finalize'
+        ? `admin-verify-finalize:${adminEmail}`
+        : `admin-retry:${adminEmail}`;
+
+      const result = await retryPaymentIncidentOrder(orderId, {
+        source: recoverySource,
+        localOnly,
+        note,
+      });
+
+      const now = new Date();
+      await db.collection('payment_incidents').updateMany(
+        { orderId },
+        {
+          $set: {
+            updatedAt: now,
+            lastManualAction: {
+              at: now,
+              by: adminEmail,
+              action,
+              localOnly,
+              note,
+              result: {
+                success: Boolean(result?.success),
+                reason: result?.reason || null,
+                paymentId: result?.paymentId || null,
+                usedLocalPaymentRecord: Boolean(result?.usedLocalPaymentRecord),
+              },
+            },
+          },
+          $push: {
+            history: {
+              at: now,
+              action: 'manual_recovery',
+              source: `admin:${adminEmail}`,
+              note,
+              meta: {
+                recoveryAction: action,
+                localOnly,
+                success: Boolean(result?.success),
+                reason: result?.reason || null,
+                usedLocalPaymentRecord: Boolean(result?.usedLocalPaymentRecord),
+              },
+            },
+          },
+        } as any
+      );
+
       invalidateAdminCacheByTags(['payments', 'dashboard', 'health']);
-      return NextResponse.json({ success: true, result });
+      return NextResponse.json({ success: true, action, result });
     }
 
     if (action === 'update-status') {
@@ -157,18 +218,32 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'note must be 1000 characters or less' }, { status: 400 });
       }
 
+      if ((status === 'resolved' || status === 'ignored') && note.length < 5) {
+        return NextResponse.json({ success: false, error: 'A note with at least 5 characters is required for resolve/ignore' }, { status: 400 });
+      }
+
       const now = new Date();
-      await db.collection('payment_incidents').updateOne(
+      const shouldResolve = status === 'resolved';
+      const shouldIgnore = status === 'ignored';
+
+      const updateResult = await db.collection('payment_incidents').updateOne(
         { _id: new ObjectId(incidentId) },
         {
           $set: {
             status,
             updatedAt: now,
-            ...(status === 'resolved'
+            ...(shouldResolve
               ? {
                   resolvedAt: now,
                   resolvedBy: adminEmail,
                   resolutionNote: note || 'Resolved by admin',
+                }
+              : {}),
+            ...(shouldIgnore
+              ? {
+                  ignoredAt: now,
+                  ignoredBy: adminEmail,
+                  resolutionNote: note || 'Ignored by admin',
                 }
               : {}),
           },
@@ -183,6 +258,10 @@ export async function POST(request: Request) {
           },
         } as any
       );
+
+      if (!updateResult.matchedCount) {
+        return NextResponse.json({ success: false, error: 'Payment incident not found' }, { status: 404 });
+      }
 
       invalidateAdminCacheByTags(['payments', 'dashboard', 'health']);
 

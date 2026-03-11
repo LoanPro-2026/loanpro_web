@@ -16,16 +16,47 @@ interface ReconciliationOptions {
 
 interface ReconciliationSummary {
   scanned: number;
+  completedScanned: number;
   autoRecovered: number;
   completedMarked: number;
   pendingHealthy: number;
   incidentsOpened: number;
   incidentsResolved: number;
+  completedWithoutActivation: number;
   failures: number;
   startedAt: string;
   completedAt: string;
   durationMs: number;
   source: string;
+}
+
+const SUCCESS_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
+
+function isSuccessfulStatus(status: unknown): boolean {
+  return SUCCESS_STATUS_REGEX.test(String(status || '').trim());
+}
+
+function findCapturedLikePayment(items: any[]): any | undefined {
+  return items.find((payment: any) => isSuccessfulStatus(payment?.status));
+}
+
+function buildSuccessfulPaymentMatch(fieldName: string) {
+  return {
+    $or: [
+      { [fieldName]: { $in: ['captured', 'completed', 'success', 'successful', 'paid'] } },
+      { [fieldName]: { $regex: SUCCESS_STATUS_REGEX } },
+    ],
+  };
+}
+
+async function hasActivePaidSubscription(db: any, userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const active = await db.collection('subscriptions').findOne({
+    userId,
+    status: 'active',
+    plan: { $ne: 'trial' },
+  });
+  return Boolean(active);
 }
 
 const razorpay = new Razorpay({
@@ -175,7 +206,7 @@ async function maybeSendIncidentAlert(db: any, incidentDoc: any, source: string)
   return sent;
 }
 
-async function resolveIncidentsForOrder(db: any, orderId: string, source: string, note: string) {
+async function resolveIncidentsForOrder(db: any, orderId: string, source: string, note: string, actionMeta?: Record<string, any>) {
   const now = new Date();
   const result = await db.collection('payment_incidents').updateMany(
     {
@@ -196,6 +227,7 @@ async function resolveIncidentsForOrder(db: any, orderId: string, source: string
           action: 'resolved',
           source,
           note,
+          ...(actionMeta ? { meta: actionMeta } : {}),
         },
       },
     }
@@ -210,10 +242,15 @@ async function finalizeOrderIntent(db: any, orderIntent: any, capturedPayment: a
     throw new Error('order_intent missing userId');
   }
 
+  const paymentId = String(capturedPayment?.id || capturedPayment?.paymentId || capturedPayment?.razorpay_payment_id || '').trim();
+  if (!paymentId) {
+    throw new Error('Captured payment id is missing');
+  }
+
   const user = await db.collection('users').findOne({ userId });
 
   const requestBody = {
-    razorpay_payment_id: capturedPayment.id,
+    razorpay_payment_id: paymentId,
     razorpay_order_id: orderIntent.orderId,
     razorpay_signature: `${source}_verified`,
     userId,
@@ -237,17 +274,18 @@ async function finalizeOrderIntent(db: any, orderIntent: any, capturedPayment: a
     throw new Error(result?.error?.message || result?.error || `payment-success failed with status ${response.status}`);
   }
 
-  await db.collection('order_intents').updateOne(
-    { _id: orderIntent._id },
-    {
-      $set: {
-        status: 'completed',
-        completedAt: new Date(),
-        recoveredBy: source,
-        recoveredAt: new Date(),
-      },
-    }
-  );
+  const orderIntentFilter = orderIntent?._id
+    ? { _id: orderIntent._id }
+    : { orderId: orderIntent.orderId };
+
+  await db.collection('order_intents').updateOne(orderIntentFilter, {
+    $set: {
+      status: 'completed',
+      completedAt: new Date(),
+      recoveredBy: source,
+      recoveredAt: new Date(),
+    },
+  });
 
   return result;
 }
@@ -264,11 +302,13 @@ export async function runPaymentReconciliation(options: ReconciliationOptions = 
 
   const summary: ReconciliationSummary = {
     scanned: 0,
+    completedScanned: 0,
     autoRecovered: 0,
     completedMarked: 0,
     pendingHealthy: 0,
     incidentsOpened: 0,
     incidentsResolved: 0,
+    completedWithoutActivation: 0,
     failures: 0,
     startedAt: new Date(start).toISOString(),
     completedAt: '',
@@ -297,7 +337,7 @@ export async function runPaymentReconciliation(options: ReconciliationOptions = 
     try {
       const existingCompletedPayment = await db.collection('payments').findOne({
         orderId: orderIntent.orderId,
-        status: { $in: ['captured', 'completed', 'success'] },
+        ...buildSuccessfulPaymentMatch('status'),
       });
 
       if (existingCompletedPayment) {
@@ -322,12 +362,12 @@ export async function runPaymentReconciliation(options: ReconciliationOptions = 
       }
 
       const paymentsResponse: any = await razorpay.orders.fetchPayments(orderIntent.orderId);
-      const capturedPayment = (paymentsResponse?.items || []).find((payment: any) => payment.status === 'captured');
+      const capturedPayment = findCapturedLikePayment(paymentsResponse?.items || []);
 
       if (capturedPayment) {
         const existingPaymentById = await db.collection('payments').findOne({
           paymentId: capturedPayment.id,
-          status: { $in: ['captured', 'completed', 'success'] },
+          ...buildSuccessfulPaymentMatch('status'),
         });
 
         if (existingPaymentById) {
@@ -434,6 +474,126 @@ export async function runPaymentReconciliation(options: ReconciliationOptions = 
     }
   }
 
+  const completedIntents = await db
+    .collection('order_intents')
+    .find({
+      status: 'completed',
+      completedAt: { $gte: lookbackCutoff },
+    })
+    .sort({ completedAt: -1 })
+    .limit(limit)
+    .toArray();
+
+  summary.completedScanned = completedIntents.length;
+
+  for (const completedIntent of completedIntents) {
+    const userId = String(completedIntent.userId || '');
+    const orderId = String(completedIntent.orderId || '');
+    if (!userId || !orderId) {
+      continue;
+    }
+
+    try {
+      const [hasActiveSubscription, successfulPayment] = await Promise.all([
+        hasActivePaidSubscription(db, userId),
+        db.collection('payments').findOne({
+          orderId,
+          ...buildSuccessfulPaymentMatch('status'),
+        }),
+      ]);
+
+      if (hasActiveSubscription) {
+        summary.incidentsResolved += await resolveIncidentsForOrder(
+          db,
+          orderId,
+          source,
+          'Recovered: active subscription is present for completed order'
+        );
+        continue;
+      }
+
+      summary.completedWithoutActivation += 1;
+
+      if (!successfulPayment) {
+        const paymentsResponse: any = await razorpay.orders.fetchPayments(orderId);
+        const capturedPayment = findCapturedLikePayment(paymentsResponse?.items || []);
+
+        if (capturedPayment) {
+          try {
+            await finalizeOrderIntent(db, completedIntent, capturedPayment, source);
+            summary.autoRecovered += 1;
+            summary.incidentsResolved += await resolveIncidentsForOrder(
+              db,
+              orderId,
+              source,
+              'Auto-recovered completed order with captured payment and missing activation'
+            );
+            continue;
+          } catch (finalizeError) {
+            summary.failures += 1;
+            const incident = await upsertIncident(db, {
+              orderId,
+              paymentId: capturedPayment.id,
+              userId,
+              type: 'COMPLETED_ORDER_NOT_ACTIVATED',
+              severity: 'critical',
+              message: 'Order is completed and payment is captured, but subscription is not active',
+              paymentContext: completedIntent.paymentContext,
+              plan: completedIntent.plan,
+              billingPeriod: completedIntent.billingPeriod,
+              metadata: {
+                error: finalizeError instanceof Error ? finalizeError.message : String(finalizeError),
+              },
+              source,
+            });
+            if (incident.created) summary.incidentsOpened += 1;
+            const incidentDoc = await db.collection('payment_incidents').findOne({ incidentKey: `COMPLETED_ORDER_NOT_ACTIVATED:${orderId}` });
+            if (incidentDoc) {
+              await maybeSendIncidentAlert(db, incidentDoc, source);
+            }
+            continue;
+          }
+        }
+      }
+
+      const incident = await upsertIncident(db, {
+        orderId,
+        userId,
+        paymentId: successfulPayment?.paymentId,
+        type: 'COMPLETED_ORDER_NOT_ACTIVATED',
+        severity: 'critical',
+        message: 'Order is marked completed but user does not have an active paid subscription',
+        paymentContext: completedIntent.paymentContext,
+        plan: completedIntent.plan,
+        billingPeriod: completedIntent.billingPeriod,
+        source,
+      });
+      if (incident.created) summary.incidentsOpened += 1;
+      const incidentDoc = await db.collection('payment_incidents').findOne({ incidentKey: `COMPLETED_ORDER_NOT_ACTIVATED:${orderId}` });
+      if (incidentDoc) {
+        await maybeSendIncidentAlert(db, incidentDoc, source);
+      }
+    } catch (error) {
+      summary.failures += 1;
+      const incident = await upsertIncident(db, {
+        orderId,
+        userId,
+        type: 'RECONCILIATION_CHECK_FAILED',
+        severity: 'high',
+        message: 'Failed while checking completed order activation state',
+        paymentContext: completedIntent.paymentContext,
+        plan: completedIntent.plan,
+        billingPeriod: completedIntent.billingPeriod,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          phase: 'completed-order-verification',
+        },
+        source,
+      });
+      if (incident.created) summary.incidentsOpened += 1;
+    }
+  }
+
   summary.completedAt = new Date().toISOString();
   summary.durationMs = Date.now() - start;
 
@@ -446,44 +606,161 @@ export async function runPaymentReconciliation(options: ReconciliationOptions = 
   return summary;
 }
 
-export async function retryPaymentIncidentOrder(orderId: string, source = 'admin-retry') {
+interface RetryPaymentIncidentOptions {
+  source?: string;
+  localOnly?: boolean;
+  note?: string;
+}
+
+export async function retryPaymentIncidentOrder(orderId: string, options: RetryPaymentIncidentOptions | string = 'admin-retry') {
+  const normalizedOptions: RetryPaymentIncidentOptions = typeof options === 'string'
+    ? { source: options }
+    : (options || {});
+  const source = String(normalizedOptions.source || 'admin-retry');
+  const localOnly = Boolean(normalizedOptions.localOnly);
+  const note = String(normalizedOptions.note || '').trim();
+
   const client = await clientPromise;
   const db = client.db('AdminDB');
 
-  const orderIntent = await db.collection('order_intents').findOne({ orderId });
-  if (!orderIntent) {
-    throw new Error('Order intent not found');
+  const [orderIntent, latestIncident, successfulPaymentRecord] = await Promise.all([
+    db.collection('order_intents').findOne({ orderId }),
+    db.collection('payment_incidents').find({ orderId }).sort({ lastDetectedAt: -1 }).limit(1).next(),
+    db.collection('payments').findOne({
+      orderId,
+      ...buildSuccessfulPaymentMatch('status'),
+    }),
+  ]);
+
+  if (!orderIntent && !successfulPaymentRecord) {
+    throw new Error('Order intent and successful payment record were not found');
   }
 
-  if (orderIntent.status === 'completed') {
-    await resolveIncidentsForOrder(db, orderId, source, 'Order already completed');
-    return { success: true, alreadyCompleted: true };
+  if (!orderIntent && successfulPaymentRecord) {
+    const userId = String(successfulPaymentRecord.userId || latestIncident?.userId || '').trim();
+    if (!userId) {
+      throw new Error('Cannot recover order: userId is missing in both order intent and payment record');
+    }
+
+    const syntheticOrderIntent = {
+      orderId,
+      userId,
+      plan: latestIncident?.plan || successfulPaymentRecord.plan || 'Basic',
+      billingPeriod: latestIncident?.billingPeriod || successfulPaymentRecord.billingPeriod || 'monthly',
+      paymentContext: latestIncident?.paymentContext || successfulPaymentRecord.paymentContext || 'purchase',
+    };
+
+    const syntheticPayment = {
+      id: successfulPaymentRecord.paymentId || successfulPaymentRecord.razorpay_payment_id || `manual_${orderId}`,
+    };
+
+    await finalizeOrderIntent(db, syntheticOrderIntent, syntheticPayment, source);
+    await resolveIncidentsForOrder(db, orderId, source, 'Recovered using successful local payment record', {
+      mode: localOnly ? 'local-only' : 'standard',
+      note,
+      usedLocalPaymentRecord: true,
+      syntheticOrderIntent: true,
+    });
+
+    return {
+      success: true,
+      orderId,
+      paymentId: syntheticPayment.id,
+      activationHealthy: true,
+      usedLocalPaymentRecord: true,
+    };
+  }
+
+  const userId = String(orderIntent?.userId || '');
+  const activePaidSubscription = userId ? await hasActivePaidSubscription(db, userId) : false;
+
+  if (orderIntent?.status === 'completed' && activePaidSubscription) {
+    await resolveIncidentsForOrder(db, orderId, source, 'Order already completed with active subscription', {
+      mode: localOnly ? 'local-only' : 'standard',
+      note,
+    });
+    return { success: true, alreadyCompleted: true, activationHealthy: true };
+  }
+
+  if (successfulPaymentRecord && orderIntent) {
+    const recoveredPaymentId = String(
+      successfulPaymentRecord.paymentId || successfulPaymentRecord.razorpay_payment_id || `local_${orderId}`
+    );
+
+    await finalizeOrderIntent(
+      db,
+      orderIntent,
+      { id: recoveredPaymentId },
+      `${source}:local-payment`
+    );
+    await resolveIncidentsForOrder(db, orderId, source, 'Recovered using existing successful payment record', {
+      mode: localOnly ? 'local-only' : 'standard',
+      note,
+      usedLocalPaymentRecord: true,
+    });
+
+    return {
+      success: true,
+      orderId,
+      paymentId: recoveredPaymentId,
+      activationHealthy: true,
+      usedLocalPaymentRecord: true,
+    };
+  }
+
+  if (localOnly) {
+    await upsertIncident(db, {
+      orderId,
+      userId: orderIntent?.userId,
+      type: 'STALE_PENDING_ORDER',
+      severity: 'medium',
+      message: 'Local-only verification found no successful local payment record for this order',
+      paymentContext: orderIntent?.paymentContext,
+      plan: orderIntent?.plan,
+      billingPeriod: orderIntent?.billingPeriod,
+      source,
+      metadata: {
+        localOnly: true,
+        note,
+      },
+    });
+
+    return {
+      success: false,
+      reason: 'no_local_successful_payment',
+      activationHealthy: activePaidSubscription,
+      localOnly: true,
+    };
   }
 
   const paymentsResponse: any = await razorpay.orders.fetchPayments(orderId);
-  const capturedPayment = (paymentsResponse?.items || []).find((payment: any) => payment.status === 'captured');
+  const capturedPayment = findCapturedLikePayment(paymentsResponse?.items || []);
 
   if (!capturedPayment) {
     await upsertIncident(db, {
       orderId,
-      userId: orderIntent.userId,
+      userId: orderIntent?.userId,
       type: 'STALE_PENDING_ORDER',
       severity: 'medium',
       message: 'Manual retry found no captured payment for this order',
-      paymentContext: orderIntent.paymentContext,
-      plan: orderIntent.plan,
-      billingPeriod: orderIntent.billingPeriod,
+      paymentContext: orderIntent?.paymentContext,
+      plan: orderIntent?.plan,
+      billingPeriod: orderIntent?.billingPeriod,
       source,
     });
-    return { success: false, reason: 'no_captured_payment' };
+    return { success: false, reason: 'no_captured_payment', activationHealthy: activePaidSubscription };
   }
 
   await finalizeOrderIntent(db, orderIntent, capturedPayment, source);
-  await resolveIncidentsForOrder(db, orderId, source, 'Manual retry recovered payment successfully');
+  await resolveIncidentsForOrder(db, orderId, source, 'Manual retry recovered payment successfully', {
+    mode: 'standard',
+    note,
+  });
 
   return {
     success: true,
     paymentId: capturedPayment.id,
     orderId,
+    activationHealthy: true,
   };
 }

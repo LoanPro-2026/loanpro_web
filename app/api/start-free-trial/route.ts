@@ -68,9 +68,9 @@ export async function POST(req: Request) {
     // Generate a secure access token
     const accessToken = crypto.randomBytes(48).toString('hex');
     
-    // Calculate trial expiry (1 month from now)
+    // Calculate trial expiry (6 months from now)
     const trialExpiresAt = new Date();
-    trialExpiresAt.setMonth(trialExpiresAt.getMonth() + 1);
+    trialExpiresAt.setMonth(trialExpiresAt.getMonth() + 6);
 
     // Calculate grace period expiry (15 days after trial ends)
     const gracePeriodExpiresAt = new Date(trialExpiresAt);
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true,
-      message: '1-month Pro trial started successfully!',
+      message: '6-month Pro trial started successfully!',
       trialExpiresAt,
       accessToken,
       redirectUrl: '/download'

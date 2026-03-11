@@ -22,6 +22,14 @@ export const metadata: Metadata = {
   title: "LoanPro - Professional Loan Management Application",
   description: "A comprehensive loan management application for professionals with advanced features and secure authentication.",
   keywords: "loan management, finance, application",
+  icons: {
+    icon: [
+      { url: "/icon", type: "image/png", sizes: "64x64" },
+      { url: "/brand/loanpro-logo.png", type: "image/png" },
+    ],
+    shortcut: "/icon",
+    apple: "/brand/loanpro-logo.png",
+  },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

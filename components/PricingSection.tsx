@@ -2,6 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
 import { CheckIcon } from '@heroicons/react/24/outline';
+import { connectToDatabase } from '@/lib/mongodb';
+import { getEffectivePlanPricing } from '@/lib/planConfig';
 
 const plans = [
   {
@@ -61,7 +63,22 @@ const plans = [
   }
 ];
 
-const PricingSection = () => (
+const PricingSection = async () => {
+  let livePricing: Record<string, number> = {};
+
+  try {
+    const { db } = await connectToDatabase();
+    livePricing = await getEffectivePlanPricing(db);
+  } catch {
+    livePricing = {};
+  }
+
+  const displayPlans = plans.map((plan) => ({
+    ...plan,
+    price: `₹${Number(livePricing[plan.name] || Number(String(plan.price).replace(/[^\d]/g, ''))).toLocaleString('en-IN')}`,
+  }));
+
+  return (
   <section className="py-16 bg-slate-50" id="pricing">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-14">
@@ -85,7 +102,7 @@ const PricingSection = () => (
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan, idx) => (
+        {displayPlans.map((plan, idx) => (
           <div
             key={idx}
             className={`relative rounded-2xl border ${plan.tone} bg-white p-6 shadow-sm ${plan.popular ? 'ring-2 ring-blue-600' : ''}`}
@@ -144,6 +161,7 @@ const PricingSection = () => (
       </div>
     </div>
   </section>
-);
+  );
+};
 
 export default PricingSection; 

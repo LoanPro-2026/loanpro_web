@@ -6,6 +6,8 @@ import clientPromise from '@/lib/mongodb';
 import { POST as processPaymentSuccess } from '@/app/api/payment-success/route';
 import { logger } from '@/lib/logger';
 
+const SUCCESSFUL_PAYMENT_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
+
 function normalizePlanName(plan: string | undefined): 'Basic' | 'Pro' | 'Enterprise' {
   const normalized = (plan || 'Basic').toLowerCase();
   if (normalized === 'pro') return 'Pro';
@@ -85,7 +87,10 @@ export async function POST(req: Request) {
 
     const existingPayment = await db.collection('payments').findOne({
       paymentId: razorpayPaymentId,
-      status: { $in: ['captured', 'processing', 'completed'] },
+      $or: [
+        { status: { $in: ['captured', 'processing', 'completed', 'success', 'successful', 'paid'] } },
+        { status: { $regex: SUCCESSFUL_PAYMENT_STATUS_REGEX } },
+      ],
     });
 
     if (existingPayment) {
