@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
@@ -226,6 +227,19 @@ export async function PATCH(
       }
     }
 
+    const effectiveStartDate = (patch.startDate as Date | null | undefined) ?? existing.startDate ?? null;
+    const effectiveEndDate = (patch.endDate as Date | null | undefined) ?? existing.endDate ?? null;
+    if (effectiveStartDate && effectiveEndDate && effectiveEndDate <= effectiveStartDate) {
+      return json({ success: false, error: 'endDate must be later than startDate' }, 400);
+    }
+
+    if (patch.endDate !== undefined && patch.gracePeriodEndsAt === undefined) {
+      const endDate = patch.endDate as Date | null;
+      patch.gracePeriodEndsAt = endDate
+        ? new Date(endDate.getTime() + 15 * 24 * 60 * 60 * 1000)
+        : null;
+    }
+
     const now = new Date();
     patch.updatedAt = now;
     await db.collection('subscriptions').updateOne({ _id: dbId }, { $set: patch });
@@ -250,6 +264,23 @@ export async function PATCH(
       );
     }
 
+    // Grant a fresh access token when admin sets status to active —
+    // handles re-activations where the old token was previously revoked.
+    let grantedAccessToken: string | null = null;
+    if (['active', 'trial', 'active_subscription'].includes(String(nextStatus).toLowerCase())) {
+      grantedAccessToken = crypto.randomBytes(48).toString('hex');
+      await db.collection('users').updateOne(
+        { userId: nextUserId },
+        {
+          $set: {
+            accessToken: grantedAccessToken,
+            status: 'active',
+            updatedAt: now,
+          },
+        }
+      );
+    }
+
     if (['cancelled', 'expired', 'superseded'].includes(String(nextStatus).toLowerCase())) {
       await revokeUserAccessIfNoActiveSubscription(db, String(nextUserId));
     }
@@ -259,13 +290,13 @@ export async function PATCH(
       action: 'subscriptions.update',
       targetType: 'subscription',
       targetId: subscriptionId,
-      details: patch,
+      details: { ...patch, tokenGranted: Boolean(grantedAccessToken) },
     });
 
     invalidateAdminCacheByTags(['subscriptions', 'users', 'dashboard', 'analytics']);
 
     const updated = await db.collection('subscriptions').findOne({ _id: dbId });
-    return json({ success: true, subscription: updated });
+    return json({ success: true, subscription: updated, accessToken: grantedAccessToken });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update subscription';
     const status = message === 'Invalid subscription ID' ? 400 : getAdminErrorStatus(error);

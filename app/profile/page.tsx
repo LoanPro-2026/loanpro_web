@@ -1239,7 +1239,9 @@ const ProfilePage = () => {
     setDesktopIntentHandled(true);
     setActiveTab(0);
 
-    if (intent === 'update') {
+    if (intent === 'renew') {
+      setRenewModalOpen(true);
+    } else if (intent === 'update') {
       setUpgradeModalOpen(true);
     } else if (intent === 'cancel') {
       void handleCancelRequest();
@@ -1533,7 +1535,7 @@ const ProfilePage = () => {
               </Link>
               
               <p className="text-sm text-slate-500">
-                6-month free trial available - no credit card required
+                1-month free trial available - no credit card required
               </p>
             </div>
 
@@ -1635,7 +1637,7 @@ const ProfilePage = () => {
                       <div className="flex items-start gap-3">
                         <SparklesIcon className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <p className="font-semibold text-blue-900 mb-1">6-Month Pro Trial Active</p>
+                          <p className="font-semibold text-blue-900 mb-1">1-Month Pro Trial Active</p>
                           <p className="text-sm text-blue-800">
                             You're enjoying full Pro features. Upgrade anytime to continue after your trial ends on{' '}
                             {data.subscription.endDate ? new Date(data.subscription.endDate).toLocaleDateString() : 'trial end date'}.

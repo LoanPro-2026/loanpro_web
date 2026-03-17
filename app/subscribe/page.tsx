@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/components/ToastProvider';
 import ProgressBar from '@/components/ProgressBar';
@@ -120,6 +121,22 @@ export default function SubscribePage() {
   }));
   const selectedPlanData = displayPlans.find((p) => p.name === selectedPlan) || displayPlans[1];
 
+  const extensionContactUrl = (() => {
+    const query = new URLSearchParams({
+      inquiryType: 'pricing',
+      source: 'trial_extension_request',
+      message:
+        'I want to request an extension from the default 1-month trial to 6 months. Please review my account for eligibility.',
+    });
+
+    const email = user?.primaryEmailAddress?.emailAddress;
+    const name = user?.fullName;
+    if (email) query.set('email', email);
+    if (name) query.set('name', name);
+
+    return `/support?${query.toString()}`;
+  })();
+
   useEffect(() => {
     let disposed = false;
 
@@ -212,7 +229,7 @@ export default function SubscribePage() {
         throw new Error(data.error || 'Failed to start free trial');
       }
 
-      showToast('6-month Pro trial started successfully!', 'success');
+      showToast('1-month Pro trial started successfully!', 'success');
       setTimeout(() => {
         router.push('/download');
       }, 1200);
@@ -250,7 +267,7 @@ export default function SubscribePage() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
               <h3 className="text-xl font-semibold text-slate-900 mb-3">Start with a free trial</h3>
               <p className="text-slate-600 mb-4">
-                Try the Pro plan for 6 months. No credit card required.
+                Try the Pro plan for 1 month. No credit card required.
               </p>
               <button
                 onClick={handleFreeTrial}
@@ -262,6 +279,10 @@ export default function SubscribePage() {
               </button>
               <p className="text-sm text-slate-500 mt-3">
                 Includes Android photo capture, analytics, and priority support.
+                {' '}
+                <Link href={extensionContactUrl} className="text-blue-600 hover:text-blue-700 font-semibold">
+                  Need more time? Contact us to request extension up to 6 months.
+                </Link>
               </p>
             </div>
 
@@ -433,7 +454,7 @@ export default function SubscribePage() {
                   onClick={handleFreeTrial}
                   className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:border-slate-300 transition-colors font-semibold"
                 >
-                  Start 6-month trial
+                  Start 1-month trial
                 </button>
               </div>
             </div>
@@ -447,15 +468,15 @@ export default function SubscribePage() {
                 All plans include core loan management features. The main differences are cloud storage and device support.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <button className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-2.5 rounded-lg hover:border-slate-300 transition-colors">
+                <Link href={extensionContactUrl} className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-2.5 rounded-lg hover:border-slate-300 transition-colors">
                   Contact sales
-                </button>
+                </Link>
                 <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors">
                   Try free demo
                 </button>
               </div>
               <p className="text-slate-500 text-sm mt-4">
-                6-month free trial available • Secure payment via Razorpay
+                1-month free trial available • Secure payment via Razorpay
               </p>
             </div>
           </div>

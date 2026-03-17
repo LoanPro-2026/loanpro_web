@@ -30,7 +30,7 @@ const faqs = [
   },
   {
     question: 'Is there a free trial available?',
-    answer: 'Yes. We offer a 6-month Pro trial so users can explore the full workflow before any payment. Also free six month trial does not require any kind of payment set-up or credit card details so you can start using immediately. '
+    answer: 'Yes. We offer a 1-month Pro trial so users can explore the workflow without any credit card. If your use case is genuine and needs more evaluation time, contact our team to request a reviewed extension up to 6 months.'
   },
   {
     question: 'How is my Data Secured?',

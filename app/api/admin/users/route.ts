@@ -4,6 +4,11 @@ import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
 import { writeAdminAuditLog } from '@/lib/adminAudit';
 
+interface PasswordSetupState {
+  sent: boolean;
+  message: string | null;
+}
+
 function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -180,6 +185,10 @@ export async function POST(request: Request) {
 
     let effectiveUserId = userId;
     let effectiveUsername = username;
+    const passwordSetup: PasswordSetupState = {
+      sent: false,
+      message: null,
+    };
 
     if (shouldSyncClerk) {
       const clerk = await clerkClient();
@@ -212,6 +221,29 @@ export async function POST(request: Request) {
           if (createdUsername) {
             effectiveUsername = createdUsername;
           }
+        }
+
+        // Best-effort password setup email for users created by admin.
+        // Clerk handles password securely in hosted flows instead of server-set passwords.
+        try {
+          const clerkAny = clerk as any;
+          if (typeof clerkAny?.invitations?.createInvitation === 'function') {
+            await clerkAny.invitations.createInvitation({
+              emailAddress: email,
+              ignoreExisting: true,
+              publicMetadata: {
+                source: 'admin-panel',
+                purpose: 'password-setup',
+              },
+            });
+            passwordSetup.sent = true;
+            passwordSetup.message = 'Password setup email sent via Clerk invitation flow.';
+          } else {
+            passwordSetup.message = 'User created, but Clerk invitation API is unavailable in this runtime.';
+          }
+        } catch (inviteError: any) {
+          const inviteErrorMessage = inviteError?.errors?.[0]?.message || inviteError?.message || 'Unable to send password setup email';
+          passwordSetup.message = `User created, but password setup email could not be sent: ${inviteErrorMessage}`;
         }
       } catch (clerkError: any) {
         const clerkErrorMessage = clerkError?.errors?.[0]?.message || clerkError?.message || 'Clerk sync failed';
@@ -260,13 +292,23 @@ export async function POST(request: Request) {
       action: 'users.create',
       targetType: 'user',
       targetId: result.insertedId.toString(),
-      details: { userId: effectiveUserId, email, clerkSynced: shouldSyncClerk },
+      details: {
+        userId: effectiveUserId,
+        email,
+        clerkSynced: shouldSyncClerk,
+        passwordSetupEmailSent: passwordSetup.sent,
+      },
     });
 
     invalidateAdminCacheByTags(['users', 'dashboard', 'analytics']);
 
     return new Response(
-      JSON.stringify({ success: true, user: { ...doc, _id: result.insertedId } }),
+      JSON.stringify({
+        success: true,
+        user: { ...doc, _id: result.insertedId },
+        passwordSetupEmailSent: passwordSetup.sent,
+        passwordSetupMessage: passwordSetup.message,
+      }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {

@@ -53,10 +53,45 @@ async function hasActivePaidSubscription(db: any, userId: string): Promise<boole
   if (!userId) return false;
   const active = await db.collection('subscriptions').findOne({
     userId,
-    status: 'active',
+    status: { $in: ['active', 'active_subscription'] },
     plan: { $ne: 'trial' },
   });
   return Boolean(active);
+}
+
+async function ensureRecoverableOrderIntent(db: any, orderIntent: any, capturedPayment: any, source: string) {
+  const now = new Date();
+  const paymentAmount = Number(capturedPayment?.amount || orderIntent?.amount || 0);
+  const couponCode = typeof orderIntent?.couponCode === 'string' && orderIntent.couponCode.trim().length > 0
+    ? orderIntent.couponCode.trim().toUpperCase()
+    : null;
+
+  await db.collection('order_intents').updateOne(
+    { orderId: orderIntent.orderId },
+    {
+      $set: {
+        userId: orderIntent.userId,
+        plan: orderIntent.plan || 'Basic',
+        billingPeriod: orderIntent.billingPeriod || 'monthly',
+        paymentContext: orderIntent.paymentContext || 'new',
+        couponCode,
+        coupon: orderIntent.coupon || null,
+        baseAmount: Number(orderIntent?.baseAmount || paymentAmount),
+        discountAmount: Number(orderIntent?.discountAmount || 0),
+        amount: Number(orderIntent?.amount || paymentAmount),
+        status: orderIntent.status === 'completed' ? 'completed' : 'pending',
+        expiresAt: orderIntent.expiresAt ? new Date(orderIntent.expiresAt) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+        reminderSent: Boolean(orderIntent?.reminderSent),
+        updatedAt: now,
+        recoveredBy: source,
+      },
+      $setOnInsert: {
+        orderId: orderIntent.orderId,
+        createdAt: orderIntent.createdAt ? new Date(orderIntent.createdAt) : now,
+      },
+    },
+    { upsert: true }
+  );
 }
 
 const razorpay = new Razorpay({
@@ -246,6 +281,8 @@ async function finalizeOrderIntent(db: any, orderIntent: any, capturedPayment: a
   if (!paymentId) {
     throw new Error('Captured payment id is missing');
   }
+
+  await ensureRecoverableOrderIntent(db, orderIntent, capturedPayment, source);
 
   const user = await db.collection('users').findOne({ userId });
 

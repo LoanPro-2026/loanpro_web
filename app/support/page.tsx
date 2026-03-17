@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type InquiryType =
   | 'sales'
@@ -20,6 +21,7 @@ const inquiryOptions: Array<{ value: InquiryType; label: string }> = [
 ];
 
 export default function SupportPage() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,6 +39,25 @@ export default function SupportPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [requestId, setRequestId] = useState('');
   const messageLength = formData.message.trim().length;
+
+  useEffect(() => {
+    const inquiryType = searchParams.get('inquiryType') as InquiryType | null;
+    const email = searchParams.get('email') || '';
+    const name = searchParams.get('name') || '';
+    const phone = searchParams.get('phone') || '';
+    const organization = searchParams.get('organization') || '';
+    const message = searchParams.get('message') || '';
+
+    setFormData((prev) => ({
+      ...prev,
+      inquiryType: inquiryType && inquiryOptions.some((opt) => opt.value === inquiryType) ? inquiryType : prev.inquiryType,
+      email: email || prev.email,
+      name: name || prev.name,
+      phone: phone || prev.phone,
+      organization: organization || prev.organization,
+      message: message || prev.message,
+    }));
+  }, [searchParams]);
 
   const isSubmitDisabled = useMemo(() => {
     return (

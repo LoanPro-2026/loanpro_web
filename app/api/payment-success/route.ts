@@ -12,6 +12,7 @@ import emailService from '@/services/emailService';
 import { getRazorpayClient } from '@/lib/razorpayClient';
 
 const SUCCESSFUL_PAYMENT_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
+const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trial', 'active_subscription'];
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -143,16 +144,7 @@ export async function POST(req: Request) {
     }
 
     // Handle payment success
-    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, userId, email, fullName, username, plan, billingPeriod = 'monthly', isUpgrade = false, isRenewal = false } = normalizedBody;
-
-    logger.info('Processing payment', 'PAYMENT_SUCCESS', { 
-      userId, 
-      username, 
-      plan, 
-      billingPeriod, 
-      isUpgrade, 
-      isRenewal 
-    });
+    const { razorpay_payment_id, razorpay_order_id, email, fullName, username } = normalizedBody;
 
     // IDEMPOTENCY: Check if payment already processed
     const db = (await clientPromise).db('AdminDB');
@@ -161,9 +153,40 @@ export async function POST(req: Request) {
     const orderIntent = await db.collection('order_intents').findOne({
       orderId: razorpay_order_id
     });
+
+    if (!orderIntent?.userId) {
+      logger.warn('Order intent missing or invalid during payment finalization', 'PAYMENT_SUCCESS', {
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+      });
+      return errorResponse({
+        code: 'ORDER_INTENT_NOT_FOUND',
+        message: 'Order intent not found for this payment',
+        statusCode: 409,
+      });
+    }
+
+    const resolvedUserId = String(orderIntent.userId).trim();
+    const resolvedPlan = typeof orderIntent.plan === 'string' && orderIntent.plan.length > 0
+      ? orderIntent.plan.charAt(0).toUpperCase() + orderIntent.plan.slice(1).toLowerCase()
+      : 'Basic';
+    const resolvedBillingPeriod = orderIntent.billingPeriod === 'annually' ? 'annually' : 'monthly';
+    const resolvedPaymentContext = typeof orderIntent.paymentContext === 'string'
+      ? orderIntent.paymentContext.toLowerCase()
+      : 'new';
+    const resolvedIsUpgrade = resolvedPaymentContext === 'upgrade';
+    const resolvedIsRenewal = resolvedPaymentContext === 'renewal';
+    const userRecord = await db.collection('users').findOne(
+      { userId: resolvedUserId },
+      { projection: { email: 1, fullName: 1, username: 1 } }
+    );
+    const resolvedEmail = userRecord?.email || email || '';
+    const resolvedFullName = userRecord?.fullName || fullName || '';
+    const resolvedUsername = userRecord?.username || username || (resolvedEmail ? resolvedEmail.split('@')[0] : resolvedUserId);
     const orderCoupon = orderIntent?.coupon && typeof orderIntent.coupon === 'object'
       ? orderIntent.coupon
       : null;
+    const resolvedCouponCode = orderCoupon?.code || (typeof orderIntent?.couponCode === 'string' ? orderIntent.couponCode.toUpperCase() : null);
     const baseAmountRupees = Math.round(Number(orderIntent?.baseAmount || orderIntent?.amount || 0) / 100);
     const discountAmountRupees = Math.round(Number(orderIntent?.discountAmount || 0) / 100);
     
@@ -174,10 +197,18 @@ export async function POST(req: Request) {
       amount: paymentAmount,
       amountInRupees: paymentAmount / 100
     });
+
+    logger.info('Processing payment', 'PAYMENT_SUCCESS', {
+      userId: resolvedUserId,
+      username: resolvedUsername,
+      plan: resolvedPlan,
+      billingPeriod: resolvedBillingPeriod,
+      isUpgrade: resolvedIsUpgrade,
+      isRenewal: resolvedIsRenewal
+    });
     
     const existingPayment = await db.collection('payments').findOne({
       paymentId: razorpay_payment_id,
-      userId,
       $or: [
         { status: { $in: ['captured', 'processing', 'completed', 'success', 'successful', 'paid'] } },
         { status: { $regex: SUCCESSFUL_PAYMENT_STATUS_REGEX } },
@@ -187,13 +218,13 @@ export async function POST(req: Request) {
     if (existingPayment) {
       logger.warn('Duplicate payment attempt', 'PAYMENT_SUCCESS', { 
         paymentId: razorpay_payment_id, 
-        userId 
+        userId: existingPayment.userId || resolvedUserId
       });
       
       // Return existing subscription
       const subscription = await db.collection('subscriptions').findOne({ 
-        userId, 
-        status: 'active' 
+        userId: existingPayment.userId || resolvedUserId,
+        status: { $in: ['active', 'active_subscription'] }
       });
       
       return successResponse({
@@ -260,12 +291,12 @@ export async function POST(req: Request) {
     }
 
     // Normalize plan name and set features
-    let subscriptionPlan = plan;
+    let subscriptionPlan = resolvedPlan;
     let features = {};
     let maxDevices = 1;
     let cloudStorageLimit = 0;
     
-    switch(plan) {
+    switch(resolvedPlan) {
       case 'Basic':
         features = {
           biometrics: false,
@@ -330,7 +361,7 @@ export async function POST(req: Request) {
 
     // Calculate subscription expiry based on billing period
     const subscriptionExpiresAt = new Date();
-    if (billingPeriod === 'annually') {
+    if (resolvedBillingPeriod === 'annually') {
       // Annual subscription - add 1 year
       subscriptionExpiresAt.setFullYear(subscriptionExpiresAt.getFullYear() + 1);
     } else {
@@ -339,8 +370,8 @@ export async function POST(req: Request) {
     }
 
     logger.info('Subscription expiry calculated', 'PAYMENT_SUCCESS', {
-      plan,
-      billingPeriod,
+      plan: resolvedPlan,
+      billingPeriod: resolvedBillingPeriod,
       startDate: new Date().toISOString(),
       expiryDate: subscriptionExpiresAt.toISOString()
     });
@@ -350,14 +381,14 @@ export async function POST(req: Request) {
       'monthly': 'monthly',
       'annually': 'yearly'
     };
-    const subscriptionType = subscriptionTypeMap[billingPeriod] || 'monthly';
+    const subscriptionType = subscriptionTypeMap[resolvedBillingPeriod] || 'monthly';
 
     // Calculate grace period expiry (15 days after subscription ends)
     const gracePeriodExpiresAt = new Date(subscriptionExpiresAt);
     gracePeriodExpiresAt.setDate(gracePeriodExpiresAt.getDate() + 15);
 
     // Generate username from email
-    const generatedUsername = email?.split('@')[0].replace(/\./g, '') || '';
+    const generatedUsername = String(resolvedUsername || resolvedEmail.split('@')[0] || resolvedUserId).replace(/\./g, '');
 
     // IMPORTANT: Use MongoDB transaction for atomic operations
     const client = await clientPromise;
@@ -374,8 +405,8 @@ export async function POST(req: Request) {
         // Don't supersede trials when purchasing first paid subscription
         const existingSubscriptions = await db.collection('subscriptions').find(
           {
-            userId,
-            status: { $in: ['active', 'trial'] },
+            userId: resolvedUserId,
+            status: { $in: ACTIVE_SUBSCRIPTION_STATUSES },
             plan: { $ne: 'trial' } // Only supersede paid plans, not trial
           },
           { session }
@@ -383,7 +414,7 @@ export async function POST(req: Request) {
 
         if (existingSubscriptions.length > 0) {
           logger.info('Superseding existing paid subscriptions', 'PAYMENT_SUCCESS', { 
-            userId, 
+            userId: resolvedUserId,
             count: existingSubscriptions.length,
             plans: existingSubscriptions.map(s => s.plan)
           });
@@ -391,8 +422,8 @@ export async function POST(req: Request) {
           // Supersede only paid subscriptions (not trials)
           await db.collection('subscriptions').updateMany(
             { 
-              userId, 
-              status: { $in: ['active', 'trial'] },
+              userId: resolvedUserId,
+              status: { $in: ACTIVE_SUBSCRIPTION_STATUSES },
               plan: { $ne: 'trial' }
             },
             {
@@ -407,12 +438,12 @@ export async function POST(req: Request) {
         } else {
           // If no paid subscriptions, mark trial as completed if exists
           const trialSubscription = await db.collection('subscriptions').findOne(
-            { userId, status: 'trial', plan: 'trial' },
+            { userId: resolvedUserId, status: 'trial', plan: 'trial' },
             { session }
           );
           
           if (trialSubscription) {
-            logger.info('Converting trial to paid subscription', 'PAYMENT_SUCCESS', { userId });
+            logger.info('Converting trial to paid subscription', 'PAYMENT_SUCCESS', { userId: resolvedUserId });
             await db.collection('subscriptions').updateOne(
               { _id: trialSubscription._id },
               {
@@ -430,7 +461,7 @@ export async function POST(req: Request) {
         // Create subscription in MongoDB (within transaction)
         const subscriptionService = new SubscriptionService();
         subscription = await subscriptionService.createSubscription({
-          userId,
+          userId: resolvedUserId,
           username: generatedUsername,
           subscriptionType: subscriptionType, // Use mapped subscription type
           paymentId: razorpay_payment_id,
@@ -439,20 +470,25 @@ export async function POST(req: Request) {
 
         // Upsert user in users collection
         // Generate a secure access token ONLY when subscription is created (not on signup)
-        const accessToken = crypto.randomBytes(48).toString('hex');
+        const freshAccessToken = crypto.randomBytes(48).toString('hex');
+        const userUpdate: Record<string, unknown> = {
+          userId: resolvedUserId,
+          lastSubscribedAt: new Date()
+        };
+        if (resolvedEmail) {
+          userUpdate.email = resolvedEmail;
+        }
+        if (resolvedFullName) {
+          userUpdate.fullName = resolvedFullName;
+        }
         await db.collection('users').updateOne(
-          { userId },
+          { userId: resolvedUserId },
           {
-            $set: {
-              userId,
-              email: email,
-              fullName: fullName,
-              accessToken, // Generate token on PAYMENT, not signup
-              lastSubscribedAt: new Date()
-            },
+            $set: userUpdate,
             $setOnInsert: {
                 username: generatedUsername,
                 createdAt: new Date(),
+                accessToken: freshAccessToken,
                 devices: [],
                 dataUsage: 0
               }
@@ -463,7 +499,7 @@ export async function POST(req: Request) {
         // Update subscription record with plan details (single source of truth for subscription data)
         const subscriptionUpdate: any = {
           plan: subscriptionPlan,
-          billingPeriod,
+          billingPeriod: resolvedBillingPeriod,
           status: 'active',
           endDate: subscriptionExpiresAt,
           gracePeriodEndsAt: gracePeriodExpiresAt,
@@ -471,9 +507,9 @@ export async function POST(req: Request) {
         };
 
         // If this is an upgrade, preserve the original start date and update end date
-        if (isUpgrade) {
+        if (resolvedIsUpgrade) {
           const existingSubscription = await db.collection('subscriptions').findOne(
-            { userId, status: 'superseded' },
+            { userId: resolvedUserId, status: 'superseded' },
             { sort: { supersededDate: -1 }, session }
           );
           if (existingSubscription) {
@@ -481,13 +517,13 @@ export async function POST(req: Request) {
             subscriptionUpdate.startDate = existingSubscription.startDate;
             // The expiry date calculation should already account for remaining days from upgrade calculation
           }
-          subscriptionUpdate.plan = plan; // Update plan field
+          subscriptionUpdate.plan = resolvedPlan; // Update plan field
           subscriptionUpdate.isUpgraded = true;
           subscriptionUpdate.upgradedDate = new Date();
-        } else if (isRenewal) {
+        } else if (resolvedIsRenewal) {
           // For renewals, extend the subscription from current end date or now (whichever is later)
           const existingSubscription = await db.collection('subscriptions').findOne(
-            { userId, status: 'superseded' },
+            { userId: resolvedUserId, status: 'superseded' },
             { sort: { supersededDate: -1 }, session }
           );
           if (existingSubscription) {
@@ -500,7 +536,7 @@ export async function POST(req: Request) {
             
             // Calculate new expiry date based on billing period
             const newExpiryDate = new Date(renewalStartDate);
-            if (billingPeriod === 'annually') {
+            if (resolvedBillingPeriod === 'annually') {
               newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
             } else {
               newExpiryDate.setDate(newExpiryDate.getDate() + 30);
@@ -518,7 +554,7 @@ export async function POST(req: Request) {
         }
 
         await db.collection('subscriptions').updateOne(
-          { userId, _id: subscription._id },
+          { userId: resolvedUserId, _id: subscription._id },
           { $set: subscriptionUpdate },
           { session }
             );
@@ -527,20 +563,20 @@ export async function POST(req: Request) {
         const paymentRecord = {
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
-      userId,
+      userId: resolvedUserId,
       subscriptionId: subscription._id.toString(),
       plan: subscriptionPlan,
-      billingPeriod,
+      billingPeriod: resolvedBillingPeriod,
       amount: Math.round(paymentAmount / 100), // Convert paise to rupees for storage and refund calculations
       baseAmount: baseAmountRupees,
       discountAmount: discountAmountRupees,
-      couponCode: orderCoupon?.code || null,
+      couponCode: resolvedCouponCode,
       coupon: orderCoupon,
       currency: 'INR',
       status: 'captured',
       paymentMethod: 'razorpay',
-      isUpgrade,
-      isRenewal,
+      isUpgrade: resolvedIsUpgrade,
+      isRenewal: resolvedIsRenewal,
       receiptUrl: razorpay_payment_id ? `https://dashboard.razorpay.com/payments/${razorpay_payment_id}` : undefined,
           createdAt: new Date(),
           capturedAt: new Date()
@@ -548,9 +584,9 @@ export async function POST(req: Request) {
         
         await db.collection('payments').insertOne(paymentRecord, { session });
 
-                if (orderCoupon?.code) {
+                if (resolvedCouponCode) {
                   await db.collection('coupons').updateOne(
-                    { code: String(orderCoupon.code).toUpperCase() },
+                    { code: resolvedCouponCode },
                     {
                       $inc: { usedCount: 1 },
                       $set: { updatedAt: new Date(), lastUsedAt: new Date() },
@@ -567,7 +603,7 @@ export async function POST(req: Request) {
                       status: 'completed',
                       completedAt: new Date(),
                       paymentId: razorpay_payment_id,
-                      couponCode: orderCoupon?.code || null,
+                      couponCode: resolvedCouponCode,
                       coupon: orderCoupon,
                     },
                   },
@@ -575,7 +611,7 @@ export async function POST(req: Request) {
         );
       }); // End transaction
 
-      logger.info('Transaction completed successfully', 'PAYMENT_SUCCESS', { userId });
+      logger.info('Transaction completed successfully', 'PAYMENT_SUCCESS', { userId: resolvedUserId });
     } catch (transactionError) {
       logger.error('Transaction failed, rolled back', transactionError as Error, 'PAYMENT_SUCCESS');
       throw transactionError;
@@ -598,21 +634,22 @@ export async function POST(req: Request) {
 
     try {
       const userRecord = await db.collection('users').findOne(
-        { userId },
+        { userId: resolvedUserId },
         { projection: { email: 1, username: 1, fullName: 1 } }
       );
-      const resolvedEmail = userRecord?.email || email || '';
+      const finalResolvedEmail = userRecord?.email || resolvedEmail || '';
       const resolvedName =
         userRecord?.fullName ||
         userRecord?.username ||
-        (resolvedEmail ? resolvedEmail.split('@')[0] : 'Customer');
+        resolvedFullName ||
+        (finalResolvedEmail ? finalResolvedEmail.split('@')[0] : 'Customer');
 
-      if (resolvedEmail && resolvedEmail.includes('@')) {
+      if (finalResolvedEmail && finalResolvedEmail.includes('@')) {
         const emailData = {
           userName: resolvedName,
-          userEmail: resolvedEmail,
+          userEmail: finalResolvedEmail,
           plan: String(subscriptionPlan || 'basic'),
-          billingPeriod,
+          billingPeriod: resolvedBillingPeriod,
           amount: Math.round(paymentAmount / 100),
           orderId: razorpay_order_id,
           paymentId: razorpay_payment_id,
@@ -622,27 +659,27 @@ export async function POST(req: Request) {
           endDate: subscriptionExpiresAt
         };
 
-        const sendEmail = isUpgrade
+        const sendEmail = resolvedIsUpgrade
           ? emailService.sendSubscriptionUpgradeEmail(emailData)
-          : isRenewal
+          : resolvedIsRenewal
           ? emailService.sendSubscriptionRenewalEmail(emailData)
           : emailService.sendSubscriptionPurchaseEmail(emailData);
 
         Promise.resolve(sendEmail).catch(err => {
           logger.warn('Subscription email failed', 'PAYMENT_SUCCESS', {
-            userId,
+            userId: resolvedUserId,
             error: err instanceof Error ? err.message : 'unknown'
           });
         });
       } else {
         logger.warn('No valid email address for subscription email', 'PAYMENT_SUCCESS', {
-          userId,
-          resolvedEmail
+          userId: resolvedUserId,
+          resolvedEmail: finalResolvedEmail
         });
       }
     } catch (emailError) {
       logger.warn('Failed to prepare subscription email', 'PAYMENT_SUCCESS', {
-        userId,
+        userId: resolvedUserId,
         error: emailError instanceof Error ? emailError.message : 'unknown'
       });
     }
@@ -652,7 +689,7 @@ export async function POST(req: Request) {
       subscription: {
         id: subscription._id,
         plan: subscriptionPlan,
-        billingPeriod,
+        billingPeriod: resolvedBillingPeriod,
         expiresAt: subscriptionExpiresAt,
         features,
         maxDevices,

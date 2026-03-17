@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { connectToDatabase } from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, invalidateAdminCacheByTags, setAdminCachedResponse } from '@/lib/adminResponseCache';
@@ -5,10 +6,12 @@ import { writeAdminAuditLog } from '@/lib/adminAudit';
 import { getEffectivePlanPricing } from '@/lib/planConfig';
 import { getCouponQuote } from '@/lib/couponUtils';
 import { calculatePlanAmountRupees, type PaidPlanName } from '@/lib/pricing';
+import emailService from '@/services/emailService';
 
 const ALLOWED_PLANS = ['basic', 'pro', 'enterprise', 'trial'];
 const ALLOWED_BILLING_PERIODS = ['monthly', 'annually'];
 const ALLOWED_STATUSES = ['active', 'trial', 'cancelled', 'expired', 'superseded', 'active_subscription'];
+const DEFAULT_TRIAL_MONTHS = 1;
 
 function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -178,11 +181,18 @@ export async function POST(request: Request) {
       ? endDate
       : (() => {
           const date = new Date(startDate);
-          if (normalizedPlan === 'trial') date.setMonth(date.getMonth() + 6);
+          if (normalizedPlan === 'trial') date.setMonth(date.getMonth() + DEFAULT_TRIAL_MONTHS);
           else if (billingPeriod === 'annually') date.setFullYear(date.getFullYear() + 1);
           else date.setMonth(date.getMonth() + 1);
           return date;
         })();
+
+    if (computedEndDate <= startDate) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'endDate must be later than startDate' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { db } = await connectToDatabase();
     const user = await db.collection('users').findOne({ userId });
@@ -258,6 +268,23 @@ export async function POST(request: Request) {
 
     const result = await db.collection('subscriptions').insertOne(subscription);
 
+    // Grant a fresh access token so the user can immediately authenticate
+    // to the desktop app without any extra step.
+    let grantedAccessToken: string | null = null;
+    if (['active', 'trial', 'active_subscription'].includes(rawStatus)) {
+      grantedAccessToken = crypto.randomBytes(48).toString('hex');
+      await db.collection('users').updateOne(
+        { userId },
+        {
+          $set: {
+            accessToken: grantedAccessToken,
+            status: 'active',
+            updatedAt: now,
+          },
+        }
+      );
+    }
+
     await writeAdminAuditLog({
       actorEmail: admin.email,
       action: 'subscriptions.create',
@@ -271,13 +298,49 @@ export async function POST(request: Request) {
         couponCode: subscription.couponCode,
         amount: subscription.amount,
         replaceExistingActive,
+        tokenGranted: Boolean(grantedAccessToken),
       },
     });
+
+    // Best-effort confirmation email so admin-created subscriptions mirror website UX.
+    // Do not fail subscription creation if email provider is unavailable.
+    if (['active', 'trial', 'active_subscription'].includes(rawStatus)) {
+      try {
+        const resolvedEmail = normalizeText(user.email);
+        if (resolvedEmail && resolvedEmail.includes('@')) {
+          const resolvedName =
+            normalizeText(user.fullName) ||
+            normalizeText(user.username) ||
+            resolvedEmail.split('@')[0] ||
+            'Customer';
+
+          await emailService.sendSubscriptionPurchaseEmail({
+            userName: resolvedName,
+            userEmail: resolvedEmail,
+            plan: subscription.plan,
+            billingPeriod: billingPeriod as 'monthly' | 'annually',
+            amount: subscription.amount,
+            orderId: `ADMIN-${result.insertedId.toString()}`,
+            paymentId: subscription.paymentId || undefined,
+            endDate: computedEndDate,
+          });
+        }
+      } catch (emailError) {
+        console.warn('Subscription created but confirmation email failed', {
+          userId,
+          error: emailError instanceof Error ? emailError.message : 'unknown',
+        });
+      }
+    }
 
     invalidateAdminCacheByTags(['subscriptions', 'users', 'dashboard', 'analytics']);
 
     return new Response(
-      JSON.stringify({ success: true, subscription: { ...subscription, _id: result.insertedId } }),
+      JSON.stringify({
+        success: true,
+        subscription: { ...subscription, _id: result.insertedId },
+        accessToken: grantedAccessToken,
+      }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {

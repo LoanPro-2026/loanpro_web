@@ -56,6 +56,21 @@ export async function ensureDbIndexes(db: Db) {
       ]),
     ]);
 
+    try {
+      await db.collection('subscriptions').createIndex(
+        { userId: 1, status: 1 },
+        {
+          name: 'idx_subscriptions_single_active_per_user_legacy',
+          unique: true,
+          partialFilterExpression: { status: { $in: ['active', 'trial', 'active_subscription'] } },
+        }
+      );
+    } catch (legacyIndexError) {
+      logger.warn('Skipped legacy active subscription uniqueness index', 'DB_INDEXES', {
+        error: legacyIndexError instanceof Error ? legacyIndexError.message : String(legacyIndexError),
+      });
+    }
+
     logger.debug('MongoDB indexes ensured', 'DB_INDEXES');
   } catch (error) {
     logger.error('Failed ensuring MongoDB indexes', error, 'DB_INDEXES');

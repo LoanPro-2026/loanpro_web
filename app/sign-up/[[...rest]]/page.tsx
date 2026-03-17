@@ -38,7 +38,7 @@ export default function SignUpPage() {
             Create your LoanPro account
           </h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-2">
-            Start with a 6-month Pro trial and set up your team in minutes.
+            Start with a 1-month Pro trial and set up your team in minutes.
           </p>
           <p className="text-slate-500 text-sm">No credit card required to start</p>
         </div>

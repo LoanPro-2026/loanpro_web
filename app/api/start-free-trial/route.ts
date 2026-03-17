@@ -4,6 +4,19 @@ import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
 import crypto from 'crypto';
 
+const TRIAL_DURATION_MONTHS = 1;
+
+function buildTrialExtensionContactUrl(email: string): string {
+  const query = new URLSearchParams({
+    inquiryType: 'pricing',
+    email,
+    message:
+      'I have started the 1-month LoanPro trial and would like to request an extension to 6 months. Please review my account for eligibility.',
+    source: 'trial_extension_request',
+  });
+  return `/support?${query.toString()}`;
+}
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
@@ -34,6 +47,7 @@ export async function POST(req: Request) {
         {
           error: `You already have an active ${activeKind}`,
           expiresAt: activeSubscription.endDate,
+          extensionContactUrl: buildTrialExtensionContactUrl(String(existingUser?.email || email || '')),
         },
         { status: 400 }
       );
@@ -44,10 +58,12 @@ export async function POST(req: Request) {
       // Check if currently has active trial/subscription
       // IMPORTANT: Check if user has used trial before (historical check)
       if (existingUser.hasUsedTrial === true || existingUser.trialStartedAt) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Trial period can only be used once per account',
-          message: 'You have already used your free trial. Please subscribe to continue using the service.',
-          previousTrialDate: existingUser.trialStartedAt
+          message:
+            'You have already used your free trial. For genuine conversion evaluation, contact us to request a reviewed extension up to 6 months.',
+          previousTrialDate: existingUser.trialStartedAt,
+          extensionContactUrl: buildTrialExtensionContactUrl(String(existingUser?.email || email || '')),
         }, { status: 403 });
       }
     }
@@ -68,9 +84,9 @@ export async function POST(req: Request) {
     // Generate a secure access token
     const accessToken = crypto.randomBytes(48).toString('hex');
     
-    // Calculate trial expiry (6 months from now)
+    // Calculate trial expiry (1 month from now)
     const trialExpiresAt = new Date();
-    trialExpiresAt.setMonth(trialExpiresAt.getMonth() + 6);
+    trialExpiresAt.setMonth(trialExpiresAt.getMonth() + TRIAL_DURATION_MONTHS);
 
     // Calculate grace period expiry (15 days after trial ends)
     const gracePeriodExpiresAt = new Date(trialExpiresAt);
@@ -115,10 +131,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true,
-      message: '6-month Pro trial started successfully!',
+      message: '1-month Pro trial started successfully!',
       trialExpiresAt,
       accessToken,
-      redirectUrl: '/download'
+      redirectUrl: '/download',
+      extensionNote:
+        'Need more time? Contact us and we can review eligible accounts for extension up to 6 months.',
+      extensionContactUrl: buildTrialExtensionContactUrl(resolvedEmail),
     });
 
   } catch (error) {

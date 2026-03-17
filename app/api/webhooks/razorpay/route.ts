@@ -26,6 +26,16 @@ function safeCompareSignature(actual: string, expected: string): boolean {
   return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
 }
 
+function normalizeBillingPeriod(input: string | undefined): 'monthly' | 'annually' {
+  return input === 'annually' ? 'annually' : 'monthly';
+}
+
+function normalizePaymentContext(input: string | undefined): 'new' | 'upgrade' | 'renewal' {
+  if (input === 'upgrade') return 'upgrade';
+  if (input === 'renewal') return 'renewal';
+  return 'new';
+}
+
 export async function POST(req: Request) {
   const startTime = Date.now();
 
@@ -108,16 +118,59 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, alreadyProcessed: true }, { status: 200 });
     }
 
-    const orderIntent = await db.collection('order_intents').findOne({ orderId: razorpayOrderId });
+    let orderIntent = await db.collection('order_intents').findOne({ orderId: razorpayOrderId });
+    const webhookNotes = paymentEntity?.notes || orderEntity?.notes || {};
+
     if (!orderIntent) {
-      logger.warn('No order intent found for webhook order', 'RAZORPAY_WEBHOOK', {
-        orderId: razorpayOrderId,
-        paymentId: razorpayPaymentId,
-      });
-      return NextResponse.json({ success: true, queued: false, reason: 'order_intent_missing' }, { status: 202 });
+      const syntheticUserId = String(webhookNotes?.userId || '').trim();
+      if (!syntheticUserId) {
+        logger.warn('No order intent found and webhook notes missing userId', 'RAZORPAY_WEBHOOK', {
+          orderId: razorpayOrderId,
+          paymentId: razorpayPaymentId,
+        });
+        return NextResponse.json({ success: false, error: 'Unable to determine user for order' }, { status: 400 });
+      }
+
+      const now = new Date();
+      const syntheticPlan = normalizePlanName(webhookNotes?.plan as string | undefined);
+      const syntheticBillingPeriod = normalizeBillingPeriod(webhookNotes?.billingPeriod as string | undefined);
+      const syntheticPaymentContext = normalizePaymentContext((webhookNotes?.paymentContext || webhookNotes?.type) as string | undefined);
+      const syntheticAmount = Number(orderEntity?.amount || paymentEntity?.amount || 0);
+      const syntheticCouponCode = typeof webhookNotes?.couponCode === 'string' && webhookNotes.couponCode.trim().length > 0
+        ? webhookNotes.couponCode.trim().toUpperCase()
+        : null;
+
+      await db.collection('order_intents').updateOne(
+        { orderId: razorpayOrderId },
+        {
+          $set: {
+            userId: syntheticUserId,
+            plan: syntheticPlan,
+            billingPeriod: syntheticBillingPeriod,
+            paymentContext: syntheticPaymentContext,
+            couponCode: syntheticCouponCode,
+            coupon: null,
+            baseAmount: syntheticAmount,
+            discountAmount: 0,
+            amount: syntheticAmount,
+            status: 'pending',
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            reminderSent: false,
+            updatedAt: now,
+            recoveredBy: 'razorpay-webhook-synthetic-intent',
+          },
+          $setOnInsert: {
+            orderId: razorpayOrderId,
+            createdAt: now,
+          },
+        },
+        { upsert: true }
+      );
+
+      orderIntent = await db.collection('order_intents').findOne({ orderId: razorpayOrderId });
     }
 
-    const userId = (orderIntent.userId || paymentEntity?.notes?.userId) as string | undefined;
+    const userId = (orderIntent?.userId || webhookNotes?.userId) as string | undefined;
     if (!userId) {
       logger.warn('No userId found for webhook order', 'RAZORPAY_WEBHOOK', {
         orderId: razorpayOrderId,
@@ -128,9 +181,9 @@ export async function POST(req: Request) {
 
     const user = await db.collection('users').findOne({ userId });
 
-    const plan = normalizePlanName((orderIntent.plan || paymentEntity?.notes?.plan) as string | undefined);
-    const billingPeriod = (orderIntent.billingPeriod || paymentEntity?.notes?.billingPeriod || 'monthly') as 'monthly' | 'annually';
-    const paymentContext = (orderIntent.paymentContext || paymentEntity?.notes?.paymentContext || paymentEntity?.notes?.type || 'new') as string;
+    const plan = normalizePlanName((orderIntent?.plan || webhookNotes?.plan) as string | undefined);
+    const billingPeriod = normalizeBillingPeriod((orderIntent?.billingPeriod || webhookNotes?.billingPeriod) as string | undefined);
+    const paymentContext = normalizePaymentContext((orderIntent?.paymentContext || webhookNotes?.paymentContext || webhookNotes?.type) as string | undefined);
 
     const requestBody = {
       razorpay_payment_id: razorpayPaymentId,
