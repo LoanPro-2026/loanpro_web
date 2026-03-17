@@ -649,7 +649,7 @@ export async function POST(req: Request) {
           userName: resolvedName,
           userEmail: finalResolvedEmail,
           plan: String(subscriptionPlan || 'basic'),
-          billingPeriod: resolvedBillingPeriod,
+          billingPeriod: resolvedBillingPeriod as 'monthly' | 'annually',
           amount: Math.round(paymentAmount / 100),
           orderId: razorpay_order_id,
           paymentId: razorpay_payment_id,
