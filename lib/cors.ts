@@ -5,9 +5,6 @@
 
 // Allowed origins for CORS - update based on your deployment
 const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://127.0.0.1:3000',
   'https://www.loanpro.tech',
   'https://loanpro.tech',
 ];

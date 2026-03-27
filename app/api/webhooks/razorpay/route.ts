@@ -7,6 +7,7 @@ import { POST as processPaymentSuccess } from '@/app/api/payment-success/route';
 import { logger } from '@/lib/logger';
 
 const SUCCESSFUL_PAYMENT_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
+const INTERNAL_PAYMENT_SUCCESS_URL = 'https://loanpro.tech/api/payment-success';
 
 function normalizePlanName(plan: string | undefined): 'Basic' | 'Pro' | 'Enterprise' {
   const normalized = (plan || 'Basic').toLowerCase();
@@ -197,7 +198,7 @@ export async function POST(req: Request) {
       isRenewal: paymentContext === 'renewal',
     };
 
-    const internalRequest = new Request('http://localhost/api/payment-success', {
+    const internalRequest = new Request(INTERNAL_PAYMENT_SUCCESS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),

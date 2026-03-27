@@ -8,19 +8,19 @@ import {
 const requirements = [
   {
     title: 'Windows Operating System',
-    description: 'Windows 10 or later for optimal stability and updates.',
+    description: 'Windows 10 or later (64-bit) is required for installer compatibility, stable updates, and reliable runtime performance.',
     icon: ComputerDesktopIcon,
     required: true
   },
   {
     title: 'Android Phone With Camera',
-    description: 'Required for mobile photo capture so shop owners can add and verify customer photos from their own phone.',
+    description: 'Required if your process uses companion capture for customer photo verification in loan creation and closure workflows.',
     icon: DevicePhoneMobileIcon,
     required: true
   },
   {
     title: 'Internet Connection',
-    description: 'Needed for cloud backup, license checks, and updates.',
+    description: 'Needed for subscription checks, release updates, support diagnostics, and cloud backup on eligible plans.',
     icon: CloudIcon,
     required: true
   }
@@ -35,10 +35,10 @@ const RequirementsSection = () => {
             Requirements
           </div>
           <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-            System requirements
+            Pre-install checklist
           </h2>
           <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-            A simple checklist to ensure the desktop app runs smoothly.
+            Verify these prerequisites before rollout to avoid onboarding interruptions.
           </p>
         </div>
 

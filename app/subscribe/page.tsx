@@ -16,7 +16,6 @@ interface SubscriptionPlan {
   limitations?: string[];
   recommended?: boolean;
   gradient: string;
-  comingSoon?: boolean;
   deviceLimit: number;
   storage: string;
 }
@@ -260,14 +259,14 @@ export default function SubscribePage() {
               Pricing for every team
             </h1>
             <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-              All plans include core loan management features. Select the backup and support level you need.
+              All plans include core loan workflows. Choose the backup, device access, and support level that matches your operations.
             </p>
             
             {/* Free Trial CTA */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
               <h3 className="text-xl font-semibold text-slate-900 mb-3">Start with a free trial</h3>
               <p className="text-slate-600 mb-4">
-                Try the Pro plan for 1 month. No credit card required.
+                Try the Pro plan for 1 month with no credit card required.
               </p>
               <button
                 onClick={handleFreeTrial}
@@ -281,7 +280,7 @@ export default function SubscribePage() {
                 Includes Android photo capture, analytics, and priority support.
                 {' '}
                 <Link href={extensionContactUrl} className="text-blue-600 hover:text-blue-700 font-semibold">
-                  Need more time? Contact us to request extension up to 6 months.
+                  Need more time? Contact us to request an extension up to 6 months.
                 </Link>
               </p>
             </div>
@@ -327,15 +326,6 @@ export default function SubscribePage() {
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
                     <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
                       Most popular
-                    </div>
-                  </div>
-                )}
-
-                {/* Coming Soon Badge */}
-                {plan.comingSoon && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                    <div className="bg-slate-900 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
-                      Coming Soon
                     </div>
                   </div>
                 )}
@@ -398,27 +388,18 @@ export default function SubscribePage() {
                     {/* CTA Button */}
                     <button
                       onClick={() => {
-                        if (plan.comingSoon) return;
                         setSelectedPlan(plan.name);
                         handleSubscribeWithValidation(plan.name, billingPeriod);
                       }}
-                      disabled={loading === plan.name || plan.comingSoon}
-                      className={`w-full ${plan.comingSoon 
-                        ? 'bg-slate-300 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700'
-                      } text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                      disabled={loading === plan.name}
+                      className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
                         loading === plan.name ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
                       <span>
-                        {plan.comingSoon 
-                          ? 'Coming Soon' 
-                          : loading === plan.name 
-                            ? 'Processing...' 
-                            : `Choose ${plan.name}`
-                        }
+                        {loading === plan.name ? 'Processing...' : `Choose ${plan.name}`}
                       </span>
-                      {!plan.comingSoon && loading !== plan.name && (
+                      {loading !== plan.name && (
                         <ArrowRightIcon className="w-4 h-4" />
                       )}
                     </button>
@@ -465,15 +446,15 @@ export default function SubscribePage() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-4xl mx-auto">
               <h3 className="text-xl font-semibold text-slate-900 mb-3">Need help choosing?</h3>
               <p className="text-slate-600 mb-6">
-                All plans include core loan management features. The main differences are cloud storage and device support.
+                All plans include core loan operations. Primary differences are backup capabilities, device access, and support priority.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link href={extensionContactUrl} className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-2.5 rounded-lg hover:border-slate-300 transition-colors">
                   Contact sales
                 </Link>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors">
-                  Try free demo
-                </button>
+                <Link href="/download" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors">
+                  View installation guide
+                </Link>
               </div>
               <p className="text-slate-500 text-sm mt-4">
                 1-month free trial available • Secure payment via Razorpay

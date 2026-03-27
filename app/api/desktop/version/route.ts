@@ -1,10 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readFile } from 'fs/promises';
+import path from 'path';
+
+interface DesktopVersionManifest {
+  version: string;
+  downloadUrl: string;
+  releaseDate?: string;
+  changelog?: string[];
+  systemRequirements?: string[];
+  checksum?: string;
+}
+
+const VERSION_MANIFEST_PATH = path.join(process.cwd(), 'public', 'downloads', 'version.json');
+
+const readVersionManifest = async (): Promise<DesktopVersionManifest> => {
+  const fileContent = await readFile(VERSION_MANIFEST_PATH, 'utf8');
+  const parsed = JSON.parse(fileContent) as Partial<DesktopVersionManifest>;
+
+  if (!parsed.version || !parsed.downloadUrl) {
+    throw new Error('Desktop version manifest is invalid');
+  }
+
+  return {
+    version: parsed.version,
+    downloadUrl: parsed.downloadUrl,
+    releaseDate: parsed.releaseDate,
+    changelog: Array.isArray(parsed.changelog) ? parsed.changelog : [],
+    systemRequirements: Array.isArray(parsed.systemRequirements) ? parsed.systemRequirements : [],
+    checksum: parsed.checksum,
+  };
+};
 
 export async function GET() {
   try {
-    // Read version info from public directory
-    const versionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/downloads/version.json`);
-    const versionData = await versionResponse.json();
+    const versionData = await readVersionManifest();
     
     return NextResponse.json({
       success: true,
@@ -28,9 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     const { currentVersion } = await request.json();
     
-    // Get latest version
-    const versionResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/downloads/version.json`);
-    const latestVersion = await versionResponse.json();
+    const latestVersion = await readVersionManifest();
     
     // Compare versions (simple string comparison for now)
     const isUpdateAvailable = currentVersion !== latestVersion.version;

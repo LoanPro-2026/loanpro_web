@@ -179,14 +179,6 @@ export async function enforceAdminAccess(
   request: Request,
   options: AdminGuardOptions
 ): Promise<AdminAuthResult> {
-  // Restrict all admin APIs to localhost only until fully developed
-  const url = new URL(request.url);
-  const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
-  
-  if (!isLocalhost) {
-    throw new Error('Admin APIs are currently restricted to localhost only');
-  }
-
   const admin = await verifyAdminRequest(request);
 
   if (!hasAdminPermission(admin, options.permission)) {

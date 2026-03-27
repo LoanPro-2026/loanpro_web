@@ -11,15 +11,15 @@ const HeroSection = () => {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
-              Trusted by loan teams across India
+              Built for serious lending operations
             </div>
 
             <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-slate-900 font-display leading-tight">
-              Professional loan management for modern teams
+              Run your lending business with precision every day
             </h1>
 
             <p className="mt-5 text-lg text-slate-600 max-w-xl">
-              LoanPro is a Windows desktop platform for tracking loans, collections, and portfolios with optional cloud backup and Android photo capture for customer verification workflows.
+              LoanPro gives finance teams one reliable workflow for loans, collections, repayment monitoring, and customer verification. It combines fast local performance with optional cloud backup and Android photo capture for operational accountability.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -51,7 +51,7 @@ const HeroSection = () => {
             </div>
 
             <div className="mt-6 text-sm text-slate-500">
-              Windows desktop app plus Android companion photo capture support.
+              Windows-first desktop product with companion Android capture support.
             </div>
           </div>
 

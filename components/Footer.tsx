@@ -22,18 +22,18 @@ const Footer = () => (
             />
           </Link>
           <p className="mt-4 text-sm text-slate-400 max-w-md">
-            LoanPro is a Windows desktop loan management platform built for clarity, control, and secure operations.
+            LoanPro is a Windows desktop loan operations platform built for control, traceability, and dependable day-to-day execution.
           </p>
           <div className="mt-6 space-y-3 text-sm text-slate-400">
             <div className="flex items-center gap-3">
               <EnvelopeIcon className="w-4 h-4 text-slate-500" />
               <a href="mailto:support@loanpro.tech" className="hover:text-white transition-colors">
-                j.akshat296@gmail.com
+                support@loanpro.tech
               </a>
             </div>
             <div className="flex items-center gap-3">
               <PhoneIcon className="w-4 h-4 text-slate-500" />
-              <a href="tel:+911234567890" className="hover:text-white transition-colors">
+              <a href="tel:+917898885129" className="hover:text-white transition-colors">
                 +91 78988 85129
               </a>
             </div>
@@ -82,7 +82,7 @@ const Footer = () => (
       <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
         <h3 className="text-lg font-semibold text-white">Ready to streamline loan operations?</h3>
         <p className="mt-2 text-sm text-slate-400">
-          Start with a 1-month Pro trial. Need more time? Contact us to request an extension up to 6 months.
+          Start with a 1-month Pro trial to evaluate real workflows. Need a longer evaluation window? Contact us with your rollout requirements.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
           <SignedOut>

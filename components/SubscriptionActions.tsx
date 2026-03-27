@@ -69,9 +69,9 @@ export default function SubscriptionActions({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
               <div className="bg-white rounded-xl shadow-xl p-8 max-w-md w-full relative z-50">
                 <h2 className="text-xl font-bold mb-4 text-red-600">Cancel Subscription</h2>
-                <p className="mb-3 text-gray-700">Are you sure you want to cancel your subscription? You will lose access to all premium features and your data will be deleted.</p>
+                <p className="mb-3 text-gray-700">Are you sure you want to cancel your subscription? Your premium access will be removed according to your plan policy.</p>
                 <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded">
-                  <strong>Important:</strong> Please <span className="underline">download a copy of your data</span> from <span className="font-semibold">Settings</span> before canceling. (Data export coming soon)
+                  <strong>Important:</strong> Before cancellation, ensure your required records and backups are safely retained according to your internal policy.
                 </div>
                 <div className="flex gap-4 justify-end mt-6">
                   <button

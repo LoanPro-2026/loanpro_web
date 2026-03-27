@@ -7,7 +7,7 @@ const plans = [
     name: 'Basic',
     price: '₹599',
     period: '/month',
-    description: 'Core loan operations for individual lenders and small shops',
+    description: 'Core loan operations for individual lenders and small branch teams',
     deviceLimit: 1,
     storage: 'Local only',
     features: [
@@ -25,7 +25,7 @@ const plans = [
     name: 'Pro',
     price: '₹899',
     period: '/month',
-    description: 'For growing operations that need sync and backup reliability',
+    description: 'For growing operations that need backup reliability and stronger workflow controls',
     deviceLimit: 1,
     storage: 'Cloud backup (up to 15GB)',
     features: [
@@ -45,7 +45,7 @@ const plans = [
     name: 'Enterprise',
     price: '₹1,399',
     period: '/month',
-    description: 'Pro capabilities with controlled multi-device access',
+    description: 'Pro capabilities with controlled multi-device access for managed teams',
     deviceLimit: 2,
     storage: 'Cloud backup (up to 15GB)',
     features: [

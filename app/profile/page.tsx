@@ -987,8 +987,11 @@ const ProfilePage = () => {
   };
 
   const handleRegenerate = () => {
-    // Placeholder for regenerate logic
-    openStatusModal('Coming Soon', 'Regenerate token feature coming soon!', 'info');
+    openStatusModal(
+      'Token Regeneration Support',
+      'For security reasons, access token regeneration is handled through support verification. Please contact support@loanpro.tech from your registered account email to request token reset.',
+      'info'
+    );
   };
 
   const handleUpgrade = async (newPlan: string, billingPeriod: 'monthly' | 'annually' = 'monthly') => {

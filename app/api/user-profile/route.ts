@@ -14,6 +14,7 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || '',
   key_secret: process.env.RAZORPAY_KEY_SECRET || '',
 });
+const INTERNAL_PAYMENT_SUCCESS_URL = 'https://loanpro.tech/api/payment-success';
 
 interface ResolvedIdentity {
   email: string;
@@ -157,7 +158,7 @@ async function attemptPendingPaymentRecovery(userId: string, user: any, db: any)
           isUpgrade: pendingOrder.paymentContext === 'upgrade',
         };
 
-        const recoveryRequest = new Request('http://localhost/api/payment-success', {
+        const recoveryRequest = new Request(INTERNAL_PAYMENT_SUCCESS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(recoveryBody),

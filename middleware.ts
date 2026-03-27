@@ -13,13 +13,9 @@ const protectedRoutes = [
 
 // Allowed origins for CORS (restrict in production)
 const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
   'https://www.loanpro.tech',
   'https://loanpro.tech',
 ];
-
-const LOCALHOST_ORIGIN_REGEX = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
 /**
  * Check if origin is allowed
@@ -27,7 +23,7 @@ const LOCALHOST_ORIGIN_REGEX = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
   if (origin === 'null' || origin.startsWith('file://')) return true;
-  return ALLOWED_ORIGINS.includes(origin) || LOCALHOST_ORIGIN_REGEX.test(origin);
+  return ALLOWED_ORIGINS.includes(origin);
 }
 
 /**

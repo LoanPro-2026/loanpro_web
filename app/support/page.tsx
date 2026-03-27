@@ -20,6 +20,29 @@ const inquiryOptions: Array<{ value: InquiryType; label: string }> = [
   { value: 'other', label: 'Other' }
 ];
 
+const supportFAQs = [
+  {
+    question: 'How quickly will someone respond after form submission?',
+    answer: 'Most requests receive an initial response within 24 business hours. Setup blockers, payment-impacting issues, and production-critical interruptions are prioritized for faster handling.'
+  },
+  {
+    question: 'What details should I include for faster resolution?',
+    answer: 'Include your organization name, exact error message, expected outcome, and the exact step where the issue occurred. Screenshots, timestamps, and workflow context reduce back-and-forth and speed up diagnosis.'
+  },
+  {
+    question: 'Can I request onboarding or migration assistance?',
+    answer: 'Yes. Choose Application Setup or Sales, then share your rollout stage and current tools. Our team can help with phased onboarding and migration planning to reduce downtime.'
+  },
+  {
+    question: 'Can I discuss plan fit before purchasing?',
+    answer: 'Yes. Choose Pricing or Sales and include expected device count, backup requirements, and branch workflow details so we can recommend the most suitable plan.'
+  },
+  {
+    question: 'Do you support technical checks before deployment?',
+    answer: 'Yes. For production rollouts, share your environment details and planned deployment timeline. We can guide compatibility checks, installation sequencing, and backup readiness before go-live.'
+  }
+];
+
 export default function SupportPage() {
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
@@ -129,11 +152,11 @@ export default function SupportPage() {
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
           <h1 className="text-3xl font-semibold text-slate-900 mb-2">Contact Us</h1>
           <p className="text-slate-600 mb-6">
-            Tell us about your sales or application requirements. Our team will review your details and call you to discuss the next steps.
+            Share your sales, onboarding, setup, billing, or technical requirement. Our team reviews every request and responds with clear next actions.
           </p>
 
           <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            After you submit this form, our team will call you within 24 business hours.
+            After submission, you receive a tracking reference and a response window based on request priority.
           </div>
 
           {error && (
@@ -292,9 +315,24 @@ export default function SupportPage() {
             </button>
 
             <p className="text-xs text-slate-500">
-              Typical callback window: Monday–Saturday, 10:00 AM to 7:00 PM IST.
+              Typical callback window: Monday-Saturday, 10:00 AM to 7:00 PM IST.
             </p>
           </form>
+        </div>
+
+        <div className="mt-6 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
+          <h2 className="text-2xl font-semibold text-slate-900 mb-2">Support FAQs</h2>
+          <p className="text-slate-600 mb-6">
+            Common pre-sales, onboarding, and support questions before you submit a request.
+          </p>
+          <div className="space-y-4">
+            {supportFAQs.map((item) => (
+              <div key={item.question} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-900">{item.question}</h3>
+                <p className="mt-1 text-sm text-slate-600 leading-relaxed">{item.answer}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -9,19 +9,19 @@ const setupSteps = [
   {
     step: 1,
     title: 'Install the desktop app',
-    description: 'Download LoanPro for Windows and complete the guided installation in minutes.',
+    description: 'Download LoanPro for Windows from the official page and complete guided installation on your operations system.',
     icon: ArrowDownTrayIcon
   },
   {
     step: 2,
     title: 'Connect your account',
-    description: 'Enter any Device Name, Organization Name , copy your access token from Profile, and authenticate the desktop app.',
+    description: 'Add organization and device details, then authenticate using your account access token from your profile.',
     icon: KeyIcon
   },
   {
     step: 3,
     title: 'Enable Android photo capture',
-    description: 'Pair your Android phone and allow camera access so you can capture customer photos while adding and removing records.',
+    description: 'Pair your Android phone, allow camera permission, and start capturing customer photos during loan workflows.',
     icon: DevicePhoneMobileIcon
   }
 ];
@@ -41,10 +41,10 @@ const HowToSetup: React.FC<HowToSetupProps> = ({ showTitle = true, variant = 'de
               How it works
             </div>
             <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-              Get started in three simple steps
+              Go live in three practical steps
             </h2>
             <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-              Install the desktop app, connect your account, and configure your workspace and start using.
+              Set up your desktop app, authenticate your workspace, and enable capture workflows for operational readiness.
             </p>
           </div>
         )}

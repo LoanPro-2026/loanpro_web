@@ -10,34 +10,34 @@ import {
 
 const features = [
   {
-    title: 'Personalized DashBoard',
+    title: 'Operational Dashboard',
     icon: ChartBarIcon,
-    description: 'Comprehensive analytics and reporting with real-time insights into your lending operations and portfolio performance.',
+    description: 'Track daily disbursements, collections, overdue exposure, and portfolio movement from one control center.',
   },
   {
     title: 'Photo Verification',
     icon: CameraIcon,
-    description: 'Capture and view customer photos while adding or removing records using your Android phone as a companion camera.',
+    description: 'Capture customer photos with the Android companion and verify identity during repayment, closure, or dispute checks.',
   },
   {
     title: 'Cloud Sync & Backup',
     icon: CloudIcon,
-    description: 'Seamless synchronization between local storage and cloud storage for data backup and safety.',
+    description: 'Schedule backup cycles and keep recoverable copies so teams can restore quickly after system changes or failures.',
   },
   {
     title: 'Cashflow Tracking',
     icon: CreditCardIcon,
-    description: 'Track daily cash flow, deposits, withdrawals, and maintain accurate financial records with automated reporting.',
+    description: 'Record deposits, repayments, withdrawals, and adjustments with a clear transaction trail and day-end visibility.',
   },
   {
     title: 'Local-First Storage',
     icon: ServerIcon,
-    description: 'Local database with encryption for sensitive loan data storage and fast query performance.',
+    description: 'Local-first architecture keeps front-desk operations fast and dependable even on unstable internet connections.',
   },
   {
-    title: 'Secure Operations',
+    title: 'Portfolio Intelligence',
     icon: ShieldCheckIcon,
-    description: 'Monitor loan portfolios, track returns, and analyze investment performance with detailed reporting.',
+    description: 'Review exposure, repayment trends, and performance signals to make better collection and lending decisions daily.',
   }
 ];
 
@@ -50,10 +50,10 @@ const FeaturesSection = () => {
             Features
           </div>
           <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-            Everything you need to run loans at scale
+            Everything required for disciplined loan operations
           </h2>
           <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-            LoanPro combines local-first performance with the controls and reporting needed by professional lending teams.
+            From loan entry to closure, LoanPro combines speed, control, and audit-ready workflows for growing lending teams.
           </p>
         </div>
 

@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
+const PUBLIC_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://loanpro.tech').replace(/\/$/, '');
+const ANALYTICS_TIMEOUT_MS = 5000;
+
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = ANALYTICS_TIMEOUT_MS): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -16,11 +33,10 @@ export async function GET(request: NextRequest) {
     
     // Track analytics (make it more robust)
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-                      'http://localhost:3000';
+      const requestOrigin = new URL(request.url).origin;
+      const baseUrl = requestOrigin || PUBLIC_BASE_URL;
       
-      await fetch(`${baseUrl}/api/analytics/track`, {
+      await fetchWithTimeout(`${baseUrl}/api/analytics/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

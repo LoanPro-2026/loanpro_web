@@ -5,52 +5,52 @@ import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 const faqs = [
   {
-    question: 'What is LoanPro and how does it work?',
-    answer: 'LoanPro is a Windows desktop loan management platform. It Allow Local lenders to Add, Remove, Delete Loans; Add Deposits; View Reports, Track Investments, Returns and Interest collection over a Period Of Time.'
+    question: 'What is LoanPro and who is it built for?',
+    answer: 'LoanPro is a Windows-first loan operations platform built for lenders, collection teams, finance offices, and branch operators that need clean daily execution. It centralizes loan creation, repayment tracking, cash movement, customer verification, and reporting so teams can run with fewer manual gaps.'
   },
   {
     question: 'Can I cancel my subscription anytime?',
-    answer: 'Yes. You can cancel at any time and refund will be calculated as per pro rata basis and will be manually refunded within 3-4 days.Your subscription stays active until the end of the billing period, and you can export your data if needed.'
+    answer: 'Yes. You can submit a cancellation request at any time from your account or through support. Access generally continues until the end of your active billing cycle, and any refund eligibility is handled as per the current payment and cancellation policy.'
   },
   {
     question: 'What features are included in each plan?',
-    answer: 'Every plan includes core loan operations with unlimited active records. Pro adds mobile sync and cloud backup. Enterprise includes everything in Pro and allows 2 app devices on the same access token.'
+    answer: 'Every plan includes core loan workflows, repayment entries, and reporting. Pro adds cloud backup and Android companion capture support. Enterprise includes Pro capabilities plus controlled multi-device access, faster onboarding coordination, and priority issue handling.'
   },
   {
-    question: 'How secure is my data with LoanPro?',
-    answer: 'In LoanPro your data is stored in your own system locally and even we dont have access to your data. Also In cloud Backup your data is synced in your own google Account. So Complete Safety and Security to your data is maintained.'
+    question: 'How secure is data in LoanPro?',
+    answer: 'LoanPro follows a local-first model where day-to-day operational data stays on your system for speed and control. If cloud backup is enabled, backups are written to your configured storage account. Account access and device usage are controlled by your team through authenticated workflows.'
   },
   {
-    question: 'Do you offer customer support?',
-    answer: 'Yes. We Offer Contact Form Support For Everyone. Navigate to Our support page and fill up the contact form. Our support team will reach out to you as soon as possible. '
+    question: 'What support channels are available?',
+    answer: 'You can reach LoanPro through the support form, support email, and phone for onboarding, billing, setup, and technical help. Each request gets a tracking reference and is triaged based on impact so business-critical issues are prioritized first.'
   },
   {
-    question: 'Can I Start using LoanPro immediately?',
-    answer: 'LoanPro is a ready to use desktop application that you can start using immediately. However Your existing past records needs to entered manually for the system to work at full potential.'
+    question: 'How quickly can a new team start using LoanPro?',
+    answer: 'Most teams can start operations on the same day after installation, account authentication, and basic setup. Historical data migration can be done in phases, so front-desk operations can begin immediately while older records are imported in a controlled timeline.'
   },
   {
-    question: 'Is there a free trial available?',
-    answer: 'Yes. We offer a 1-month Pro trial so users can explore the workflow without any credit card. If your use case is genuine and needs more evaluation time, contact our team to request a reviewed extension up to 6 months.'
+    question: 'Is a trial available before purchasing?',
+    answer: 'Yes. LoanPro provides a 1-month Pro trial so your team can evaluate real production workflows before purchasing. If you have a genuine rollout need, you can request a trial extension through support for eligibility review.'
   },
   {
-    question: 'How is my Data Secured?',
-    answer: 'You can Set up a Auto backup Functionality at any location on your PC at the selected time interval lets say every 1 hour or 6 hour and save changes. Now the system will automatically backup your complete data at your choosen location.'
+    question: 'How does backup and recovery work?',
+    answer: 'You can define backup frequency and retain local recovery points for continuity. On eligible plans, cloud backup can be enabled so data can be restored during system migration, reinstall, or device replacement with lower downtime risk.'
   },
   {
-    question: 'How to OnBoard as the first time users',
-    answer: 'Activate the subscription (paid or premium), then download the App from downloads Page and Install it, giving all required permissions. After that Go to your profile page, copy the access token and then enter the access token and give your office name, and device ID. Wait for some time for onboarding to be completed and here Your app is ready to use.       '
+    question: 'What does first-time onboarding look like?',
+    answer: 'First-time onboarding typically includes trial or subscription activation, desktop installation, account sign-in, organization setup, and access-token authentication. Once initial checks complete, your team can start creating and managing live loan records.'
   },
   {
-    question: 'Why should I use photo functionality?',
-    answer: 'Photo functionality helps shop owners capture a customer image while creating a loan record and quickly view the same image while removing or closing records. This improves verification, reduces confusion between similar names, and works through your own Android phone camera.'
+    question: 'Why should I enable Android photo capture?',
+    answer: 'Android photo capture adds visual identity verification to customer records. Teams can capture at loan creation and verify later during repayments, closures, and exception handling. This helps reduce identity disputes and improves field-level confidence.'
   },
   {
-    question: 'How can I raise my concerns about the software',
-    answer: 'There is a support ticket page which user can access from menubar. First choose your concern type, its priority and then explain it in detail and submit it. Our Support will reply to your requested concern and will contact you. user can directly chat with our support system there itself.'
+    question: 'How do I report an issue or request a feature?',
+    answer: 'Submit a support request with clear reproduction steps, expected result, actual result, and urgency. Include screenshots, logs, or workflow context where possible. This speeds up diagnosis and helps product teams evaluate feature requests with better context.'
   },
   {
-    question: 'How does the Cloud database system work?',
-    answer: 'First You need to connect your google account with us and give required permissions for drive backup(We only write our backup file into your google drive. Our system Cannot access other files in your drive). The select your backup interval and auto cloud sync is finally set up and completed.'
+    question: 'How does cloud backup setup work?',
+    answer: 'On eligible plans, connect your storage account, grant required permissions, and configure backup schedule and retention. LoanPro then runs scheduled backup jobs so your operational data remains recoverable across machine upgrades or reinstall scenarios.'
   }
 ];
 
@@ -72,7 +72,7 @@ const FAQSection = () => {
             Frequently asked questions
           </h2>
           <p className="mt-3 text-lg text-slate-600">
-            Answers to common questions about setup, plans, and support.
+            Practical answers on onboarding, billing, reliability, data handling, and daily execution.
           </p>
         </div>
 
@@ -104,7 +104,7 @@ const FAQSection = () => {
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
             <h3 className="text-lg font-semibold text-slate-900">Need more help?</h3>
             <p className="mt-2 text-sm text-slate-600">
-              Reach out to our team for onboarding guidance or plan recommendations.
+              Reach out for onboarding guidance, migration planning, plan selection, or issue resolution.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
               <a
@@ -114,7 +114,7 @@ const FAQSection = () => {
                 Contact support
               </a>
               <a
-                href="tel:+911234567890"
+                href="tel:+917898885129"
                 className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold px-5 py-2.5 hover:border-slate-300 transition-colors"
               >
                 Call us

@@ -6,32 +6,32 @@ import HowToSetup from '../../components/HowToSetup';
 const features = [
 	{
 		title: 'Advanced Dashboard',
-		description: 'Comprehensive loan management with real-time analytics',
+		description: 'Track collections, outstanding loans, and daily business movement from one operational dashboard.',
 		icon: RocketLaunchIcon,
 	},
 	{
 		title: 'Photo Verification Workflow',
-		description: 'Capture and review customer photos from your Android phone during add and removal actions',
+		description: 'Capture and verify customer photos through your Android companion flow during record creation and closure.',
 		icon: DevicePhoneMobileIcon,
 	},
 	{
 		title: 'Local Database',
-		description: 'Fast SQLite database for secure local data storage',
+		description: 'Local-first SQLite storage keeps everyday operations fast and available, even with unstable internet.',
 		icon: ComputerDesktopIcon,
 	},
 	{
 		title: 'Cloud Sync',
-		description: 'Automatic backup and synchronization with cloud',
+		description: 'Automated backup scheduling helps keep data recoverable across machine changes and reinstallations.',
 		icon: ClockIcon,
 	},
 	{
 		title: 'Cash Management',
-		description: 'Track daily transactions and financial operations',
+		description: 'Record deposits, repayments, and adjustments with better day-end financial visibility.',
 		icon: CheckCircleIcon,
 	},
 	{
 		title: 'Investment Tracking',
-		description: 'Monitor loan portfolios and investment performance',
+		description: 'Analyze portfolio exposure, returns, and operational trends with practical reporting snapshots.',
 		icon: ShieldCheckIcon,
 	},
 ];
@@ -104,23 +104,35 @@ const DownloadPage = () => {
 	const faqs = [
 		{
 			question: 'What if I get a security warning during installation?',
-			answer: 'LoanPro is digitally signed by our developers. If you see a Windows SmartScreen warning, click "More info" then "Run anyway". This is normal for newly released apps.'
+			answer: 'If Windows SmartScreen appears, select More info and then Run anyway. This warning can appear for newly installed builds. Always use the official download button on this page so you install the genuine LoanPro installer.'
 		},
 		{
-			question: 'Can I use LoanPro on Mac or Linux?',
-			answer: 'Currently, LoanPro is only available for Windows (10 and later). We are working on Mac and Linux versions - check back soon!'
+			question: 'Can I install LoanPro on Mac or Linux?',
+			answer: 'LoanPro desktop is currently built for Windows 10 and later. If your organization uses mixed operating systems, contact support so we can help plan deployment around your Windows operations nodes.'
 		},
 		{
-			question: 'Do I need an Android phone for photos?',
-			answer: 'No. Fingerprint scanner support has been replaced by Android companion photo capture. Use your own Android phone camera to take customer photos during loan workflows.'
+			question: 'Do I need an Android phone to use LoanPro?',
+			answer: 'No. Core desktop workflows run without Android. An Android device is only required if your team wants companion photo capture and customer identity verification during loan lifecycle actions.'
 		},
 		{
-			question: 'What if I lose my internet connection?',
-			answer: 'LoanPro works offline! Your data is stored locally in SQLite database. Once you reconnect, changes automatically sync with the cloud.'
+			question: 'What happens when internet connectivity drops?',
+			answer: 'Core operations continue in local mode, so front-desk work is not blocked. Cloud backup and sync-related tasks automatically resume when the connection returns.'
 		},
 		{
 			question: 'How much data can I store?',
-			answer: 'Basic: 200 MB cloud storage, Pro: 1 GB cloud storage, Enterprise: Unlimited. Local storage depends on your PC.'
+			answer: 'Local operational capacity depends on your system storage. Cloud backup eligibility and limits depend on your active plan and configured storage account. Check your plan details before rollout for exact limits.'
+		},
+		{
+			question: 'How long does first-time setup usually take?',
+			answer: 'Most first-time setups are completed in about 10 to 20 minutes, including install, login, and initial checks. Additional time may be required when pairing Android capture devices or configuring cloud backup for the first time.'
+		},
+		{
+			question: 'What should I do if download or install fails?',
+			answer: 'Re-download the installer, run setup as administrator, and confirm Windows version compatibility. If it still fails, contact support with the exact error text, screenshot, and where the failure occurs for faster troubleshooting.'
+		},
+		{
+			question: 'Can I migrate to a new system later?',
+			answer: 'Yes. Keep regular backups enabled so you can restore safely during machine replacement or upgrade. Support can guide migration sequencing to reduce downtime for your operations team.'
 		}
 	];
 
@@ -152,7 +164,7 @@ const DownloadPage = () => {
 						Download LoanPro for Windows
 					</h1>
 					<p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-						Install the desktop application to manage loans locally with optional cloud backup and Android photo capture support.
+						Install the desktop application to run daily loan operations with local reliability, optional cloud backups, and companion photo capture.
 					</p>
 
 					<div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -188,7 +200,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Main Dashboard</h3>
-							<p className="text-sm text-slate-600">Overview of loan operations and daily performance.</p>
+							<p className="text-sm text-slate-600">Real-time snapshot of collections, receivables, and daily operational status.</p>
 						</div>
 
 						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -198,7 +210,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Add New Record</h3>
-							<p className="text-sm text-slate-600">Create loan records quickly with verification.</p>
+							<p className="text-sm text-slate-600">Create validated customer loan entries with structured fields and guided flow.</p>
 						</div>
 
 						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -208,7 +220,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Account Management</h3>
-							<p className="text-sm text-slate-600">Track customer accounts and loan details.</p>
+							<p className="text-sm text-slate-600">Review customer account history, balances, and repayment progress in one place.</p>
 						</div>
 
 						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -218,7 +230,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Settings</h3>
-							<p className="text-sm text-slate-600">Configure application preferences and system settings.</p>
+							<p className="text-sm text-slate-600">Configure office profile, device setup, backup preferences, and workflow behavior.</p>
 						</div>
 
 						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -228,7 +240,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Cloud Backup</h3>
-							<p className="text-sm text-slate-600">Automatic backup and synchronization with cloud storage.</p>
+							<p className="text-sm text-slate-600">Schedule secure backup cycles and keep operational data recoverable over time.</p>
 						</div>
 
 						<div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -238,7 +250,7 @@ const DownloadPage = () => {
 								className="w-full h-48 object-cover rounded-lg mb-4"
 							/>
 							<h3 className="font-semibold text-slate-900 mb-2">Support Tickets</h3>
-							<p className="text-sm text-slate-600">Get help and support for LoanPro desktop application.</p>
+							<p className="text-sm text-slate-600">Raise support requests with context and track updates through your support flow.</p>
 						</div>
 					</div>
 				</div>
@@ -303,7 +315,7 @@ const DownloadPage = () => {
 						</ul>
 						<div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
 							<p className="text-sm text-slate-700">
-								Once all items are checked, you're ready to install.
+								Once all items are checked, proceed with installation and account authentication.
 							</p>
 						</div>
 					</div>
@@ -322,7 +334,7 @@ const DownloadPage = () => {
 								</div>
 								<div>
 									<p className="text-slate-900 font-semibold">Download</p>
-									<p className="text-sm text-slate-600">Click the Download for Windows button above.</p>
+									<p className="text-sm text-slate-600">Use the official Download for Windows button shown on this page.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
@@ -331,7 +343,7 @@ const DownloadPage = () => {
 								</div>
 								<div>
 									<p className="text-slate-900 font-semibold">Run</p>
-									<p className="text-sm text-slate-600">Open {installerName} from your Downloads folder.</p>
+									<p className="text-sm text-slate-600">Open {installerName} from your Downloads folder and allow required permissions.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
@@ -340,7 +352,7 @@ const DownloadPage = () => {
 								</div>
 								<div>
 									<p className="text-slate-900 font-semibold">Install</p>
-									<p className="text-sm text-slate-600">Follow the setup wizard and choose an install location.</p>
+									<p className="text-sm text-slate-600">Complete the setup wizard and choose your preferred installation location.</p>
 								</div>
 							</li>
 							<li className="flex items-start space-x-3">
@@ -349,14 +361,14 @@ const DownloadPage = () => {
 								</div>
 								<div>
 									<p className="text-slate-900 font-semibold">Launch & login</p>
-									<p className="text-sm text-slate-600">Open LoanPro and sign in with your account.</p>
+									<p className="text-sm text-slate-600">Open LoanPro, sign in, and complete initial workspace setup.</p>
 								</div>
 							</li>
 						</ol>
 						<div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-3">
 							<ExclamationTriangleIcon className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" />
 							<p className="text-sm text-slate-700">
-								If Windows SmartScreen appears, select More info, then Run anyway.
+								If SmartScreen appears, select More info and then Run anyway to continue with installation.
 							</p>
 						</div>
 					</div>
@@ -370,15 +382,15 @@ const DownloadPage = () => {
 							<DevicePhoneMobileIcon className="w-6 h-6 text-blue-600 flex-shrink-0" />
 							<div>
 								<h3 className="text-lg font-semibold text-slate-900">Device binding for Android photo capture</h3>
-								<p className="text-sm text-slate-600">Required for plans using customer photo capture from your own mobile phone.</p>
+								<p className="text-sm text-slate-600">Recommended when your process requires customer image verification during loan lifecycle actions.</p>
 							</div>
 						</div>
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 							{[
-								{ title: 'Install Android app', text: 'Install the LoanPro companion app on your Android phone.' },
-								{ title: 'Pair phone', text: 'Pair your phone from Settings → Devices in the desktop app.' },
-								{ title: 'Allow camera', text: 'Grant camera permission to capture customer photos.' },
-								{ title: 'Start using', text: 'Capture during add record and view the same photo during record removal.' }
+								{ title: 'Install companion app', text: 'Install the LoanPro companion application on your Android phone.' },
+								{ title: 'Pair the device', text: 'Pair your phone from the Devices section inside desktop settings.' },
+								{ title: 'Allow camera access', text: 'Grant camera permissions so capture requests can be completed successfully.' },
+								{ title: 'Use in workflow', text: 'Capture photos during record creation and verify them during repayment or closure.' }
 							].map((item, idx) => (
 								<div key={item.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
 									<div className="text-xs font-semibold text-slate-500">Step {idx + 1}</div>
@@ -389,7 +401,7 @@ const DownloadPage = () => {
 						</div>
 						<div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
 							<p className="text-sm text-slate-700">
-								Need help? Visit Settings → Devices in LoanPro or contact support.
+								If pairing fails, verify phone and desktop are on the same network, re-open device settings, and retry pairing before contacting support.
 							</p>
 						</div>
 					</div>
@@ -424,7 +436,7 @@ const DownloadPage = () => {
 					<div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto shadow-sm">
 						<h3 className="text-xl font-semibold text-slate-900 mb-3">Need help getting started?</h3>
 						<p className="text-slate-600 mb-6">
-							Our support team can help with installation and setup.
+							Our team can assist with installation, onboarding sequence, backup design, and migration planning for your branch rollout.
 						</p>
 						<div className="flex flex-col sm:flex-row items-center justify-center gap-3">
 							<a
@@ -434,14 +446,14 @@ const DownloadPage = () => {
 								Email support
 							</a>
 							<a
-								href="tel:+911234567890"
+								href="tel:+917898885129"
 								className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-3 rounded-lg hover:border-slate-300 transition-colors"
 							>
 								Call support
 							</a>
 						</div>
 						<p className="text-slate-500 text-sm mt-4">
-							Support hours: Monday-Friday, 9 AM - 6 PM IST
+							Support hours: Monday-Saturday, 10:00 AM - 7:00 PM IST
 						</p>
 					</div>
 				</div>
