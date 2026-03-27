@@ -4,10 +4,30 @@
  */
 
 // Allowed origins for CORS - update based on your deployment
-const ALLOWED_ORIGINS = [
+const PROD_ALLOWED_ORIGINS = [
   'https://www.loanpro.tech',
   'https://loanpro.tech',
 ];
+
+const DEV_ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
+const EXTRA_ALLOWED_ORIGINS = String(process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const ALLOWED_ORIGINS = Array.from(
+  new Set([
+    ...PROD_ALLOWED_ORIGINS,
+    ...(process.env.NODE_ENV === 'production' ? [] : DEV_ALLOWED_ORIGINS),
+    ...EXTRA_ALLOWED_ORIGINS,
+  ])
+);
 
 /**
  * Check if an origin is allowed

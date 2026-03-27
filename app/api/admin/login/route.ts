@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { checkRateLimit, resetRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { connectToDatabase } from '@/lib/mongodb';
+import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -27,6 +28,8 @@ function timingSafeEqualText(a: string, b: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
+
   try {
     const { email, password } = await request.json();
     const clientIp = getClientIp(request);
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (!normalizedEmail || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
     if (!checkRateLimit(rateLimitKey, RateLimitPresets.AUTH.limit, RateLimitPresets.AUTH.windowMs)) {
       return NextResponse.json(
         { error: 'Too many login attempts. Please try again later.' },
-        { status: 429 }
+        { status: 429, headers: corsHeaders }
       );
     }
 
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (!adminEmail || !adminPassword || !jwtSecret) {
       return NextResponse.json(
         { error: 'Admin configuration is incomplete' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
       const retryAfterSeconds = Math.ceil((new Date(securityRecord.lockUntil).getTime() - now.getTime()) / 1000);
       return NextResponse.json(
         { error: 'Account temporarily locked due to repeated failed attempts.', retryAfterSeconds },
-        { status: 429 }
+        { status: 429, headers: corsHeaders }
       );
     }
 
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         { error: 'Invalid email or password' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -128,21 +131,27 @@ export async function POST(request: NextRequest) {
       email: normalizedEmail,
       expiresIn: '24h',
       message: 'Admin login successful'
-    }, { status: 200 });
+    }, { status: 200, headers: corsHeaders });
 
   } catch (error) {
     console.error('Admin login error:', error);
     return NextResponse.json(
       { error: 'Login failed' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
 
 // Health check
 export async function GET(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
+
   return NextResponse.json({
     status: 'ok',
     message: 'Admin login endpoint active'
-  });
+  }, { headers: corsHeaders });
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return handleCorsPreFlight(request);
 }
