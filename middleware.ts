@@ -12,10 +12,30 @@ const protectedRoutes = [
 ];
 
 // Allowed origins for CORS (restrict in production)
-const ALLOWED_ORIGINS = [
+const PROD_ALLOWED_ORIGINS = [
   'https://www.loanpro.tech',
   'https://loanpro.tech',
 ];
+
+const DEV_ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+];
+
+const EXTRA_ALLOWED_ORIGINS = String(process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const ALLOWED_ORIGINS = Array.from(
+  new Set([
+    ...PROD_ALLOWED_ORIGINS,
+    ...(process.env.NODE_ENV === 'production' ? [] : DEV_ALLOWED_ORIGINS),
+    ...EXTRA_ALLOWED_ORIGINS,
+  ])
+);
 
 /**
  * Check if origin is allowed
@@ -31,13 +51,18 @@ function isOriginAllowed(origin: string | null): boolean {
  */
 function getCorsHeaders(origin: string | null) {
   const isAllowed = isOriginAllowed(origin);
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? (origin || '*') : 'null',
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, x-admin-api-key, x-admin-token',
     'Access-Control-Max-Age': '86400', // 24 hours
   };
+
+  if (isAllowed) {
+    headers['Access-Control-Allow-Origin'] = origin || '*';
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+
+  return headers;
 }
 
 /**
