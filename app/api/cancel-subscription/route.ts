@@ -4,9 +4,9 @@ import { connectToDatabase } from '@/lib/mongodb';
 import Razorpay from 'razorpay';
 import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateCancellationRequest } from '@/lib/validation';
-import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { logger } from '@/lib/logger';
 import emailService from '@/services/emailService';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -93,23 +93,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limiting - prevent rapid cancellation attempts
-    const rateLimitKey = `cancel-subscription:${userId}`;
-    if (!checkRateLimit(rateLimitKey, 5, 60000)) { // 5 per minute
+    const rateLimitResponse = enforceRequestRateLimit({
+      request,
+      scope: 'cancel-subscription',
+      limit: 5,
+      windowMs: 60000,
+      userId,
+    });
+    if (rateLimitResponse) { // 5 per minute
       logger.warn('Rate limit exceeded for cancellation', 'CANCEL_SUBSCRIPTION', { userId });
-      return errorResponse(ApiErrors.RATE_LIMIT);
+      return rateLimitResponse;
     }
 
     // Validate request body
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return errorResponse({
-        code: 'INVALID_JSON',
-        message: 'Invalid JSON in request body',
-        statusCode: 400,
-      });
-    }
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(request, { maxBytes: 64 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.data;
 
     const validation = validateCancellationRequest(body);
     if (!validation.isValid()) {
@@ -120,7 +119,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const { reason = 'user_requested' } = body;
+    const reason =
+      typeof body.reason === 'string' && body.reason.trim().length > 0
+        ? body.reason.trim()
+        : 'user_requested';
     
     logger.info('Processing subscription cancellation', 'CANCEL_SUBSCRIPTION', { userId, reason });
     
@@ -584,11 +586,7 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     logger.error('Cancel subscription error', error, 'CANCEL_SUBSCRIPTION');
-    return errorResponse({
-      code: 'CANCELLATION_FAILED',
-      message: 'Failed to cancel subscription',
-      statusCode: 500,
-    });
+    return toSafeErrorResponse(error, 'CANCEL_SUBSCRIPTION', 'Failed to cancel subscription');
   }
 }
 

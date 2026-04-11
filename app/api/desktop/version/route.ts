@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 interface DesktopVersionManifest {
   version: string;
@@ -45,17 +47,26 @@ export async function GET() {
       checksum: versionData.checksum
     });
   } catch (error) {
-    console.error('Version check failed:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to check for updates'
-    }, { status: 500 });
+    logger.error('Version check failed', error, 'DESKTOP_VERSION');
+    return toSafeErrorResponse(error, 'DESKTOP_VERSION', 'Failed to check for updates');
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { currentVersion } = await request.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request,
+      scope: 'desktop-version-check',
+      limit: 120,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(request, { maxBytes: 16 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const body = parsedBody.data as Record<string, any>;
+    const currentVersion = typeof body.currentVersion === 'string' ? body.currentVersion.trim() : '';
     
     const latestVersion = await readVersionManifest();
     
@@ -71,10 +82,7 @@ export async function POST(request: NextRequest) {
       changelog: isUpdateAvailable ? latestVersion.changelog : []
     });
   } catch (error) {
-    console.error('Update check failed:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to check for updates'
-    }, { status: 500 });
+    logger.error('Update check failed', error, 'DESKTOP_VERSION');
+    return toSafeErrorResponse(error, 'DESKTOP_VERSION', 'Failed to check for updates');
   }
 }

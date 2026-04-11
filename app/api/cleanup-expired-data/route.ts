@@ -1,14 +1,33 @@
 export const runtime = "nodejs";
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
+
+const CLEANUP_API_KEY = String(process.env.CLEANUP_API_KEY || '').trim();
 
 export async function POST(req: Request) {
   try {
-    // This endpoint should be called by a cron job or scheduler
-    // In production, add proper authentication/API key verification
-    const { apiKey } = await req.json();
-    
-    if (apiKey !== process.env.CLEANUP_API_KEY) {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'cleanup-expired-data',
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    // Prefer header-based API key; keep JSON body fallback for existing cron integrations.
+    let providedApiKey = (req.headers.get('x-cleanup-api-key') || '').trim();
+    if (!providedApiKey) {
+      const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, {
+        maxBytes: 16 * 1024,
+        requireJsonContentType: false,
+      });
+      const body = parsedBody.ok ? (parsedBody.data as Record<string, any>) : {};
+      providedApiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+    }
+
+    if (!CLEANUP_API_KEY || providedApiKey !== CLEANUP_API_KEY) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -61,10 +80,10 @@ export async function POST(req: Request) {
         );
 
         deletedUsersCount++;
-        console.log(`Deleted data for user: ${user.userId}`);
+        logger.info('Deleted expired user data', 'CLEANUP_EXPIRED_DATA', { userId: user.userId });
         
       } catch (error) {
-        console.error(`Error deleting data for user ${user.userId}:`, error);
+        logger.error(`Error deleting data for user ${user.userId}`, error, 'CLEANUP_EXPIRED_DATA');
       }
     }
 
@@ -88,10 +107,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Error during cleanup:', error);
-    return NextResponse.json(
-      { error: 'Error during cleanup process' },
-      { status: 500 }
-    );
+    logger.error('Error during cleanup', error, 'CLEANUP_EXPIRED_DATA');
+    return toSafeErrorResponse(error, 'CLEANUP_EXPIRED_DATA', 'Error during cleanup process');
   }
 }

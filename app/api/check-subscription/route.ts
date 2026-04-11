@@ -4,10 +4,26 @@ import clientPromise from '@/lib/mongodb';
 import { getUserWithSubscription, getSubscriptionStatus } from '@/lib/subscriptionHelpers';
 import { getPlanFeatures } from '@/lib/planFeatures';
 import { getEffectivePlanFeatures } from '@/lib/planConfig';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 export async function POST(req: Request) {
   try {
-    const { accessToken, deviceId, skipDeviceCheck = false } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'check-subscription',
+      limit: 80,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 48 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const skipDeviceCheck = body.skipDeviceCheck === true;
 
     if (!accessToken) {
       return NextResponse.json({ error: 'Access token required' }, { status: 400 });
@@ -61,12 +77,13 @@ export async function POST(req: Request) {
     // Get user with enriched subscription data
     const { subscription } = await getUserWithSubscription(user.userId, db);
 
-    const now = new Date();
     let subscriptionStatus = 'expired';
     let daysRemaining = 0;
     let features = {};
     let isInGracePeriod = false;
     let resolvedPlanFeatures: Awaited<ReturnType<typeof getEffectivePlanFeatures>> | null = null;
+    const hasAccess = subscription ? getSubscriptionStatus(subscription) !== 'expired' : false;
+    const subscriptionPlanName = subscription?.plan || 'basic';
 
     if (subscription) {
       subscriptionStatus = getSubscriptionStatus(subscription);
@@ -75,9 +92,9 @@ export async function POST(req: Request) {
 
       // Resolve features from DB-backed config with static fallback.
       resolvedPlanFeatures = await getEffectivePlanFeatures(db, subscription.plan);
-      features = resolvedPlanFeatures.features;
+      features = hasAccess ? resolvedPlanFeatures.features : {};
 
-      if ((subscription.daysRemaining || 0) <= 0 && !isInGracePeriod) {
+      if (!hasAccess) {
         // Grace period expired - schedule for deletion
         subscriptionStatus = 'expired';
         
@@ -112,8 +129,8 @@ export async function POST(req: Request) {
       gracePeriodEndsAt: subscription?.gracePeriodEndsAt || null,
       isInGracePeriod,
       features,
-      maxDevices: subscription ? (resolvedPlanFeatures?.maxDevices ?? getPlanFeatures(subscription.plan).maxDevices) : 0,
-      cloudStorageLimit: subscription ? (resolvedPlanFeatures?.cloudStorageGB ?? getPlanFeatures(subscription.plan).cloudStorageGB) : 0,
+      maxDevices: hasAccess ? (resolvedPlanFeatures?.maxDevices ?? getPlanFeatures(subscriptionPlanName).maxDevices) : 0,
+      cloudStorageLimit: hasAccess ? (resolvedPlanFeatures?.cloudStorageGB ?? getPlanFeatures(subscriptionPlanName).cloudStorageGB) : 0,
       dataUsage: user.dataUsage || 0,
       devices: user.devices || [],
       user: {
@@ -124,11 +141,8 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Error checking subscription status:', error);
-    return NextResponse.json(
-      { error: 'Error checking subscription status' },
-      { status: 500 }
-    );
+    logger.error('Error checking subscription status', error, 'CHECK_SUBSCRIPTION');
+    return toSafeErrorResponse(error, 'CHECK_SUBSCRIPTION', 'Error checking subscription status');
   }
 }
 

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 const TRIAL_DURATION_MONTHS = 1;
 
@@ -24,7 +26,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { username, email, fullName } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'start-free-trial',
+      limit: 6,
+      windowMs: 60 * 60 * 1000,
+      userId,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 32 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const body = parsedBody.data as Record<string, any>;
+    const username = typeof body.username === 'string' ? body.username : '';
+    const email = typeof body.email === 'string' ? body.email : '';
+    const fullName = typeof body.fullName === 'string' ? body.fullName : '';
 
     // Check if user already has an active trial or subscription
     const db = (await clientPromise).db('AdminDB');
@@ -141,10 +158,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Error starting free trial:', error);
-    return NextResponse.json(
-      { error: 'Error starting free trial' },
-      { status: 500 }
-    );
+    logger.error('Error starting free trial', error, 'START_FREE_TRIAL');
+    return toSafeErrorResponse(error, 'START_FREE_TRIAL', 'Error starting free trial');
   }
 }

@@ -1,5 +1,6 @@
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const corsHeaders = getCorsHeaders(request);
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       { status: 200, headers: corsHeaders }
     );
   } catch (error) {
-    console.error('[ADMIN VERIFY] Error:', error);
+    logger.error('Admin verify failed', error, 'ADMIN_VERIFY');
     const message = error instanceof Error ? error.message : 'Internal server error';
     const status = getAdminErrorStatus(error);
     return new Response(JSON.stringify({ error: message }), { status, headers: corsHeaders });

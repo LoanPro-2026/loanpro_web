@@ -3,85 +3,84 @@ import { getEffectivePlanPricing } from '@/lib/planConfig';
 import PricingSectionClient from './PricingSectionClient';
 
 const plans = [
-  {
-    name: 'Basic',
-    price: '₹599',
-    period: '/month',
-    description: 'Core loan operations for individual lenders and small branch teams',
-    deviceLimit: 1,
-    storage: 'Local only',
-    features: [
-      'Core loan tracking and collections',
-      'Unlimited active records',
-      'Local data storage',
-      'Basic analytics dashboard',
-      'Standard reports',
-      'Email support',
-    ],
-    popular: false,
-    tone: 'border-slate-200'
-  },
-  {
-    name: 'Pro',
-    price: '₹899',
-    period: '/month',
-    description: 'For growing operations that need backup reliability and stronger workflow controls',
-    deviceLimit: 1,
-    storage: 'Cloud backup (up to 15GB)',
-    features: [
-      'Everything in Basic',
-      'Unlimited active records',
-      'Google Drive Cloud Backup',
-      'Mobile sync support',
-      'Android photo capture workflow',
-      'Daily cloud sync',
-      'Priority support',
-      'Faster feature request queue'
-    ],
-    popular: true,
-    tone: 'border-blue-600'
-  },
-  {
-    name: 'Enterprise',
-    price: '₹1,399',
-    period: '/month',
-    description: 'Pro capabilities with controlled multi-device access for managed teams',
-    deviceLimit: 2,
-    storage: 'Cloud backup (up to 15GB)',
-    features: [
-      'Everything in Pro',
-      '2 app devices on same access token',
-      'Unlimited active records',
-      'Enterprise onboarding priority',
-      'Priority issue handling',
-      ],
-    popular: false,
-    tone: 'border-slate-200'
-  }
+    {
+        name: 'Basic',
+        price: '₹599',
+        period: '/month',
+        description: 'Perfect for a single shop owner just starting out',
+        deviceLimit: 1,
+        storage: 'Local computer only',
+        features: [
+            'Track all daily loans and payments',
+            'Add unlimited customer records',
+            'Data stays safely on your computer',
+            'Simple daily profit reports',
+            'Print loan receipts',
+            'Email support',
+        ],
+        popular: false,
+        tone: 'border-slate-200'
+    },
+    {
+        name: 'Pro',
+        price: '₹899',
+        period: '/month',
+        description: 'For busy shops that need photo taking and safety backups',
+        deviceLimit: 1,
+        storage: 'Cloud backup included',
+        features: [
+            'Everything in Basic',
+            'Take customer photos via mobile app',
+            'Automatic Google Drive safety backups',
+            'See your data on mobile',
+            'Priority direct support',
+            'Request new features directly'
+        ],
+        popular: true,
+        tone: 'border-blue-600'
+    },
+    {
+        name: 'Enterprise',
+        price: '₹1,399',
+        period: '/month',
+        description: 'For larger teams that need more devices, branding, and dedicated support',
+        deviceLimit: 5,
+        storage: '100GB cloud storage included',
+        features: [
+            'Everything in Pro',
+            'Install the app on up to 5 computers',
+            'White-label and custom branding options',
+            'Dedicated onboarding and support',
+            'Higher storage and backup limits',
+            'Priority help for setup',
+        ],
+        popular: false,
+        tone: 'border-slate-200'
+    }
 ];
 
 const PricingSection = async () => {
-  let livePricing: Record<string, number> = {};
+    let livePricing: Record<string, number> = {};
 
-  try {
-    const { db } = await connectToDatabase();
-    livePricing = await getEffectivePlanPricing(db);
-  } catch {
-    livePricing = {};
-  }
+    try {
+        const { db } = await connectToDatabase();
+        livePricing = await getEffectivePlanPricing(db);
+    } catch {
+        livePricing = {};
+    }
 
-  const displayPlans = plans.map((plan) => ({
-    name: plan.name,
-    monthlyPrice: Number(livePricing[plan.name] || Number(String(plan.price).replace(/[^\d]/g, ''))),
-    description: plan.description,
-    deviceLimit: plan.deviceLimit,
-    storage: plan.storage,
-    features: plan.features,
-    popular: plan.popular,
-    tone: plan.tone,
-  }));
+    const displayPlans = plans.map((plan) => ({
+        name: plan.name,
+        monthlyPrice: Number(livePricing[plan.name] || Number(String(plan.price).replace(/[^\d]/g, ''))),
+        description: plan.description,
+        deviceLimit: plan.deviceLimit,
+        storage: plan.storage,
+        features: plan.features,
+        popular: plan.popular,
+        tone: plan.tone,
+    }));
 
-  return <PricingSectionClient plans={displayPlans} />;
+    return <PricingSectionClient plans={displayPlans} />;
 };
 
 export default PricingSection; 

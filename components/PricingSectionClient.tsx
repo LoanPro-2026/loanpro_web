@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
 import { CheckIcon } from '@heroicons/react/24/outline';
+import { trackEvent } from '@/lib/googleAnalytics';
 
 type BillingPeriod = 'monthly' | 'annually';
 
@@ -64,7 +65,13 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
                   type="button"
                   role="tab"
                   aria-selected={billingPeriod === 'monthly'}
-                  onClick={() => setBillingPeriod('monthly')}
+                  onClick={() => {
+                    setBillingPeriod('monthly');
+                    trackEvent('select_billing_period', {
+                      billing_period: 'monthly',
+                      source: 'pricing_section',
+                    });
+                  }}
                   className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                     billingPeriod === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -75,7 +82,13 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
                   type="button"
                   role="tab"
                   aria-selected={billingPeriod === 'annually'}
-                  onClick={() => setBillingPeriod('annually')}
+                  onClick={() => {
+                    setBillingPeriod('annually');
+                    trackEvent('select_billing_period', {
+                      billing_period: 'annually',
+                      source: 'pricing_section',
+                    });
+                  }}
                   className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                     billingPeriod === 'annually' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
@@ -89,6 +102,12 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
           <div className="mt-6 flex justify-center">
             <Link
               href="/subscribe"
+              onClick={() =>
+                trackEvent('click_subscribe_cta', {
+                  source: 'pricing_section_header',
+                  billing_period: billingPeriod,
+                })
+              }
               className="inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors"
             >
               Start free trial
@@ -140,7 +159,16 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
               <div className="mt-8">
                 <SignedOut>
                   <SignUpButton mode="modal">
-                    <button className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors">
+                    <button
+                      onClick={() =>
+                        trackEvent('click_signup_cta', {
+                          source: 'pricing_plan_card',
+                          plan: plan.name,
+                          billing_period: billingPeriod,
+                        })
+                      }
+                      className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors"
+                    >
                       Get started
                     </button>
                   </SignUpButton>
@@ -149,6 +177,13 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
                 <SignedIn>
                   <Link
                     href={`/subscribe?billingPeriod=${billingPeriod}`}
+                    onClick={() =>
+                      trackEvent('click_choose_plan', {
+                        source: 'pricing_plan_card',
+                        plan: plan.name,
+                        billing_period: billingPeriod,
+                      })
+                    }
                     className="block w-full text-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors"
                   >
                     Choose plan

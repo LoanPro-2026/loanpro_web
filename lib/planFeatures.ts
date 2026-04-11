@@ -53,10 +53,10 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
     },
   },
   Enterprise: {
-    maxDevices: 2,
-    cloudStorageGB: 15,
+    maxDevices: 5,
+    cloudStorageGB: 100,
     features: {
-      biometrics: false,
+      biometrics: true,
       autoSync: true,
       cloudDatabase: true,
       mobileSync: true,
@@ -65,6 +65,8 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
       prioritySupport: true,
       customSubdomain: true,
       apiAccess: true,
+      whiteLabel: true,
+      dedicatedSupport: true,
     },
   },
   trial: {
@@ -84,12 +86,22 @@ export const PLAN_FEATURES: Record<string, PlanFeatures> = {
   },
 };
 
+function normalizePlanKey(plan: string): keyof typeof PLAN_FEATURES {
+  const normalized = String(plan || '').trim().toLowerCase();
+
+  if (normalized === 'basic') return 'Basic';
+  if (normalized === 'pro') return 'Pro';
+  if (normalized === 'enterprise') return 'Enterprise';
+  if (normalized === 'trial') return 'trial';
+
+  return 'Basic';
+}
+
 /**
  * Get features and limits for a specific plan
  */
 export function getPlanFeatures(plan: string): PlanFeatures {
-  const normalizedPlan = plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase();
-  return PLAN_FEATURES[normalizedPlan] || PLAN_FEATURES.Basic;
+  return PLAN_FEATURES[normalizePlanKey(plan)] || PLAN_FEATURES.Basic;
 }
 
 /**

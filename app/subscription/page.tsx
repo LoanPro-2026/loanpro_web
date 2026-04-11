@@ -7,6 +7,7 @@ import SubscriptionActions from '@/components/SubscriptionActions';
 import GoToDashboardButton from '@/components/GoToDashboardButton';
 import { Suspense } from 'react';
 import Loader from '@/components/Loader';
+import { getSubscriptionStatus } from '@/lib/subscriptionHelpers';
 
 function getDaysLeft(endDate: Date) {
   const now = new Date();
@@ -35,8 +36,16 @@ export default async function MySubscriptionPage() {
   }
 
   const daysLeft = getDaysLeft(subscription.endDate);
-  const isActive = subscription.status === 'active' && daysLeft > 0;
-  const isExpired = daysLeft === 0 || subscription.status === 'canceled';
+  const computedStatus = getSubscriptionStatus(subscription as any);
+  const isActive = computedStatus === 'active_subscription' || computedStatus === 'active_trial';
+  const isGracePeriod = computedStatus === 'grace_period';
+  const isExpired = computedStatus === 'expired' || subscription.status === 'canceled';
+  const statusLabel = isActive ? 'Active' : isGracePeriod ? 'Grace Period' : 'Inactive';
+  const statusBadgeClass = isActive
+    ? 'bg-green-100 text-green-700'
+    : isGracePeriod
+      ? 'bg-yellow-100 text-yellow-700'
+      : 'bg-red-100 text-red-700';
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
@@ -48,9 +57,9 @@ export default async function MySubscriptionPage() {
               <div className="text-xl font-semibold text-slate-900 mb-1 uppercase">{subscription.subscriptionType}</div>
               <div className="text-slate-500">{subscription.username}</div>
             </div>
-            <div className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-semibold ${isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            <div className={`flex items-center gap-2 px-4 py-1 rounded-full text-sm font-semibold ${statusBadgeClass}`}>
               {isActive ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
-              {isActive ? 'Active' : 'Inactive'}
+              {statusLabel}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
@@ -68,7 +77,9 @@ export default async function MySubscriptionPage() {
             </div>
             <div className="bg-slate-50 rounded-xl p-6 flex flex-col items-center border border-slate-200">
               <span className="text-slate-600">Renewal</span>
-              <span className="text-slate-900 font-semibold text-lg">{isActive ? 'Auto-renewal enabled' : 'Expired'}</span>
+              <span className="text-slate-900 font-semibold text-lg">
+                {isActive ? 'Auto-renewal enabled' : isGracePeriod ? 'Grace period active' : 'Expired'}
+              </span>
             </div>
           </div>
           <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">

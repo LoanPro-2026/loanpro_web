@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders } from '@/lib/cors';
 import { ObjectId } from 'mongodb';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 // Restore specific backup
 export async function POST(
@@ -9,9 +11,25 @@ export async function POST(
   { params }: { params: Promise<{ backupId: string }> }
 ) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    const { accessToken } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'backup-restore',
+      limit: 25,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 32 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
     const { backupId } = await params; // Await the params promise
     
     if (!accessToken) {
@@ -59,8 +77,8 @@ export async function POST(
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Restore API error:', error);
-    return NextResponse.json({ error: 'Restore failed' }, { status: 500, headers: corsHeaders });
+    logger.error('Restore API error', error, 'BACKUP_API');
+    return applyCors(toSafeErrorResponse(error, 'BACKUP_API', 'Restore failed'));
   }
 }
 
@@ -70,10 +88,26 @@ export async function DELETE(
   { params }: { params: Promise<{ backupId: string }> }
 ) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'backup-delete',
+      limit: 25,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
     const { searchParams } = new URL(req.url);
-    const accessToken = searchParams.get('accessToken');
+    const queryToken = searchParams.get('accessToken')?.trim() || '';
+    const headerToken = req.headers.get('x-desktop-access-token')?.trim() || '';
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+    const accessToken = queryToken || headerToken || bearerToken;
     const { backupId } = await params; // Await the params promise
     
     if (!accessToken) {
@@ -109,8 +143,8 @@ export async function DELETE(
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Delete backup API error:', error);
-    return NextResponse.json({ error: 'Failed to delete backup' }, { status: 500, headers: corsHeaders });
+    logger.error('Delete backup API error', error, 'BACKUP_API');
+    return applyCors(toSafeErrorResponse(error, 'BACKUP_API', 'Failed to delete backup'));
   }
 }
 

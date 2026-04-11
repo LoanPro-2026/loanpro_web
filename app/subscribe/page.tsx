@@ -6,6 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/components/ToastProvider';
 import ProgressBar from '@/components/ProgressBar';
 import { CheckIcon, XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { trackEvent } from '@/lib/googleAnalytics';
 
 interface SubscriptionPlan {
   name: string;
@@ -228,6 +229,11 @@ export default function SubscribePage() {
         throw new Error(data.error || 'Failed to start free trial');
       }
 
+      trackEvent('start_free_trial', {
+        plan: 'Pro',
+        source: 'subscribe_page',
+      });
+
       showToast('1-month Pro trial started successfully!', 'success');
       setTimeout(() => {
         router.push('/download');
@@ -241,6 +247,13 @@ export default function SubscribePage() {
   };
 
   const handleSubscribe = async (planName: string, billingPeriod: 'monthly' | 'annually' = 'monthly') => {
+    trackEvent('begin_checkout', {
+      currency: 'INR',
+      value: livePricing[planName]?.[billingPeriod] ?? 0,
+      items: [{ item_name: planName, item_category: 'subscription', price: livePricing[planName]?.[billingPeriod] ?? 0, quantity: 1 }],
+      billing_period: billingPeriod,
+      source: 'subscribe_page',
+    });
     setLoading(planName);
     router.push(`/checkout?plan=${encodeURIComponent(planName)}&billingPeriod=${billingPeriod}&context=new`);
   };
@@ -290,7 +303,13 @@ export default function SubscribePage() {
               <div className="border border-slate-200 bg-white rounded-lg p-1">
                 <div className="flex items-center">
                   <button
-                    onClick={() => setBillingPeriod('monthly')}
+                    onClick={() => {
+                      setBillingPeriod('monthly');
+                      trackEvent('select_billing_period', {
+                        billing_period: 'monthly',
+                        source: 'subscribe_page',
+                      });
+                    }}
                     className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                       billingPeriod === 'monthly'
                         ? 'bg-blue-600 text-white'
@@ -300,7 +319,13 @@ export default function SubscribePage() {
                     Monthly
                   </button>
                   <button
-                    onClick={() => setBillingPeriod('annually')}
+                    onClick={() => {
+                      setBillingPeriod('annually');
+                      trackEvent('select_billing_period', {
+                        billing_period: 'annually',
+                        source: 'subscribe_page',
+                      });
+                    }}
                     className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
                       billingPeriod === 'annually'
                         ? 'bg-blue-600 text-white'

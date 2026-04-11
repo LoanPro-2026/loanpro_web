@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import { checkRateLimit, resetRateLimit, RateLimitPresets } from '@/lib/rateLimit';
+import { resetRateLimit, RateLimitPresets } from '@/lib/rateLimit';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -29,14 +31,24 @@ function timingSafeEqualText(a: string, b: string): boolean {
 
 export async function POST(request: NextRequest) {
   const corsHeaders = getCorsHeaders(request);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
 
   try {
-    const { email, password } = await request.json();
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(request, { maxBytes: 32 * 1024 });
+    if (!parsedBody.ok) {
+      return applyCors(parsedBody.response);
+    }
+
+    const { email, password } = parsedBody.data;
     const clientIp = getClientIp(request);
     const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPassword = String(password || '');
 
     // Validate input
-    if (!normalizedEmail || !password) {
+    if (!normalizedEmail || !normalizedPassword) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400, headers: corsHeaders }
@@ -44,11 +56,14 @@ export async function POST(request: NextRequest) {
     }
 
     const rateLimitKey = `admin:login:ip:${clientIp}`;
-    if (!checkRateLimit(rateLimitKey, RateLimitPresets.AUTH.limit, RateLimitPresets.AUTH.windowMs)) {
-      return NextResponse.json(
-        { error: 'Too many login attempts. Please try again later.' },
-        { status: 429, headers: corsHeaders }
-      );
+    const rateLimitResponse = enforceRequestRateLimit({
+      request,
+      scope: 'admin-login',
+      limit: RateLimitPresets.AUTH.limit,
+      windowMs: RateLimitPresets.AUTH.windowMs,
+    });
+    if (rateLimitResponse) {
+      return applyCors(rateLimitResponse);
     }
 
     // Check against admin credentials from environment
@@ -79,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     // Verify credentials
     const emailMatches = timingSafeEqualText(normalizedEmail, adminEmail);
-    const passwordMatches = timingSafeEqualText(password, adminPassword);
+    const passwordMatches = timingSafeEqualText(normalizedPassword, adminPassword);
 
     if (!emailMatches || !passwordMatches) {
       const isFreshWindow =
@@ -134,11 +149,8 @@ export async function POST(request: NextRequest) {
     }, { status: 200, headers: corsHeaders });
 
   } catch (error) {
-    console.error('Admin login error:', error);
-    return NextResponse.json(
-      { error: 'Login failed' },
-      { status: 500, headers: corsHeaders }
-    );
+    logger.error('Admin login error', error, 'ADMIN_LOGIN');
+    return applyCors(toSafeErrorResponse(error, 'ADMIN_LOGIN', 'Login failed'));
   }
 }
 

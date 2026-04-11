@@ -5,6 +5,7 @@ import DialogProvider from '@/components/DialogProvider';
 import GlobalLoader from '@/components/GlobalLoader';
 import { TenantProvider } from '../components/TenantProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 import AppWrapper from './AppWrapper';
 import { headers } from 'next/headers';
 import type { Metadata, Viewport } from "next";
@@ -44,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         </head>
         <body className={`${inter.variable} ${plusJakarta.variable} antialiased`}>
+          <GoogleAnalytics />
           <ErrorBoundary>
             <ToastProvider>
               <DialogProvider>

@@ -2,15 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import emailService from '@/services/emailService';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const authResult = await auth();
+    const userId = authResult.userId;
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { deviceId, reason = 'User revoked' } = await request.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request,
+      scope: 'devices-revoke',
+      limit: 20,
+      windowMs: 60 * 1000,
+      userId,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(request, { maxBytes: 32 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const body = parsedBody.data as Record<string, any>;
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const reason = typeof body.reason === 'string' && body.reason.trim().length > 0
+      ? body.reason.trim()
+      : 'User revoked';
     if (!deviceId) {
       return NextResponse.json({ error: 'Missing deviceId' }, { status: 400 });
     }
@@ -39,7 +58,7 @@ export async function POST(request: NextRequest) {
     const userWithToken = await db.collection('users').findOne({ 
       $or: [
         { userId },
-        { email: (await auth()).sessionClaims?.email }
+        { email: authResult.sessionClaims?.email }
       ]
     });
 
@@ -107,10 +126,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Device revoke API error:', error);
-    return NextResponse.json(
-      { error: 'Failed to revoke device' },
-      { status: 500 }
-    );
+    logger.error('Device revoke API error', error, 'DEVICES_API');
+    return toSafeErrorResponse(error, 'DEVICES_API', 'Failed to revoke device');
   }
 }

@@ -37,6 +37,86 @@ const ALLOWED_ORIGINS = Array.from(
   ])
 );
 
+interface MiddlewareRateLimitEntry {
+  count: number;
+  resetTime: number;
+}
+
+const middlewareApiRateLimitStore = new Map<string, MiddlewareRateLimitEntry>();
+
+function getRequestIp(req: Request): string {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(',')[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+
+  return 'unknown';
+}
+
+function getApiLimitProfile(pathname: string): { scope: string; limit: number; windowMs: number } {
+  if (pathname.startsWith('/api/webhooks/')) {
+    return { scope: 'webhook', limit: 120, windowMs: 60_000 };
+  }
+
+  if (
+    pathname.startsWith('/api/create-order') ||
+    pathname.startsWith('/api/payment-success') ||
+    pathname.startsWith('/api/upgrade-plan') ||
+    pathname.startsWith('/api/cancel-subscription')
+  ) {
+    return { scope: 'payment', limit: 35, windowMs: 60_000 };
+  }
+
+  if (pathname.startsWith('/api/admin/')) {
+    return { scope: 'admin', limit: 50, windowMs: 60_000 };
+  }
+
+  return { scope: 'api', limit: 100, windowMs: 60_000 };
+}
+
+function checkMiddlewareApiRateLimit(req: Request, pathname: string): { allowed: boolean; retryAfterSeconds: number; remaining: number; limit: number; resetEpochSeconds: number } {
+  const ip = getRequestIp(req);
+  const profile = getApiLimitProfile(pathname);
+  const key = `${profile.scope}:${ip}`;
+  const now = Date.now();
+  const entry = middlewareApiRateLimitStore.get(key);
+
+  if (!entry || now > entry.resetTime) {
+    middlewareApiRateLimitStore.set(key, { count: 1, resetTime: now + profile.windowMs });
+    return {
+      allowed: true,
+      retryAfterSeconds: 0,
+      remaining: profile.limit - 1,
+      limit: profile.limit,
+      resetEpochSeconds: Math.floor((now + profile.windowMs) / 1000),
+    };
+  }
+
+  if (entry.count >= profile.limit) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((entry.resetTime - now) / 1000));
+    return {
+      allowed: false,
+      retryAfterSeconds,
+      remaining: 0,
+      limit: profile.limit,
+      resetEpochSeconds: Math.floor(entry.resetTime / 1000),
+    };
+  }
+
+  entry.count += 1;
+  return {
+    allowed: true,
+    retryAfterSeconds: 0,
+    remaining: Math.max(0, profile.limit - entry.count),
+    limit: profile.limit,
+    resetEpochSeconds: Math.floor(entry.resetTime / 1000),
+  };
+}
+
 /**
  * Check if origin is allowed
  */
@@ -93,7 +173,7 @@ function getSecurityHeaders() {
       "style-src 'self' 'unsafe-inline' https://*.razorpay.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https:",
-      "connect-src 'self' https://api.clerk.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
+      "connect-src 'self' https://api.clerk.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/ https://www.google-analytics.com https://*.google-analytics.com https://stats.g.doubleclick.net",
       "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
       "frame-ancestors 'none'",
     ].join('; '),
@@ -119,6 +199,23 @@ export default clerkMiddleware(async (auth, req) => {
     });
   }
   // ======== END PREFLIGHT ======== //
+
+  // Global API abuse protection layer (defense in depth).
+  if (isApiRoute) {
+    const rate = checkMiddlewareApiRateLimit(req, pathname);
+    if (!rate.allowed) {
+      const allHeaders: Record<string, string> = { ...corsHeaders, ...securityHeaders };
+      allHeaders['Retry-After'] = String(rate.retryAfterSeconds);
+      allHeaders['X-RateLimit-Limit'] = String(rate.limit);
+      allHeaders['X-RateLimit-Remaining'] = String(rate.remaining);
+      allHeaders['X-RateLimit-Reset'] = String(rate.resetEpochSeconds);
+
+      return NextResponse.json(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT' },
+        { status: 429, headers: allHeaders }
+      );
+    }
+  }
 
   // Check if current route requires authentication
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));

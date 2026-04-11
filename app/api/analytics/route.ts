@@ -1,13 +1,47 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders } from '@/lib/cors';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
+
+async function resolveUserIdFromRequest(req: Request): Promise<string | null> {
+  const { userId } = await auth();
+  if (userId) return userId;
+
+  const desktopAccessToken = req.headers.get('x-desktop-access-token')?.trim();
+  if (!desktopAccessToken) return null;
+
+  const client = await clientPromise;
+  const db = client.db('AdminDB');
+  const user = await db.collection('users').findOne({ accessToken: desktopAccessToken }, { projection: { userId: 1 } });
+  return typeof user?.userId === 'string' ? user.userId : null;
+}
 
 // Analytics endpoint for desktop app usage tracking
 export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    const { accessToken, events, sessionData } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'analytics-ingest',
+      limit: 120,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 1024 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const events = Array.isArray(body.events) ? body.events : [];
+    const sessionData = body.sessionData && typeof body.sessionData === 'object' ? body.sessionData : null;
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -64,21 +98,28 @@ export async function POST(req: Request) {
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Analytics API error:', error);
-    return NextResponse.json({ error: 'Failed to record analytics' }, { status: 500, headers: corsHeaders });
+    logger.error('Analytics ingestion API error', error, 'ANALYTICS_API');
+    return applyCors(toSafeErrorResponse(error, 'ANALYTICS_API', 'Failed to record analytics'));
   }
 }
 
 // Get analytics insights for web dashboard
 export async function GET(req: Request) {
   try {
+    const resolvedUserId = await resolveUserIdFromRequest(req);
+    if (!resolvedUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const timeframe = searchParams.get('timeframe') || '30d';
-    const userId = searchParams.get('userId');
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
+    const requestedUserId = searchParams.get('userId');
+
+    // Backward compatibility: allow userId query param only when it matches authenticated identity.
+    if (requestedUserId && requestedUserId !== resolvedUserId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const userId = resolvedUserId;
     
     const client = await clientPromise;
     const db = client.db('AdminDB');
@@ -124,7 +165,7 @@ export async function GET(req: Request) {
     return NextResponse.json(insights);
     
   } catch (error) {
-    console.error('Analytics GET API error:', error);
+    logger.error('Analytics insights API error', error, 'ANALYTICS_API');
     return NextResponse.json({ error: 'Failed to get analytics' }, { status: 500 });
   }
 }

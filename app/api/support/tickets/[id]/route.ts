@@ -3,6 +3,59 @@ import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
+import { connectToDatabase } from '@/lib/mongodb';
+
+type VerifiedSupportUser = {
+  userId: string;
+  email: string;
+  fullName: string;
+};
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+async function verifySupportUserIdentity(params: {
+  userId?: string;
+  userEmail?: string;
+  accessToken?: string;
+}): Promise<VerifiedSupportUser | null> {
+  const { db } = await connectToDatabase();
+  const normalizedUserId = (params.userId || '').trim();
+  const normalizedEmail = (params.userEmail || '').trim().toLowerCase();
+  const normalizedToken = (params.accessToken || '').trim();
+
+  if (normalizedToken) {
+    const user = await db.collection('users').findOne({ accessToken: normalizedToken });
+    if (!user) return null;
+
+    const tokenUserId = String(user.userId || '');
+    const tokenEmail = String(user.email || '').trim().toLowerCase();
+    if (!tokenUserId || !tokenEmail) return null;
+
+    if (normalizedUserId && normalizedUserId !== tokenUserId) return null;
+    if (normalizedEmail && normalizedEmail !== tokenEmail) return null;
+
+    return {
+      userId: tokenUserId,
+      email: tokenEmail,
+      fullName: String(user.fullName || user.username || '').trim(),
+    };
+  }
+
+  if (!normalizedUserId || !normalizedEmail) {
+    return null;
+  }
+
+  const user = await db.collection('users').findOne({ userId: normalizedUserId, email: normalizedEmail });
+  if (!user) return null;
+
+  return {
+    userId: normalizedUserId,
+    email: normalizedEmail,
+    fullName: String(user.fullName || user.username || '').trim(),
+  };
+}
 
 /**
  * OPTIONS /api/support/tickets/[id]
@@ -21,22 +74,51 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'support-ticket-get',
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
     const { id } = await params;
     const ticketId = id;
     const { searchParams } = new URL(req.url);
-    const userEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId');
+    const requestedUserEmail = searchParams.get('userEmail') || searchParams.get('email') || searchParams.get('userId') || undefined;
+    const requestedUserId = searchParams.get('userId') || undefined;
+    const queryAccessToken = searchParams.get('accessToken') || undefined;
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+    const accessToken = queryAccessToken || bearerToken;
 
-    if (!userEmail) {
+    if (!requestedUserEmail && !requestedUserId) {
       return NextResponse.json(
         { success: false, error: 'userEmail or userId is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Reject only if userId is explicitly 'unknown'
-    if (userEmail === 'unknown') {
+    if (isProduction && !accessToken) {
+      return NextResponse.json(
+        { success: false, error: 'Access token is required in production.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    const verifiedUser = await verifySupportUserIdentity({
+      userId: requestedUserId,
+      userEmail: requestedUserEmail,
+      accessToken,
+    });
+
+    if (!verifiedUser) {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -55,7 +137,7 @@ export async function GET(
     }
 
     // Verify ownership - check userEmail instead of userId since userId param contains the email
-    if (ticket.userEmail !== userEmail) {
+    if (ticket.userEmail !== verifiedUser.email) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }
@@ -74,12 +156,8 @@ export async function GET(
     }, { headers: corsHeaders });
 
   } catch (error: any) {
-    console.error('Error fetching ticket:', error);
-    const corsHeaders = getCorsHeaders(req);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch ticket', details: error.message },
-      { status: 500, headers: corsHeaders }
-    );
+    logger.error('Error fetching support ticket', error, 'SUPPORT_TICKETS');
+    return applyCors(toSafeErrorResponse(error, 'SUPPORT_TICKETS', 'Failed to fetch ticket'));
   }
 }
 
@@ -92,23 +170,50 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'support-ticket-patch',
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
     const { id } = await params;
     const ticketId = id;
-    const body = await req.json();
-    const { userId, userEmail, message } = body;
-    const requesterEmail = userEmail || userId;
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 64 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
 
-    if (!requesterEmail || !message) {
+    const body = parsedBody.data as Record<string, any>;
+    const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+    const userEmail = typeof body.userEmail === 'string' ? body.userEmail.trim().toLowerCase() : '';
+    const message = typeof body.message === 'string' ? body.message : '';
+    const bodyAccessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+    const accessToken = bodyAccessToken || bearerToken;
+
+    if ((!userEmail && !userId) || !message.trim()) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Reject only if userId is explicitly 'unknown'
-    if (requesterEmail === 'unknown') {
+    if (isProduction && !accessToken) {
+      return NextResponse.json(
+        { success: false, error: 'Access token is required in production.' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
+    const verifiedUser = await verifySupportUserIdentity({ userId, userEmail, accessToken });
+    if (!verifiedUser) {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -127,7 +232,7 @@ export async function PATCH(
     }
 
     // Verify ownership - check userEmail instead of userId since userId param contains the email
-    if (ticket.userEmail !== requesterEmail) {
+    if (ticket.userEmail !== verifiedUser.email) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 403, headers: corsHeaders }
@@ -161,7 +266,10 @@ export async function PATCH(
       issueType: ticket.issueType,
       priority: ticket.priority,
       appVersion: ticket.appVersion
-    }).catch(err => console.error('Failed to send email:', err));
+    }).catch((err) => logger.warn('Failed to send support update email', 'SUPPORT_TICKETS', {
+      ticketId: ticket.ticketId,
+      error: err instanceof Error ? err.message : 'unknown',
+    }));
 
     return NextResponse.json({
       success: true,
@@ -173,11 +281,7 @@ export async function PATCH(
     }, { headers: corsHeaders });
 
   } catch (error: any) {
-    console.error('Error updating ticket:', error);
-    const corsHeaders = getCorsHeaders(req);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update ticket', details: error.message },
-      { status: 500, headers: corsHeaders }
-    );
+    logger.error('Error updating support ticket', error, 'SUPPORT_TICKETS');
+    return applyCors(toSafeErrorResponse(error, 'SUPPORT_TICKETS', 'Failed to update ticket'));
   }
 }

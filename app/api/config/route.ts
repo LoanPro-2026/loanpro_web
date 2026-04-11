@@ -1,13 +1,36 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders } from '@/lib/cors';
+import { getPlanFeatures } from '@/lib/planFeatures';
+import { getEffectivePlanFeatures } from '@/lib/planConfig';
+import { getSubscriptionStatus } from '@/lib/subscriptionHelpers';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 // Remote configuration for desktop app
 export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    const { accessToken, appVersion, deviceInfo } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'config',
+      limit: 90,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 96 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const appVersion = typeof body.appVersion === 'string' ? body.appVersion.trim() : '';
+    const deviceInfo = (body.deviceInfo && typeof body.deviceInfo === 'object') ? body.deviceInfo : undefined;
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -23,7 +46,8 @@ export async function POST(req: Request) {
     }
     
     const subscription = await db.collection('subscriptions').findOne({ userId: user.userId });
-    if (!subscription || subscription.status !== 'active') {
+    const accessStatus = subscription ? getSubscriptionStatus(subscription as any) : 'expired';
+    if (!subscription || accessStatus === 'expired') {
       return NextResponse.json({ error: 'No active subscription' }, { status: 403, headers: corsHeaders });
     }
     
@@ -41,20 +65,26 @@ export async function POST(req: Request) {
     
     // Get configuration based on subscription plan
     const config = await getConfigForPlan(subscription.subscriptionType, appVersion);
+    const effectivePlanFeatures = await getEffectivePlanFeatures(db, subscription.subscriptionType);
     
     return NextResponse.json({
       success: true,
       config,
       subscription: {
         plan: subscription.subscriptionType,
-        status: subscription.status,
+        status: accessStatus,
         expiresAt: subscription.endDate
+      },
+      planFeatures: {
+        maxDevices: effectivePlanFeatures.maxDevices,
+        cloudStorageGB: effectivePlanFeatures.cloudStorageGB,
+        features: effectivePlanFeatures.features,
       }
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Config API error:', error);
-    return NextResponse.json({ error: 'Failed to get config' }, { status: 500, headers: corsHeaders });
+    logger.error('Config API error', error, 'CONFIG_API');
+    return applyCors(toSafeErrorResponse(error, 'CONFIG_API', 'Failed to get config'));
   }
 }
 

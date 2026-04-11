@@ -2,12 +2,14 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { successResponse, errorResponse, ApiErrors } from '@/lib/apiResponse';
 import { validateOrderRequest } from '@/lib/validation';
-import { checkRateLimit, RateLimitPresets } from '@/lib/rateLimit';
+import { RateLimitPresets } from '@/lib/rateLimit';
 import { getRazorpayClient } from '@/lib/razorpayClient';
 import { getEffectivePlanPricing, normalizePlanName } from '@/lib/planConfig';
 import { connectToDatabase } from '@/lib/mongodb';
 import { getCouponQuote } from '@/lib/couponUtils';
 import { calculatePlanAmountPaise, calculatePlanAmountRupees, type PaidPlanName } from '@/lib/pricing';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse, withRecovery } from '@/lib/apiSafety';
 
 async function resolveUserIdFromRequest(req: Request): Promise<string | null> {
   const { userId } = await auth();
@@ -22,14 +24,14 @@ async function resolveUserIdFromRequest(req: Request): Promise<string | null> {
 }
 
 export async function POST(req: Request) {
-  console.log('[CREATE-ORDER] API route called');
+  logger.info('Create order API route called', 'CREATE_ORDER');
   
   try {
     const { client: razorpay, error: razorpayInitError, keyId } = getRazorpayClient();
 
     // Check if Razorpay is initialized
     if (!razorpay) {
-      console.error('[CREATE-ORDER] Razorpay not initialized');
+      logger.error('Razorpay not initialized', razorpayInitError || new Error('PAYMENT_CONFIG_ERROR'), 'CREATE_ORDER');
       return errorResponse({
         code: 'PAYMENT_CONFIG_ERROR',
         message: razorpayInitError || 'Payment system is not configured',
@@ -37,34 +39,31 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log('[CREATE-ORDER] Razorpay initialized', { keyType: keyId.includes('test') ? 'test' : 'live' });
+    logger.info('Razorpay initialized', 'CREATE_ORDER', { keyType: keyId.includes('test') ? 'test' : 'live' });
 
     // Check authentication
     const userId = await resolveUserIdFromRequest(req);
-    console.log('[CREATE-ORDER] User ID:', userId);
+    logger.debug('Create order authenticated request', 'CREATE_ORDER', { userId: userId || null });
     
     if (!userId) {
-      console.log('[CREATE-ORDER] Unauthorized - no user ID');
+      logger.warn('Unauthorized create order attempt', 'CREATE_ORDER');
       return errorResponse(ApiErrors.UNAUTHORIZED);
     }
 
     // Rate limiting - prevent abuse
-    const rateLimitKey = `create-order:${userId}`;
-    if (!checkRateLimit(rateLimitKey, RateLimitPresets.PAYMENT.limit, RateLimitPresets.PAYMENT.windowMs)) {
-      return errorResponse(ApiErrors.RATE_LIMIT);
-    }
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'create-order',
+      limit: RateLimitPresets.PAYMENT.limit,
+      windowMs: RateLimitPresets.PAYMENT.windowMs,
+      userId,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
 
     // Parse and validate request body
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return errorResponse({
-        code: 'INVALID_JSON',
-        message: 'Invalid JSON in request body',
-        statusCode: 400,
-      });
-    }
+    const parsedBody = await parseJsonRequest<Record<string, any>>(req, { maxBytes: 64 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.data;
 
     // Validate input
     const validation = validateOrderRequest(body);
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
     });
 
     if (existingOrder) {
-      console.log('[CREATE-ORDER] Reusing existing order:', existingOrder.orderId);
+      logger.info('Reusing existing create-order intent', 'CREATE_ORDER', { orderId: existingOrder.orderId, userId });
       return successResponse({
         orderId: existingOrder.orderId,
         amount: existingOrder.amount,
@@ -182,10 +181,10 @@ export async function POST(req: Request) {
 
     // Warn if exceeding test mode limit (but allow it for production)
     if (orderAmount > testModeMaxAmount && process.env.NODE_ENV !== 'production') {
-      console.warn(`[CREATE-ORDER] Amount ₹${orderAmount/100} exceeds Razorpay test mode limit of ₹10,000`);
+      logger.warn('Create order amount exceeds Razorpay test mode limit', 'CREATE_ORDER', { amount: orderAmount / 100 });
     }
 
-    console.log('[CREATE-ORDER] Processing order:', { 
+    logger.info('Processing create order request', 'CREATE_ORDER', { 
       userId,
       plan: normalizedPlan,
       billingPeriod, 
@@ -202,31 +201,40 @@ export async function POST(req: Request) {
     const userIdShort = userId.slice(-8); // Last 8 chars of userId
     const receiptId = `rcpt_${timestamp}_${userIdShort}`; // Max 28 chars
     
-    console.log('[CREATE-ORDER] Receipt ID:', receiptId, 'Length:', receiptId.length);
+    logger.debug('Create order receipt generated', 'CREATE_ORDER', { receiptId, length: receiptId.length });
 
     // Create Razorpay order
     let order;
     try {
-      console.log('[CREATE-ORDER] Creating Razorpay order...');
-      order = await razorpay.orders.create({
-        amount: orderAmount,
-        currency: 'INR',
-        receipt: receiptId,
-        notes: {
-          userId,
-          plan: normalizedPlan,
-          billingPeriod,
-          paymentContext: normalizedPaymentContext,
-          couponCode: normalizedCouponCode || '',
-        },
-      });
-      console.log('[CREATE-ORDER] Razorpay order created:', order.id);
+      logger.info('Creating Razorpay order', 'CREATE_ORDER', { userId, plan: normalizedPlan });
+      order = await withRecovery(
+        () =>
+          razorpay.orders.create({
+            amount: orderAmount,
+            currency: 'INR',
+            receipt: receiptId,
+            notes: {
+              userId,
+              plan: normalizedPlan,
+              billingPeriod,
+              paymentContext: normalizedPaymentContext,
+              couponCode: normalizedCouponCode || '',
+            },
+          }),
+        {
+          operation: 'razorpay-order-create',
+          context: 'CREATE_ORDER',
+          attempts: 2,
+          baseDelayMs: 300,
+        }
+      );
+      logger.info('Razorpay order created', 'CREATE_ORDER', { orderId: order.id });
     } catch (rzpError: any) {
-      console.error('[CREATE-ORDER] Razorpay order creation failed:', rzpError);
+      logger.error('Razorpay order creation failed', rzpError, 'CREATE_ORDER');
       throw rzpError; // Re-throw to be caught by outer catch
     }
 
-    console.log('[CREATE-ORDER] Order created successfully:', order.id);
+    logger.info('Create order completed successfully', 'CREATE_ORDER', { orderId: order.id });
 
     // Store order intent for idempotency and abandoned cart tracking
     const now = new Date();
@@ -272,9 +280,7 @@ export async function POST(req: Request) {
     }, 'Order created successfully', 201);
 
   } catch (error: any) {
-    console.error('[CREATE-ORDER] Error caught:', error);
-    console.error('[CREATE-ORDER] Error type:', typeof error);
-    console.error('[CREATE-ORDER] Error details:', JSON.stringify(error, null, 2));
+    logger.error('Create order failed', error, 'CREATE_ORDER');
 
     // Handle Razorpay API errors
     if (error?.error?.code) {
@@ -290,7 +296,7 @@ export async function POST(req: Request) {
         });
       }
 
-      console.error('[CREATE-ORDER] Razorpay API error:', error.error);
+      logger.error('Razorpay API error during create order', razorpayError, 'CREATE_ORDER');
       return errorResponse({
         code: razorpayError.code || 'PAYMENT_ERROR',
         message: description || 'Failed to create payment order. Verify Razorpay key/secret pair and account mode.',
@@ -300,7 +306,6 @@ export async function POST(req: Request) {
 
     // Handle standard errors
     if (error instanceof Error) {
-      console.error('[CREATE-ORDER] Standard error:', error.message);
       return errorResponse({
         code: 'INTERNAL_ERROR',
         message: error.message || 'Failed to process order',
@@ -309,7 +314,6 @@ export async function POST(req: Request) {
     }
 
     // Fallback error
-    console.error('[CREATE-ORDER] Unknown error type');
-    return errorResponse(ApiErrors.INTERNAL_ERROR);
+    return toSafeErrorResponse(error, 'CREATE_ORDER', 'Failed to process order');
   }
 }

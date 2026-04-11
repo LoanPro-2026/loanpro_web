@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 import emailService from '@/services/emailService';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 export function OPTIONS(req: Request) {
   return handleCorsPreFlight(req);
@@ -11,9 +13,27 @@ export function OPTIONS(req: Request) {
 
 export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
 
   try {
-    const { accessToken, deviceId, deviceName } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'devices-request-switch',
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 48 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const deviceId = typeof body.deviceId === 'string' ? body.deviceId.trim() : '';
+    const deviceName = typeof body.deviceName === 'string' ? body.deviceName.trim() : '';
 
     if (!accessToken)
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -61,7 +81,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, message: 'Device switch requested', device: deviceEntry }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('Device switch request API error:', error);
-    return NextResponse.json({ error: 'Failed to request device switch' }, { status: 500, headers: corsHeaders });
+    logger.error('Device switch request API error', error, 'DEVICES_API');
+    return applyCors(toSafeErrorResponse(error, 'DEVICES_API', 'Failed to request device switch'));
   }
 }

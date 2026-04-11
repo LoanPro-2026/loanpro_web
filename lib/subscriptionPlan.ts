@@ -11,7 +11,7 @@ export function normalizePlan(input?: string | null): SupportedPlan {
 }
 
 export function getDeviceLimitForPlan(plan: SupportedPlan): number {
-  if (plan === 'enterprise') return 2;
+  if (plan === 'enterprise') return 5;
   return 1;
 }
 

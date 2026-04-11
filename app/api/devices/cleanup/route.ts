@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getDeviceLimitForPlan, resolveEffectivePlanForUser } from '@/lib/subscriptionPlan';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
+
+const INTERNAL_CLEANUP_SECRET = String(process.env.INTERNAL_CLEANUP_SECRET || '').trim();
+
+function isAuthorizedInternalRequest(req: Request): boolean {
+  if (!INTERNAL_CLEANUP_SECRET) return false;
+  const provided = (req.headers.get('x-internal-cleanup-secret') || '').trim();
+  return provided.length > 0 && provided === INTERNAL_CLEANUP_SECRET;
+}
 
 async function cleanupDevices(accessToken: string) {
   try {
@@ -9,11 +19,9 @@ async function cleanupDevices(accessToken: string) {
     
     const user = await db.collection('users').findOne({ accessToken });
     if (!user) {
-      console.log('User not found');
+      logger.warn('Device cleanup user not found', 'DEVICES_API');
       return;
     }
-
-    console.log('Before cleanup:', user.devices?.length || 0, 'devices');
     
     // Keep only the most recent device (or first device if same timestamp)
     const devices = user.devices || [];
@@ -35,7 +43,11 @@ async function cleanupDevices(accessToken: string) {
       { $set: { devices: cleanedDevices } }
     );
     
-    console.log('After cleanup:', cleanedDevices.length, 'devices');
+    logger.info('Device cleanup completed', 'DEVICES_API', {
+      before: devices.length,
+      after: cleanedDevices.length,
+      cleaned: devices.length - cleanedDevices.length,
+    });
     return {
       before: devices.length,
       after: cleanedDevices.length,
@@ -43,7 +55,7 @@ async function cleanupDevices(accessToken: string) {
     };
     
   } catch (error) {
-    console.error('Cleanup error:', error);
+    logger.error('Device cleanup execution failed', error, 'DEVICES_API');
     throw error;
   }
 }
@@ -75,14 +87,31 @@ async function testDeviceLimit(accessToken: string) {
     };
     
   } catch (error) {
-    console.error('Test error:', error);
+    logger.error('Device cleanup test failed', error, 'DEVICES_API');
     throw error;
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const { accessToken, action } = await req.json();
+    if (!isAuthorizedInternalRequest(req)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'devices-cleanup-internal',
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 32 * 1024 });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const action = typeof body.action === 'string' ? body.action.trim() : '';
 
     if (!accessToken) {
       return NextResponse.json({ error: 'Access token required' }, { status: 400 });
@@ -103,7 +132,7 @@ export async function POST(req: Request) {
     }
 
   } catch (error) {
-    console.error('Cleanup API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Cleanup API error', error, 'DEVICES_API');
+    return toSafeErrorResponse(error, 'DEVICES_API', 'Internal server error');
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { logger } from '@/lib/logger';
 
 const PUBLIC_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://loanpro.tech').replace(/\/$/, '');
 const ANALYTICS_TIMEOUT_MS = 5000;
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const clientIP = forwardedFor || realIP || 'unknown';
     
     // Track download
-    console.log(`Desktop app download requested - Version: ${version}, IP: ${clientIP}`);
+    logger.info('Desktop app download requested', 'DESKTOP_DOWNLOAD', { version, clientIP });
     
     // Track analytics (make it more robust)
     try {
@@ -48,7 +49,9 @@ export async function GET(request: NextRequest) {
         })
       });
     } catch (analyticsError) {
-      console.log('Analytics tracking failed:', analyticsError);
+      logger.warn('Download analytics tracking failed', 'DESKTOP_DOWNLOAD', {
+        error: analyticsError instanceof Error ? analyticsError.message : 'unknown',
+      });
       // Don't fail the download if analytics fails
     }
     
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
       message: 'Download initiated'
     });
   } catch (error) {
-    console.error('Download tracking failed:', error);
+    logger.error('Download tracking failed', error, 'DESKTOP_DOWNLOAD');
     return NextResponse.json({
       success: false,
       error: 'Download failed'

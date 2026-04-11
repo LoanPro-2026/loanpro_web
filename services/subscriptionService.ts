@@ -1,5 +1,6 @@
 import clientPromise from '@/lib/mongodb';
 import { Subscription, CreateSubscriptionDTO } from '@/models/Subscription';
+import { getSubscriptionStatus } from '@/lib/subscriptionHelpers';
 
 export class SubscriptionService {
   private collection = 'subscriptions';
@@ -71,7 +72,6 @@ export class SubscriptionService {
     const subscription = await this.getSubscriptionByUserId(userId);
     if (!subscription) return false;
 
-    const now = new Date();
-    return subscription.status === 'active' && subscription.endDate > now;
+    return getSubscriptionStatus(subscription as any) !== 'expired';
   }
 } 

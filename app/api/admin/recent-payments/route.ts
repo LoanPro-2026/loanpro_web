@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
 
     // First check if payments collection exists and has data
     const paymentCount = await db.collection('payments').countDocuments();
-    console.log('Total payments in database:', paymentCount);
+    logger.debug('Recent payments total count', 'ADMIN_PAYMENTS', { paymentCount });
 
     // Get recent payments with user email lookup
     const payments = await db
@@ -58,8 +59,10 @@ export async function GET(request: Request) {
       ])
       .toArray();
 
-    console.log('Recent payments fetched:', payments.length);
-    console.log('Sample payment:', payments[0]);
+    logger.debug('Recent payments fetched', 'ADMIN_PAYMENTS', {
+      count: payments.length,
+      hasSample: payments.length > 0,
+    });
 
     const payload = {
       success: true,
@@ -70,7 +73,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(payload);
   } catch (error: unknown) {
-    console.error('Error fetching recent payments:', error);
+    logger.error('Error fetching recent payments', error, 'ADMIN_PAYMENTS');
     return NextResponse.json(
       { 
         success: false, 

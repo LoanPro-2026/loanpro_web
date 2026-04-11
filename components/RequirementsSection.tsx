@@ -1,76 +1,76 @@
 import React from 'react';
 import {
-  ComputerDesktopIcon,
-  DevicePhoneMobileIcon,
-  CloudIcon
+    ComputerDesktopIcon,
+    DevicePhoneMobileIcon,
+    CloudIcon
 } from '@heroicons/react/24/outline';
 
 const requirements = [
-  {
-    title: 'Windows Operating System',
-    description: 'Windows 10 or later (64-bit) is required for installer compatibility, stable updates, and reliable runtime performance.',
-    icon: ComputerDesktopIcon,
-    required: true
-  },
-  {
-    title: 'Android Phone With Camera',
-    description: 'Required if your process uses companion capture for customer photo verification in loan creation and closure workflows.',
-    icon: DevicePhoneMobileIcon,
-    required: true
-  },
-  {
-    title: 'Internet Connection',
-    description: 'Needed for subscription checks, release updates, support diagnostics, and cloud backup on eligible plans.',
-    icon: CloudIcon,
-    required: true
-  }
+    {
+        title: 'Windows Desktop or Laptop',
+        description: 'Any basic computer running Windows 10 or Windows 11. Most computers bought after 2016 will work perfectly.',
+        icon: ComputerDesktopIcon,
+        required: true
+    },
+    {
+        title: 'Android Phone',
+        description: 'Any basic Android smartphone to take photos of customers and items. This is only needed for the Pro plan.',
+        icon: DevicePhoneMobileIcon,
+        required: false
+    },
+    {
+        title: 'Occasional Internet',
+        description: 'You only need an internet connection occasionally to verify your subscription or backup data.',
+        icon: CloudIcon,
+        required: false
+    }
 ];
 
 const RequirementsSection = () => {
-  return (
-    <section className="py-16 bg-white" id="requirements">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-semibold text-slate-600">
-            Requirements
-          </div>
-          <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-            Pre-install checklist
-          </h2>
-          <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-            Verify these prerequisites before rollout to avoid onboarding interruptions.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {requirements.map((requirement, index) => (
-            <div
-              key={index}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-5">
-                <requirement.icon className="w-6 h-6" />
-              </div>
-
-              <h3 className="text-lg font-semibold text-slate-900">
-                {requirement.title}
-              </h3>
-              
-              <p className="text-sm text-slate-600 leading-relaxed mt-2">
-                {requirement.description}
-              </p>
-
-              {requirement.required && (
-                <div className="mt-4 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  Required
+    return (
+        <section className="py-16 bg-white" id="requirements">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center mb-14">
+                    <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-sm font-semibold text-slate-600">
+                        Requirements
+                    </div>
+                    <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
+                        What you need
+                    </h2>
+                    <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
+                        LoanPro runs perfectly on simple, everyday shop computers. No expensive hardware needed.
+                    </p>
                 </div>
-              )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    {requirements.map((requirement, index) => (
+                        <div
+                            key={index}
+                            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+                        >
+                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-5">
+                                <requirement.icon className="w-6 h-6" />
+                            </div>
+
+                            <h3 className="text-lg font-semibold text-slate-900">
+                                {requirement.title}
+                            </h3>
+
+                            <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                                {requirement.description}
+                            </p>
+
+                            {requirement.required && (
+                                <div className="mt-4 inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                    Required
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+        </section>
+    );
 };
 
 export default RequirementsSection;

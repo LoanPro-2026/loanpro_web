@@ -385,8 +385,7 @@ export async function GET(request: Request) {
         userId, 
         cleaned: olderSubscriptionIds.length 
       });
-      
-      console.log(`Cleaned up ${olderSubscriptionIds.length} duplicate active subscriptions`);
+
     } else if (subscriptions.length === 1) {
       subscription = subscriptions[0];
     }

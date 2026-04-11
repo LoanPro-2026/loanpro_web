@@ -1,13 +1,35 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders } from '@/lib/cors';
+import { getSubscriptionStatus } from '@/lib/subscriptionHelpers';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 // Cloud backup endpoint for desktop app
 export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    const { accessToken, backupData, backupType, backupName } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'backup-store',
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 2 * 1024 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const backupData = body.backupData;
+    const backupType = typeof body.backupType === 'string' ? body.backupType.trim() : undefined;
+    const backupName = typeof body.backupName === 'string' ? body.backupName.trim() : undefined;
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -24,13 +46,14 @@ export async function POST(req: Request) {
     
     // Check subscription limits
     const subscription = await db.collection('subscriptions').findOne({ userId: user.userId });
-    if (!subscription || subscription.status !== 'active') {
+    const accessStatus = subscription ? getSubscriptionStatus(subscription as any) : 'expired';
+    if (!subscription || accessStatus === 'expired') {
       return NextResponse.json({ error: 'No active subscription' }, { status: 403, headers: corsHeaders });
     }
     
     // Get current backup count
     const backupCount = await db.collection('backups').countDocuments({ userId: user.userId });
-    const maxBackups = getMaxBackupsForPlan(subscription.subscriptionType);
+    const maxBackups = getMaxBackupsForPlan(subscription.subscriptionType || subscription.plan || subscription.subscriptionPlan || 'monthly');
     
     if (backupCount >= maxBackups) {
       // Remove oldest backup
@@ -65,18 +88,34 @@ export async function POST(req: Request) {
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Backup API error:', error);
-    return NextResponse.json({ error: 'Backup failed' }, { status: 500, headers: corsHeaders });
+    logger.error('Backup API error', error, 'BACKUP_API');
+    return applyCors(toSafeErrorResponse(error, 'BACKUP_API', 'Backup failed'));
   }
 }
 
 // Get available backups
 export async function GET(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'backup-list',
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
     const { searchParams } = new URL(req.url);
-    const accessToken = searchParams.get('accessToken');
+    const queryToken = searchParams.get('accessToken')?.trim() || '';
+    const headerToken = req.headers.get('x-desktop-access-token')?.trim() || '';
+    const authHeader = req.headers.get('authorization') || '';
+    const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+    const accessToken = queryToken || headerToken || bearerToken;
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -112,19 +151,21 @@ export async function GET(req: Request) {
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Backup list API error:', error);
-    return NextResponse.json({ error: 'Failed to get backups' }, { status: 500, headers: corsHeaders });
+    logger.error('Backup list API error', error, 'BACKUP_API');
+    return applyCors(toSafeErrorResponse(error, 'BACKUP_API', 'Failed to get backups'));
   }
 }
 
 function getMaxBackupsForPlan(plan: string): number {
-  switch (plan) {
+  switch (String(plan || '').toLowerCase()) {
     case 'monthly':
       return 10;
     case '6months':
       return 25;
     case 'yearly':
       return 50;
+    case 'trial':
+      return 25;
     default:
       return 5;
   }

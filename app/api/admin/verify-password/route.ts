@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
+import { logger } from '@/lib/logger';
 
 function timingSafeEqualText(a: string, b: string): boolean {
   const left = Buffer.from(a);
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       message: 'Password verified successfully'
     });
   } catch (error: unknown) {
-    console.error('Error verifying password:', error);
+    logger.error('Error verifying admin password', error, 'ADMIN_VERIFY_PASSWORD');
     return NextResponse.json(
       { 
         success: false, 

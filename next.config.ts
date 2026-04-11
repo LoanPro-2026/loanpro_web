@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://*.clerk.dev https://*.razorpay.com",
               "img-src 'self' data: https: blob:",
               "font-src 'self' data: https:",
-              "connect-src 'self' https://*.clerk.dev https://*.clerk.accounts.dev https://*.razorpay.com https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
+              "connect-src 'self' https://*.clerk.dev https://*.clerk.accounts.dev https://*.razorpay.com https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com wss://*.clerk.accounts.dev https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/ https://www.google-analytics.com https://*.google-analytics.com https://stats.g.doubleclick.net",
               "frame-src 'self' https://*.clerk.dev https://*.clerk.accounts.dev https://api.razorpay.com https://*.razorpay.com https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/",
             ].join('; '),
           },

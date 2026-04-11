@@ -11,15 +11,15 @@ const HeroSection = () => {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
-              Built for serious lending operations
+              Built for gold & silver lending businesses
             </div>
 
             <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-slate-900 font-display leading-tight">
-              Run your lending business with precision every day
+              Manage your daily lending and collections easily
             </h1>
 
             <p className="mt-5 text-lg text-slate-600 max-w-xl">
-              LoanPro gives finance teams one reliable workflow for loans, collections, repayment monitoring, and customer verification. It combines fast local performance with optional cloud backup and Android photo capture for operational accountability.
+              LoanPro is a simple Windows app for managing informal loans against gold and silver. Keep track of daily collections, cash flow, and use our Android app for quick customer photos. No complicated steps.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -51,7 +51,7 @@ const HeroSection = () => {
             </div>
 
             <div className="mt-6 text-sm text-slate-500">
-              Windows-first desktop product with companion Android capture support.
+              Simple Windows desktop app with an Android app for capturing photos.
             </div>
           </div>
 

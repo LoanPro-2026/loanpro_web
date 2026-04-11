@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ArrowLeftIcon, CheckIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ToastProvider';
+import { trackEvent } from '@/lib/googleAnalytics';
 
 declare global {
   interface Window {
@@ -113,6 +114,14 @@ export default function CheckoutPage() {
     };
   }, [plan, billingPeriod, appliedCoupon, showToast]);
 
+  useEffect(() => {
+    trackEvent('view_checkout', {
+      plan,
+      billing_period: billingPeriod,
+      checkout_context: checkoutContext,
+    });
+  }, [plan, billingPeriod, checkoutContext]);
+
   const handleApplyCoupon = () => {
     setAppliedCoupon(couponInput.trim().toUpperCase());
   };
@@ -125,6 +134,12 @@ export default function CheckoutPage() {
   const handlePayment = async () => {
     try {
       setProcessing(true);
+      trackEvent('add_payment_info', {
+        plan,
+        billing_period: billingPeriod,
+        checkout_context: checkoutContext,
+        coupon_code: appliedCoupon || undefined,
+      });
 
       const response = await fetch('/api/create-order', {
         method: 'POST',
@@ -174,6 +189,24 @@ export default function CheckoutPage() {
               const verificationError = await verificationResponse.json();
               throw new Error(verificationError?.error || 'Payment verification failed');
             }
+
+            trackEvent('purchase', {
+              transaction_id: paymentResponse.razorpay_order_id,
+              currency: 'INR',
+              value: Number(quote?.total || 0),
+              payment_id: paymentResponse.razorpay_payment_id,
+              billing_period: billingPeriod,
+              checkout_context: checkoutContext,
+              coupon_code: appliedCoupon || undefined,
+              items: [
+                {
+                  item_name: plan,
+                  item_category: 'subscription',
+                  price: Number(quote?.total || 0),
+                  quantity: 1,
+                },
+              ],
+            });
 
             setSuccess(true);
             showToast('Payment completed successfully.', 'success');

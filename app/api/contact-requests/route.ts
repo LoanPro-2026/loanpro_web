@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import ContactRequest from '@/models/ContactRequest';
-import { checkRateLimit } from '@/lib/rateLimit';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 import emailService from '@/services/emailService';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 export async function OPTIONS(req: NextRequest) {
   return handleCorsPreFlight(req);
@@ -21,19 +22,29 @@ function isValidPhone(phone: string) {
 
 export async function POST(req: NextRequest) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
 
   try {
-    const identifier = req.headers.get('x-forwarded-for') || 'anonymous-contact';
-    const allowed = checkRateLimit(`contact-form:${identifier}`, 8, 60 * 60 * 1000);
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'contact-form',
+      limit: 8,
+      windowMs: 60 * 60 * 1000,
+    });
 
-    if (!allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Too many requests. Please try again later.' },
-        { status: 429, headers: corsHeaders }
-      );
+    if (rateLimitResponse) {
+      return applyCors(rateLimitResponse);
     }
 
-    const body = await req.json();
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 64 * 1024 });
+    if (!parsedBody.ok) {
+      return applyCors(parsedBody.response);
+    }
+
+    const body = parsedBody.data;
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
@@ -115,7 +126,10 @@ export async function POST(req: NextRequest) {
     Promise.all([
       emailService.sendNewContactLeadNotificationToAdmin(emailData),
       emailService.sendContactLeadAcknowledgementToUser(emailData)
-    ]).catch(() => undefined);
+    ]).catch((err) => logger.warn('Contact lead email delivery failed', 'CONTACT_REQUESTS', {
+      requestId: contactRequest.requestId,
+      error: err instanceof Error ? err.message : 'unknown',
+    }));
 
     return NextResponse.json(
       {
@@ -130,9 +144,7 @@ export async function POST(req: NextRequest) {
       { status: 201, headers: corsHeaders }
     );
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to submit contact request', details: error.message },
-      { status: 500, headers: corsHeaders }
-    );
+    logger.error('Failed to submit contact request', error, 'CONTACT_REQUESTS');
+    return applyCors(toSafeErrorResponse(error, 'CONTACT_REQUESTS', 'Failed to submit contact request'));
   }
 }

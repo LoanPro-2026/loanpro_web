@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -118,7 +119,7 @@ export async function withErrorHandling<T>(
     const data = await handler();
     return successResponse(data);
   } catch (error) {
-    console.error('API Error:', error);
+    logger.error('API error handled by withErrorHandling', error, 'API_RESPONSE');
 
     if (error instanceof Error) {
       return errorResponse(error.message, 500);

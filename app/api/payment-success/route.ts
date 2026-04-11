@@ -6,10 +6,10 @@ import clientPromise from '@/lib/mongodb';
 import crypto from 'crypto';
 import { successResponse, errorResponse } from '@/lib/apiResponse';
 import { validatePaymentResponse } from '@/lib/validation';
-import { checkRateLimit } from '@/lib/rateLimit';
 import { logger } from '@/lib/logger';
 import emailService from '@/services/emailService';
 import { getRazorpayClient } from '@/lib/razorpayClient';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse, withRecovery } from '@/lib/apiSafety';
 
 const SUCCESSFUL_PAYMENT_STATUS_REGEX = /^(captured|completed|success|successful|paid)$/i;
 const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trial', 'active_subscription'];
@@ -28,11 +28,16 @@ export async function POST(req: Request) {
       });
     }
 
-    const body = await req.json();
+    const parsedBody = await parseJsonRequest<Record<string, any>>(req, { maxBytes: 96 * 1024 });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
+    const body = parsedBody.data as Record<string, any>;
     const normalizedPlan = typeof body.plan === 'string' && body.plan.length > 0
       ? body.plan.charAt(0).toUpperCase() + body.plan.slice(1).toLowerCase()
       : body.plan;
-    const normalizedBody = {
+    const normalizedBody: Record<string, any> = {
       ...body,
       plan: normalizedPlan,
     };
@@ -117,16 +122,18 @@ export async function POST(req: Request) {
     }
 
     // Rate limiting - prevent payment spam (higher limit for webhooks)
-    const rateLimitKey = `payment-success:${normalizedBody.userId || normalizedBody.razorpay_payment_id}`;
-    if (!checkRateLimit(rateLimitKey, 20, 60000)) { // 20 per minute
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'payment-success',
+      limit: 20,
+      windowMs: 60000,
+      userId: typeof normalizedBody.userId === 'string' ? normalizedBody.userId : undefined,
+    });
+    if (rateLimitResponse) { // 20 per minute
       logger.warn('Rate limit exceeded for payment', 'PAYMENT_SUCCESS', { 
         paymentId: normalizedBody.razorpay_payment_id 
       });
-      return errorResponse({
-        code: 'RATE_LIMIT',
-        message: 'Too many payment requests',
-        statusCode: 429,
-      });
+      return rateLimitResponse;
     }
 
     // Validate payment data
@@ -238,7 +245,15 @@ export async function POST(req: Request) {
     // SECURITY: Always verify payment with Razorpay server-side before granting access
     let razorpayPayment: any;
     try {
-      razorpayPayment = await razorpay.payments.fetch(razorpay_payment_id);
+      razorpayPayment = await withRecovery(
+        () => razorpay.payments.fetch(razorpay_payment_id),
+        {
+          operation: 'razorpay-payment-fetch',
+          context: 'PAYMENT_SUCCESS',
+          attempts: 2,
+          baseDelayMs: 300,
+        }
+      );
     } catch (verificationError) {
       logger.error('Failed to verify payment with Razorpay', verificationError as Error, 'PAYMENT_SUCCESS', {
         paymentId: razorpay_payment_id,
@@ -715,11 +730,7 @@ export async function POST(req: Request) {
     logger.error('Payment processing failed', error as Error, 'PAYMENT_SUCCESS', {
       stack: error instanceof Error ? error.stack : undefined
     });
-    
-    return errorResponse({
-      code: 'PAYMENT_PROCESSING_ERROR',
-      message: error instanceof Error ? error.message : 'Error processing payment',
-      statusCode: 500,
-    });
+
+    return toSafeErrorResponse(error, 'PAYMENT_SUCCESS', 'Error processing payment');
   }
 }

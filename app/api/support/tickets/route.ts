@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectMongoose } from '@/lib/mongoose';
 import SupportTicket from '@/models/SupportTicket';
 import emailService from '@/services/emailService';
-import { checkRateLimit } from '@/lib/rateLimit';
 import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 import { connectToDatabase } from '@/lib/mongodb';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 type VerifiedSupportUser = {
   userId: string;
@@ -70,20 +71,31 @@ export async function OPTIONS(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    // Rate limiting check: 5 tickets per hour
-    const identifier = req.headers.get('x-user-id') || req.headers.get('x-forwarded-for') || 'anonymous';
-    const allowed = checkRateLimit(identifier, 5, 60 * 60 * 1000);
-    
-    if (!allowed) {
-      return NextResponse.json(
-        { success: false, error: 'Rate limit exceeded. Please try again later.' },
-        { status: 429, headers: corsHeaders }
-      );
+    const userIdHeader = req.headers.get('x-user-id')?.trim();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'support-tickets-create',
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+      userId: userIdHeader || undefined,
+    });
+
+    if (rateLimitResponse) {
+      return applyCors(rateLimitResponse);
     }
 
-    const body = await req.json();
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 96 * 1024 });
+    if (!parsedBody.ok) {
+      return applyCors(parsedBody.response);
+    }
+
+    const body = parsedBody.data;
     const {
       userId,
       userEmail,
@@ -98,10 +110,20 @@ export async function POST(req: NextRequest) {
       accessToken
     } = body;
 
+    const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+    const normalizedUserEmail = typeof userEmail === 'string' ? userEmail.trim().toLowerCase() : '';
+    const normalizedUserName = typeof userName === 'string' ? userName.trim() : '';
+    const normalizedSubject = typeof subject === 'string' ? subject.trim() : '';
+    const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+    const normalizedIssueType = typeof issueType === 'string' ? issueType.trim().toLowerCase() : '';
+    const normalizedPriority = typeof priority === 'string' ? priority.trim().toLowerCase() : '';
+    const normalizedAppVersion = typeof appVersion === 'string' ? appVersion.trim() : '';
+    const normalizedBrowserInfo = typeof browserInfo === 'string' ? browserInfo.trim() : browserInfo;
+    const normalizedDeviceInfo = typeof deviceInfo === 'string' ? deviceInfo.trim() : deviceInfo;
     const normalizedAccessToken = typeof accessToken === 'string' ? accessToken.trim() : '';
 
     // Validation
-    if (!userId || !userEmail || !subject || !description || !issueType || !appVersion) {
+    if (!normalizedUserId || !normalizedUserEmail || !normalizedSubject || !normalizedDescription || !normalizedIssueType || !normalizedAppVersion) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
@@ -116,7 +138,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Reject only if userId is explicitly 'unknown'
-    if (userId === 'unknown') {
+    if (normalizedUserId === 'unknown') {
       return NextResponse.json(
         { success: false, error: 'Invalid user authentication. Please log in again.' },
         { status: 401, headers: corsHeaders }
@@ -125,7 +147,7 @@ export async function POST(req: NextRequest) {
 
     // Validate issue type
     const validIssueTypes = ['bug', 'feature', 'question', 'billing', 'other'];
-    if (!validIssueTypes.includes(issueType)) {
+    if (!validIssueTypes.includes(normalizedIssueType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid issue type' },
         { status: 400, headers: corsHeaders }
@@ -134,14 +156,18 @@ export async function POST(req: NextRequest) {
 
     // Validate priority
     const validPriorities = ['low', 'medium', 'high', 'urgent'];
-    if (priority && !validPriorities.includes(priority)) {
+    if (normalizedPriority && !validPriorities.includes(normalizedPriority)) {
       return NextResponse.json(
         { success: false, error: 'Invalid priority' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    const verifiedUser = await verifySupportUserIdentity({ userId, userEmail, accessToken: normalizedAccessToken });
+    const verifiedUser = await verifySupportUserIdentity({
+      userId: normalizedUserId,
+      userEmail: normalizedUserEmail,
+      accessToken: normalizedAccessToken,
+    });
     if (!verifiedUser) {
       return NextResponse.json(
         { success: false, error: 'Invalid authentication context. Please sign in again.' },
@@ -155,15 +181,15 @@ export async function POST(req: NextRequest) {
     const ticket = new SupportTicket({
       userId: verifiedUser.userId,
       userEmail: verifiedUser.email,
-      userName: userName?.trim() || verifiedUser.fullName || verifiedUser.email,
-      subject: subject.trim(),
-      description: description.trim(),
-      issueType,
-      priority: priority || 'medium',
+      userName: normalizedUserName || verifiedUser.fullName || verifiedUser.email,
+      subject: normalizedSubject,
+      description: normalizedDescription,
+      issueType: normalizedIssueType,
+      priority: normalizedPriority || 'medium',
       status: 'open',
-      appVersion,
-      browserInfo,
-      deviceInfo,
+      appVersion: normalizedAppVersion,
+      browserInfo: normalizedBrowserInfo,
+      deviceInfo: normalizedDeviceInfo,
       attachments: [],
       responses: [],
       tags: [],
@@ -190,7 +216,10 @@ export async function POST(req: NextRequest) {
     Promise.all([
       emailService.sendNewTicketNotificationToAdmin(ticketData),
       emailService.sendTicketConfirmationToUser(ticketData)
-    ]).catch(err => console.error('Email sending failed:', err));
+    ]).catch((err) => logger.warn('Support ticket email delivery failed', 'SUPPORT_TICKETS', {
+      ticketId: ticket.ticketId,
+      error: err instanceof Error ? err.message : 'unknown',
+    }));
 
     return NextResponse.json({
       success: true,
@@ -202,12 +231,8 @@ export async function POST(req: NextRequest) {
     }, { status: 201, headers: corsHeaders });
 
   } catch (error: any) {
-    console.error('Error creating support ticket:', error);
-    const corsHeaders = getCorsHeaders(req);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create ticket', details: error.message },
-      { status: 500, headers: corsHeaders }
-    );
+    logger.error('Error creating support ticket', error, 'SUPPORT_TICKETS');
+    return applyCors(toSafeErrorResponse(error, 'SUPPORT_TICKETS', 'Failed to create ticket'));
   }
 }
 
@@ -296,7 +321,7 @@ export async function GET(req: NextRequest) {
         }
       }, { headers: corsHeaders });
     } catch (dbError: any) {
-      console.error('Database query error:', dbError);
+      logger.error('Support tickets database query error', dbError, 'SUPPORT_TICKETS');
       // If database is slow, return empty results instead of erroring
       if (dbError.name === 'MongooseError' || dbError.message?.includes('buffering timed out')) {
         return NextResponse.json({
@@ -314,7 +339,7 @@ export async function GET(req: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('Error fetching tickets:', error);
+    logger.error('Error fetching tickets', error, 'SUPPORT_TICKETS');
     const corsHeaders = getCorsHeaders(req);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch tickets', details: error.message },

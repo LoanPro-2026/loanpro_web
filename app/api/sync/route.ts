@@ -1,13 +1,33 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getCorsHeaders } from '@/lib/cors';
+import { logger } from '@/lib/logger';
+import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
 
 // Real-time data sync endpoint for desktop app
 export async function POST(req: Request) {
   const corsHeaders = getCorsHeaders(req);
+  const applyCors = (response: NextResponse) => {
+    Object.entries(corsHeaders).forEach(([key, value]) => response.headers.set(key, value));
+    return response;
+  };
   
   try {
-    const { accessToken, syncData, lastSyncTimestamp } = await req.json();
+    const rateLimitResponse = enforceRequestRateLimit({
+      request: req,
+      scope: 'sync',
+      limit: 120,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return applyCors(rateLimitResponse);
+
+    const parsedBody = await parseJsonRequest<Record<string, unknown>>(req, { maxBytes: 1024 * 1024 });
+    if (!parsedBody.ok) return applyCors(parsedBody.response);
+
+    const body = parsedBody.data as Record<string, any>;
+    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+    const syncData = body.syncData;
+    const lastSyncTimestamp = body.lastSyncTimestamp;
     
     if (!accessToken) {
       return NextResponse.json({ error: 'Missing accessToken' }, { status: 400, headers: corsHeaders });
@@ -52,8 +72,8 @@ export async function POST(req: Request) {
     }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('Sync API error:', error);
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500, headers: corsHeaders });
+    logger.error('Sync API error', error, 'SYNC_API');
+    return applyCors(toSafeErrorResponse(error, 'SYNC_API', 'Sync failed'));
   }
 }
 
