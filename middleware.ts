@@ -168,7 +168,7 @@ function getSecurityHeaders() {
     // Content Security Policy - restrict resource loading
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ajax.googleapis.com https://www.googletagmanager.com https://*.googletagmanager.com https://checkout.razorpay.com https://*.razorpay.com https://*.clerk.dev https://*.clerk.accounts.dev https://clerk.loanpro.tech https://challenges.cloudflare.com https://hcaptcha.com https://*.hcaptcha.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/",
       "worker-src 'self' blob: https://*.clerk.dev",
       "style-src 'self' 'unsafe-inline' https://*.razorpay.com",
       "img-src 'self' data: https: blob:",
