@@ -9,6 +9,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useDialog } from '@/components/DialogProvider';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 interface Device {
   deviceId: string;
@@ -50,7 +51,7 @@ const DeviceManagement = () => {
       const data = await response.json();
       setDevices(data.devices || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error fetching devices');
+      setError(toUserFriendlyToastError(err));
     } finally {
       setLoading(false);
     }
@@ -124,7 +125,7 @@ const DeviceManagement = () => {
       // Refresh data
       fetchDevices();
     } catch (err) {
-      await dialog.alert(`Error revoking device: ${err instanceof Error ? err.message : 'Unknown error'}`, {
+      await dialog.alert(`Error revoking device: ${toUserFriendlyToastError(err)}`, {
         title: 'Revoke Failed',
         type: 'error',
       });

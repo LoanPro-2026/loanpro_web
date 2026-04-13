@@ -28,6 +28,7 @@ import LoadingSkeleton from '@/components/LoadingSkeleton';
 import AdminTicketsTab from '@/components/AdminTicketsTab';
 import ContactLeadsTab from '@/components/ContactLeadsTab';
 import { useDialog } from '@/components/DialogProvider';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 interface DashboardMetrics {
   totalUsers: number;
@@ -365,7 +366,7 @@ const AdminDashboard = () => {
         );
         await fetchPaymentIncidents();
       } else {
-        await dialog.alert(data.error || 'Failed to run reconciliation', { title: 'Action Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to run reconciliation'), { title: 'Action Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error running reconciliation:', error);
@@ -398,7 +399,7 @@ const AdminDashboard = () => {
       } else if (response.ok && data.success && data.result?.reason === 'no_captured_payment') {
         await dialog.alert('No captured payment found yet for this order.', { title: 'No Captured Payment', type: 'info' });
       } else {
-        await dialog.alert(data.error || 'Retry failed', { title: 'Retry Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Retry failed'), { title: 'Retry Failed', type: 'error' });
       }
 
       await fetchPaymentIncidents();
@@ -435,7 +436,7 @@ const AdminDashboard = () => {
       if (response.ok && data.success) {
         await fetchPaymentIncidents();
       } else {
-        await dialog.alert(data.error || 'Failed to update incident status', { title: 'Update Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to update incident status'), { title: 'Update Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error updating incident status:', error);
@@ -540,7 +541,7 @@ const AdminDashboard = () => {
         await dialog.alert(`Subscription extended by ${days} days successfully`, { title: 'Success', type: 'success' });
         await fetchSubscriptions();
       } else {
-        await dialog.alert(data.error || 'Failed to extend subscription', { title: 'Extension Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to extend subscription'), { title: 'Extension Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error extending subscription:', error);
@@ -572,7 +573,7 @@ const AdminDashboard = () => {
         await fetchSubscriptions();
         await fetchMetrics();
       } else {
-        await dialog.alert(data.error || 'Failed to delete user', { title: 'Delete Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to delete user'), { title: 'Delete Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -594,7 +595,7 @@ const AdminDashboard = () => {
         await dialog.alert('Pricing updated successfully', { title: 'Success', type: 'success' });
         setEditingPrices(false);
       } else {
-        await dialog.alert(data.error || 'Failed to update pricing', { title: 'Update Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to update pricing'), { title: 'Update Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error updating pricing:', error);
@@ -620,7 +621,7 @@ const AdminDashboard = () => {
         setIsAuthenticated(true);
         setPassword('');
       } else {
-        setPasswordError(data.error || 'Invalid password');
+        setPasswordError(toUserFriendlyToastError(data?.error || 'Invalid password'));
       }
     } catch (error) {
       console.error('Error verifying password:', error);
@@ -655,7 +656,7 @@ const AdminDashboard = () => {
         await dialog.alert(`Success! ${data.message}`, { title: 'Operation Complete', type: 'success' });
         await fetchMetrics();
       } else {
-        await dialog.alert(data.error || 'Failed to fix payment amounts', { title: 'Operation Failed', type: 'error' });
+        await dialog.alert(toUserFriendlyToastError(data?.error || 'Failed to fix payment amounts'), { title: 'Operation Failed', type: 'error' });
       }
     } catch (error) {
       console.error('Error fixing payment amounts:', error);

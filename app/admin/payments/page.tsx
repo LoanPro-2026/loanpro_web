@@ -13,6 +13,7 @@ import {
   IndianRupee,
 } from 'lucide-react';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 interface Payment {
   id: string;
@@ -70,7 +71,7 @@ export default function PaymentsPage() {
       setPagination(data.pagination);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error loading payments');
+      setError(toUserFriendlyToastError(err));
       setPayments([]);
     } finally {
       setLoading(false);

@@ -173,7 +173,8 @@ export async function PATCH(
         userEmail: ticket.userEmail,
         subject: ticket.subject,
         status: ticket.status,
-        message: emailMessage
+        message: emailMessage,
+        issueType: ticket.issueType
       }).catch(err => console.error('Failed to send email:', err));
     }
 

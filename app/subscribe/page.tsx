@@ -241,7 +241,7 @@ export default function SubscribePage() {
       
     } catch (error: any) {
       console.error('Error starting free trial:', error);
-      showToast(error.message || 'Failed to start free trial', 'error');
+      showToast(error || 'Failed to start free trial', 'error');
       setTrialLoading(false);
     }
   };

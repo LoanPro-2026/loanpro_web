@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ToastProvider';
 import ProgressBar from '@/components/ProgressBar';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 export default function SubscriptionActions({
   isActive,
@@ -37,10 +38,10 @@ export default function SubscriptionActions({
         setShowModal(false);
         showToast('Subscription cancelled successfully!', 'success');
       } else {
-        setMessage(data.error || "Failed to cancel subscription.");
+        setMessage(toUserFriendlyToastError(data?.error || "Failed to cancel subscription."));
       }
     } catch (err) {
-      setMessage("Error canceling subscription.");
+      setMessage(toUserFriendlyToastError(err));
     } finally {
       setLoading(false);
     }

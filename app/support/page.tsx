@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/googleAnalytics';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 type InquiryType =
     | 'sales'
@@ -115,7 +116,7 @@ export default function SupportPage() {
             const payload = await response.json();
 
             if (!response.ok || !payload.success) {
-                setError(payload.error || 'Unable to submit your request right now.');
+                setError(toUserFriendlyToastError(payload?.error || payload?.message || 'Unable to submit your request right now.'));
                 return;
             }
 

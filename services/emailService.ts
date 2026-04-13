@@ -18,6 +18,7 @@ interface TicketUpdateData {
   subject: string;
   status: string;
   message: string;
+  issueType?: string;
 }
 
 interface PaymentIncidentAlertData {
@@ -137,8 +138,25 @@ class EmailService {
     });
   }
 
+  private getSupportMailbox(issueType?: string) {
+    const normalized = String(issueType || '').trim().toLowerCase();
+    if (normalized === 'bug') {
+      return {
+        email: 'help@loanpro.tech',
+        label: 'Help',
+        senderName: 'LoanPro Help Desk'
+      };
+    }
+
+    return {
+      email: 'support@loanpro.tech',
+      label: 'Support',
+      senderName: 'LoanPro Support'
+    };
+  }
+
   /**
-   * Send notification to admin when new ticket is created
+    * Send the initial ticket email to the support/help mailbox
    */
   async sendNewTicketNotificationToAdmin(ticket: TicketData): Promise<boolean> {
     if (!this.isConfigured) {
@@ -147,6 +165,7 @@ class EmailService {
     }
 
     try {
+      const mailbox = this.getSupportMailbox(ticket.issueType);
       const priorityEmoji = {
         low: '🟢',
         medium: '🟡',
@@ -215,11 +234,10 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'support@loanpro.tech', name: 'LoanPro Support System' },
-        to: (process.env.ADMIN_EMAILS || 'admin@loanpro.tech')
-          .split(',')
-          .map(email => ({ email: email.trim() })),
-        subject: `🎫 New Support Ticket: ${ticket.ticketId} - ${ticket.subject}`,
+        sender: { email: mailbox.email, name: `${mailbox.senderName} System` },
+        to: [{ email: mailbox.email }],
+        replyTo: { email: ticket.userEmail, name: ticket.userName },
+        subject: `🎫 New ${mailbox.label} Ticket: ${ticket.ticketId} - ${ticket.subject}`,
         htmlContent
       };
 
@@ -233,7 +251,7 @@ class EmailService {
   }
 
   /**
-   * Send confirmation email to user when ticket is created
+    * Send the user confirmation for the support/help ticket
    */
   async sendTicketConfirmationToUser(ticket: TicketData): Promise<boolean> {
     if (!this.isConfigured) {
@@ -242,6 +260,7 @@ class EmailService {
     }
 
     try {
+      const mailbox = this.getSupportMailbox(ticket.issueType);
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
@@ -292,9 +311,9 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'support@loanpro.tech', name: 'LoanPro Support' },
+        sender: { email: mailbox.email, name: mailbox.senderName },
         to: [{ email: ticket.userEmail, name: ticket.userName }],
-        subject: `Ticket ${ticket.ticketId} - We've received your support request`,
+        subject: `Ticket ${ticket.ticketId} - We've received your ${mailbox.label.toLowerCase()} request`,
         htmlContent
       };
 
@@ -308,7 +327,7 @@ class EmailService {
   }
 
   /**
-   * Send email to user when admin responds or updates status
+    * Send the user update email when admin responds or changes status
    */
   async sendTicketUpdateToUser(data: TicketUpdateData): Promise<boolean> {
     if (!this.isConfigured) {
@@ -317,6 +336,7 @@ class EmailService {
     }
 
     try {
+      const mailbox = this.getSupportMailbox(data.issueType);
       const statusBadge = {
         open: '<span style="background: #28a745; color: white; padding: 5px 10px; border-radius: 3px;">Open</span>',
         'in-progress': '<span style="background: #ffc107; color: black; padding: 5px 10px; border-radius: 3px;">In Progress</span>',
@@ -357,10 +377,10 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'support@loanpro.tech', name: 'LoanPro Support' },
+        sender: { email: mailbox.email, name: mailbox.senderName },
         to: [{ email: data.userEmail, name: data.userName }],
-        replyTo: { email: (process.env.ADMIN_EMAILS || 'support@loanpro.tech').split(',')[0].trim() },
-        subject: `Ticket ${data.ticketId} - Update on your support request`,
+        replyTo: { email: mailbox.email },
+        subject: `Ticket ${data.ticketId} - Update on your ${mailbox.label.toLowerCase()} request`,
         htmlContent
       };
 

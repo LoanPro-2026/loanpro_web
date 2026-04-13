@@ -27,6 +27,7 @@ import Link from 'next/link';
 import Script from 'next/script';
 import DeviceManagement from '@/components/DeviceManagement';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
+import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
 interface PaymentHistoryEntry {
   id: string;
@@ -938,8 +939,7 @@ const ProfilePage = () => {
         // Extract data from the API response wrapper
         setData(json.data || json);
       } catch (err) {
-        if (err instanceof Error) setError(err.message);
-        else setError('Error fetching profile');
+        setError(toUserFriendlyToastError(err));
       } finally {
         setLoading(false);
       }
@@ -1133,7 +1133,7 @@ const ProfilePage = () => {
       console.error('[Upgrade] Error:', error);
       openStatusModal(
         'Upgrade Failed',
-        `${error.message || 'An unexpected error occurred'}\n\nPlease try again or contact support if the issue persists.`,
+        `${toUserFriendlyToastError(error)}\n\nPlease try again or contact support if the issue persists.`,
         'error'
       );
       setPaymentLoading(false);
@@ -1159,7 +1159,7 @@ const ProfilePage = () => {
       setCancelModalOpen(true);
     } catch (error: any) {
       console.error('Cancel request error:', error);
-      openStatusModal('Unable to Load Cancellation Details', error.message || 'Failed to get cancellation details', 'error');
+      openStatusModal('Unable to Load Cancellation Details', toUserFriendlyToastError(error), 'error');
     }
   };
 
@@ -1210,7 +1210,7 @@ const ProfilePage = () => {
       console.error('Cancel confirmation error:', error);
       openStatusModal(
         'Cancellation Failed',
-        error.message || 'An unexpected error occurred. Please try again or contact support.',
+        toUserFriendlyToastError(error),
         'error'
       );
     } finally {
@@ -1275,7 +1275,7 @@ const ProfilePage = () => {
       console.error('[Renewal] Error:', error);
       openStatusModal(
         'Renewal Failed',
-        `${error.message || 'An unexpected error occurred'}\n\nPlease try again or contact support if the issue persists.`,
+        `${toUserFriendlyToastError(error)}\n\nPlease try again or contact support if the issue persists.`,
         'error'
       );
     } finally {

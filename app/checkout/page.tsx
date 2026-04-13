@@ -99,7 +99,7 @@ export default function CheckoutPage() {
       } catch (error) {
         if (!disposed) {
           setQuote(null);
-          showToast(error instanceof Error ? error.message : 'Failed to load checkout pricing', 'error');
+          showToast(error || 'Failed to load checkout pricing', 'error');
         }
       } finally {
         if (!disposed) {
@@ -214,7 +214,7 @@ export default function CheckoutPage() {
               router.push('/profile');
             }, 1500);
           } catch (error) {
-            showToast(error instanceof Error ? error.message : 'Payment verification failed', 'error');
+            showToast(error || 'Payment verification failed', 'error');
           }
         },
         prefill: {
@@ -242,7 +242,7 @@ export default function CheckoutPage() {
       setProcessing(false);
     } catch (error) {
       setProcessing(false);
-      showToast(error instanceof Error ? error.message : 'Unable to start payment', 'error');
+      showToast(error || 'Unable to start payment', 'error');
     }
   };
 
