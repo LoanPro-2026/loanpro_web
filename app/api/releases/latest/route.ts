@@ -4,7 +4,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const OWNER = process.env.GITHUB_RELEASE_OWNER || 'jakshat296';
+const OWNER = process.env.GITHUB_RELEASE_OWNER || 'loanpro2026';
+const ORGANIZATION = process.env.GITHUB_RELEASE_ORGANIZATION || 'LoanPro-2026';
 const REPO = process.env.GITHUB_RELEASE_REPO || 'loanpro_web';
 
 type GitHubAsset = {
@@ -37,7 +38,11 @@ function toReleaseResponse(release: GitHubRelease, asset: GitHubAsset) {
 
 export async function GET() {
   try {
-    const releaseUrl = `https://api.github.com/repos/${OWNER}/${REPO}/releases?per_page=15`;
+    const ownerCandidates = [OWNER, ORGANIZATION]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .filter((value, index, array) => array.indexOf(value) === index);
+
     const headers: HeadersInit = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'LoanPro-Web',
@@ -47,13 +52,22 @@ export async function GET() {
       headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
     }
 
-    const response = await fetch(releaseUrl, {
-      headers,
-      cache: 'no-store',
-    });
+    let response: Response | null = null;
+    for (const candidate of ownerCandidates) {
+      const releaseUrl = `https://api.github.com/repos/${candidate}/${REPO}/releases?per_page=15`;
+      const candidateResponse = await fetch(releaseUrl, {
+        headers,
+        cache: 'no-store',
+      });
 
-    if (!response.ok) {
-      throw new Error(`GitHub release fetch failed: ${response.status}`);
+      if (candidateResponse.ok) {
+        response = candidateResponse;
+        break;
+      }
+    }
+
+    if (!response) {
+      throw new Error('GitHub release fetch failed for all configured owners/organization');
     }
 
     const releases = (await response.json()) as GitHubRelease[];

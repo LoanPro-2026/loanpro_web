@@ -58,7 +58,7 @@ const FALLBACK_RELEASE: ReleaseInfo = {
     version: 'latest',
     publishedAt: 'latest',
     assetName: 'LoanPro.Setup.latest.exe',
-    downloadUrl: 'https://github.com/jakshat296/loanpro_web/releases/latest',
+    downloadUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_RELEASE_ORGANIZATION || 'LoanPro-2026'}/${process.env.NEXT_PUBLIC_GITHUB_RELEASE_REPO || 'loanpro_web'}/releases/latest`,
     assetSizeBytes: 130 * 1024 * 1024,
 };
 
