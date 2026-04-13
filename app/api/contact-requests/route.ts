@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
     };
 
     Promise.all([
-      emailService.sendNewContactLeadNotificationToAdmin(emailData),
-      emailService.sendContactLeadAcknowledgementToUser(emailData)
+      emailService.sendContactRequestToContactInbox(emailData),
+      emailService.sendContactAcknowledgementFromAdmin(emailData)
     ]).catch((err) => logger.warn('Contact lead email delivery failed', 'CONTACT_REQUESTS', {
       requestId: contactRequest.requestId,
       error: err instanceof Error ? err.message : 'unknown',
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
           status: contactRequest.status,
           createdAt: contactRequest.createdAt
         },
-        message: 'Your request has been received. Our team will call you within 24 business hours.'
+        message: 'Thank you for submitting your request. Our team will get in touch with you as soon as possible.'
       },
       { status: 201, headers: corsHeaders }
     );

@@ -33,8 +33,9 @@ async function verifySupportUserIdentity(params: {
     const tokenEmail = String(user.email || '').trim().toLowerCase();
     if (!tokenUserId || !tokenEmail) return null;
 
-    if (normalizedUserId && normalizedUserId !== tokenUserId) return null;
-    if (normalizedEmail && normalizedEmail !== tokenEmail) return null;
+    const userIdMatches = !normalizedUserId || normalizedUserId === tokenUserId || normalizedUserId === tokenEmail;
+    const emailMatches = !normalizedEmail || normalizedEmail === tokenEmail;
+    if (!userIdMatches || !emailMatches) return null;
 
     return {
       userId: tokenUserId,

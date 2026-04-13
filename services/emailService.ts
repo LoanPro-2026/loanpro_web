@@ -138,7 +138,7 @@ class EmailService {
     });
   }
 
-  private getSupportMailbox(issueType?: string) {
+  private getTicketMailbox(issueType?: string) {
     const normalized = String(issueType || '').trim().toLowerCase();
     if (normalized === 'bug') {
       return {
@@ -165,7 +165,7 @@ class EmailService {
     }
 
     try {
-      const mailbox = this.getSupportMailbox(ticket.issueType);
+      const mailbox = this.getTicketMailbox(ticket.issueType);
       const priorityEmoji = {
         low: '🟢',
         medium: '🟡',
@@ -260,7 +260,7 @@ class EmailService {
     }
 
     try {
-      const mailbox = this.getSupportMailbox(ticket.issueType);
+      const mailbox = this.getTicketMailbox(ticket.issueType);
       const htmlContent = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
@@ -336,7 +336,7 @@ class EmailService {
     }
 
     try {
-      const mailbox = this.getSupportMailbox(data.issueType);
+      const mailbox = this.getTicketMailbox(data.issueType);
       const statusBadge = {
         open: '<span style="background: #28a745; color: white; padding: 5px 10px; border-radius: 3px;">Open</span>',
         'in-progress': '<span style="background: #ffc107; color: black; padding: 5px 10px; border-radius: 3px;">In Progress</span>',
@@ -393,7 +393,7 @@ class EmailService {
     }
   }
 
-  async sendNewContactLeadNotificationToAdmin(data: ContactLeadEmailData): Promise<boolean> {
+  async sendContactRequestToContactInbox(data: ContactLeadEmailData): Promise<boolean> {
     if (!this.isConfigured) {
       console.log('Email service not configured, skipping contact lead admin notification');
       return false;
@@ -416,7 +416,7 @@ class EmailService {
           </div>
 
           <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0;">
-            <p style="font-size: 14px; color: #334155; margin-top: 0;">A new website contact request has been submitted and needs callback follow-up.</p>
+            <p style="font-size: 14px; color: #334155; margin-top: 0;">A new website contact request has been submitted to contact@loanpro.tech and needs follow-up.</p>
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 12px;">
               <tr>
@@ -463,16 +463,11 @@ class EmailService {
         </div>
       `;
 
-      const recipients = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'admin@loanpro.tech')
-        .split(',')
-        .map((email: string) => email.trim())
-        .filter(Boolean)
-        .map((email: string) => ({ email }));
-
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
-        to: recipients,
-        subject: `📞 New Contact Lead: ${data.requestId} (${inquiryTypeLabel})`,
+        sender: { email: 'contact@loanpro.tech', name: 'LoanPro Contact Desk' },
+        to: [{ email: 'contact@loanpro.tech' }],
+        replyTo: { email: data.email, name: data.name },
+        subject: `📞 New Contact Request: ${data.requestId} (${inquiryTypeLabel})`,
         htmlContent
       };
 
@@ -485,7 +480,7 @@ class EmailService {
     }
   }
 
-  async sendContactLeadAcknowledgementToUser(data: ContactLeadEmailData): Promise<boolean> {
+  async sendContactAcknowledgementFromAdmin(data: ContactLeadEmailData): Promise<boolean> {
     if (!this.isConfigured) {
       console.log('Email service not configured, skipping contact lead acknowledgement');
       return false;
@@ -509,7 +504,7 @@ class EmailService {
 
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 24px;">
             <p style="font-size: 16px; color: #111827;">Hi <strong>${data.name}</strong>,</p>
-            <p style="font-size: 14px; color: #334155;">Thank you for contacting LoanPro. Our team will call you within 24 business hours to discuss your request.</p>
+            <p style="font-size: 14px; color: #334155;">Thank you for submitting your request. Our team will get in touch with you as soon as possible.</p>
 
             <div style="background: #fff; border-left: 4px solid #2563eb; padding: 14px; margin: 18px 0;">
               <p style="margin: 0; font-size: 12px; color: #64748b;">Reference ID</p>
@@ -537,9 +532,9 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: { email: 'admin@loanpro.tech', name: 'LoanPro Admin' },
         to: [{ email: data.email, name: data.name }],
-        subject: `We received your request (${data.requestId})`,
+        subject: `Thanks for contacting LoanPro (${data.requestId})`,
         htmlContent
       };
 
