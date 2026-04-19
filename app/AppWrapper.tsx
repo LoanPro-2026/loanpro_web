@@ -13,7 +13,11 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
 
   // Hide NavBar for all routes that start with /app/
   const shouldHideNav = pathname.startsWith('/app/');
-  const shouldHideSalesWidget = pathname.startsWith('/admin') || pathname.startsWith('/app/');
+  const shouldHideSalesWidget =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/app/') ||
+    pathname.startsWith('/subscribe') ||
+    pathname.startsWith('/checkout');
 
   useEffect(() => {
     const query = searchParams.toString();

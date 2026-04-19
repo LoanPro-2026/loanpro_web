@@ -56,12 +56,12 @@ const HowToSetup: React.FC<HowToSetupProps> = ({ showTitle = true, variant = 'de
               className="relative bg-white rounded-2xl p-6 border border-slate-200 shadow-sm"
             >
               {/* Step Number */}
-              <div className="absolute -top-4 -left-4 w-11 h-11 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-semibold shadow-md">
+              <div className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white shadow-md md:-left-4 md:-top-4 md:h-11 md:w-11">
                 {step.step}
               </div>
 
               {/* Icon */}
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-5">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-5 mt-10 md:mt-0">
                 <step.icon className="w-6 h-6" />
               </div>
 

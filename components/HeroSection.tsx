@@ -22,28 +22,28 @@ const HeroSection = async () => {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.08),transparent_40%)]"></div>
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-14 lg:pt-28">
+        <div className="grid lg:grid-cols-2 gap-10 items-center">
+          <div className="max-w-2xl lg:pr-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
               Built for gold & silver lending businesses
             </div>
 
-            <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-semibold text-slate-900 font-display leading-tight">
-              Manage your daily lending and collections easily
+            <h1 className="mt-6 text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold tracking-tight text-slate-900 font-display leading-[1.05] max-w-lg">
+              Manage lending without paper
             </h1>
 
-            <p className="mt-5 text-lg text-slate-600 max-w-xl">
-              LoanPro is built for gold and silver lending businesses. If you are unsure about trust, setup, or what plan fits your shop, our team will guide you first and only then help you decide.
+            <p className="mt-5 text-base sm:text-lg text-slate-600 max-w-lg">
+              LoanPro helps you manage lending, collections, and setup without paper registers. You can get guidance first or purchase directly when ready.
             </p>
 
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-lg">
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Live onboarding help</div>
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Plan fit in 10 mins</div>
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Hindi + English support</div>
             </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-lg">
               <SignedOut>
                 <SignUpButton mode="modal">
                   <button className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
@@ -73,6 +73,14 @@ const HeroSection = async () => {
 
             <div className="mt-6 text-sm text-slate-500">
               We can also schedule a callback and walkthrough in Hindi or English.
+            </div>
+
+            <div className="mt-3 text-sm text-slate-600">
+              Ready to compare plans now?{' '}
+              <Link href="#pricing" className="font-semibold text-blue-700 hover:text-blue-800">
+                See pricing below
+              </Link>
+              .
             </div>
           </div>
 

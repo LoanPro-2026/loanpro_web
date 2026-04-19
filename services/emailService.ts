@@ -48,6 +48,16 @@ interface SubscriptionEmailData {
   endDate?: Date;
 }
 
+interface RenewalReminderEmailData {
+  userName: string;
+  userEmail: string;
+  plan: string;
+  billingPeriod: 'monthly' | 'annually';
+  endDate: Date;
+  daysLeft: number;
+  renewalUrl: string;
+}
+
 interface CancellationEmailData {
   userName: string;
   userEmail: string;
@@ -717,6 +727,67 @@ class EmailService {
       return true;
     } catch (error) {
       console.error('❌ Failed to send upgrade email:', error);
+      return false;
+    }
+  }
+
+  async sendSubscriptionExpiryReminderEmail(data: RenewalReminderEmailData): Promise<boolean> {
+    if (!this.isConfigured) {
+      console.log('Email service not configured, skipping expiry reminder email');
+      return false;
+    }
+
+    try {
+      const expiryCopy =
+        data.daysLeft <= 0
+          ? 'Your subscription has expired today.'
+          : data.daysLeft === 1
+          ? 'Your subscription expires tomorrow.'
+          : `Your subscription expires in ${data.daysLeft} days.`;
+
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #0f172a; padding: 24px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 22px;">Renewal Reminder</h1>
+          </div>
+          <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0;">
+            <p style="font-size: 16px; color: #111827;">Hi <strong>${data.userName}</strong>,</p>
+            <p style="font-size: 14px; color: #334155;">${expiryCopy} Renew now to avoid interruption.</p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+              <tr>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0; font-weight: 600; width: 160px;">Plan</td>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0;">${data.plan}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0; font-weight: 600;">Billing</td>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0;">${data.billingPeriod}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0; font-weight: 600;">Current End Date</td>
+                <td style="padding: 10px; background: #fff; border: 1px solid #e2e8f0;">${this.formatDate(data.endDate)}</td>
+              </tr>
+            </table>
+
+            <p style="margin-top: 20px;">
+              <a href="${data.renewalUrl}" style="display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 11px 16px; border-radius: 8px; font-weight: 600;">Renew Now</a>
+            </p>
+          </div>
+        </div>
+      `;
+
+      const sendSmtpEmail = {
+        sender: this.getAdminSender(),
+        to: [{ email: data.userEmail, name: data.userName }],
+        subject: `LoanPro renewal reminder: ${data.daysLeft <= 0 ? 'action needed' : `${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'} left`}`,
+        htmlContent,
+      };
+
+      await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+      console.log(`✅ Renewal reminder email sent to ${data.userEmail}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to send renewal reminder email:', error);
       return false;
     }
   }

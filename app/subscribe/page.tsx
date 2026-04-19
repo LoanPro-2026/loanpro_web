@@ -105,6 +105,7 @@ interface PricingQuoteResponse {
 }
 
 export default function SubscribePage() {
+  const MAX_VISIBLE_FEATURES = 5;
   const [loading, setLoading] = useState<string | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annually'>('monthly');
@@ -261,119 +262,127 @@ export default function SubscribePage() {
   return (
     <>
       <ProgressBar show={!!loading} />
-      <div className="min-h-screen bg-slate-50 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(15,23,42,0.06),transparent_35%),#f8fafc] pt-24 pb-14 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600">
-              Choose your plan
-            </div>
-            <h1 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-              Pricing for every team
-            </h1>
-            <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-              All plans include core loan workflows. Choose the backup, device access, and support level that matches your operations.
-            </p>
-            
-            {/* Free Trial CTA */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl mx-auto mb-8">
-              <h3 className="text-xl font-semibold text-slate-900 mb-3">Start with a free trial</h3>
-              <p className="text-slate-600 mb-4">
-                Try the Pro plan for 1 month with no credit card required.
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end mb-10">
+            <div>
+              <div className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
+                Choose your plan
+              </div>
+              <h1 className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-semibold text-slate-900 font-display tracking-tight max-w-3xl leading-tight">
+                Pick a plan confidently and go live faster
+              </h1>
+              <p className="mt-3 text-base sm:text-lg text-slate-600 max-w-2xl leading-relaxed">
+                Transparent pricing, immediate checkout, and trial access in one place. Choose the support and backup level that matches your shop operations.
               </p>
-              <button
-                onClick={handleFreeTrial}
-                disabled={trialLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors inline-flex items-center gap-2"
-              >
-                <span>{trialLoading ? 'Starting trial...' : 'Start free trial'}</span>
-                {!trialLoading && <ArrowRightIcon className="w-4 h-4" />}
-              </button>
-              <p className="text-sm text-slate-500 mt-3">
-                Includes Android photo capture, analytics, and priority support.
-                {' '}
-                <Link href={extensionContactUrl} className="text-blue-600 hover:text-blue-700 font-semibold">
-                  Need more time? Contact us to request an extension up to 6 months.
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Free trial available</h2>
+                  <p className="mt-1 text-sm text-slate-600 leading-relaxed">
+                    Start Pro for 1 month, or continue to direct purchase if you already know your plan.
+                  </p>
+                </div>
+                <button
+                  onClick={handleFreeTrial}
+                  disabled={trialLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span>{trialLoading ? 'Starting trial...' : 'Start free trial'}</span>
+                  {!trialLoading && <ArrowRightIcon className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="mt-3 text-sm text-slate-500">
+                Includes Android photo capture, analytics, and priority support.{' '}
+                <Link href={extensionContactUrl} className="font-semibold text-blue-600 hover:text-blue-700">
+                  Need more time? Request an extension up to 6 months.
                 </Link>
               </p>
             </div>
+          </div>
 
-            {/* Billing Period Toggle */}
-            <div className="flex justify-center mb-8">
-              <div className="border border-slate-200 bg-white rounded-lg p-1">
-                <div className="flex items-center">
-                  <button
-                    onClick={() => {
-                      setBillingPeriod('monthly');
-                      trackEvent('select_billing_period', {
-                        billing_period: 'monthly',
-                        source: 'subscribe_page',
-                      });
-                    }}
-                    className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                      billingPeriod === 'monthly'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    onClick={() => {
-                      setBillingPeriod('annually');
-                      trackEvent('select_billing_period', {
-                        billing_period: 'annually',
-                        source: 'subscribe_page',
-                      });
-                    }}
-                    className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
-                      billingPeriod === 'annually'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Annual (Save 15%)
-                  </button>
-                </div>
+          {/* Billing Period Toggle */}
+          <div className="mb-8 flex flex-col items-center gap-3">
+            <div className="rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    setBillingPeriod('monthly');
+                    trackEvent('select_billing_period', {
+                      billing_period: 'monthly',
+                      source: 'subscribe_page',
+                    });
+                  }}
+                  className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    billingPeriod === 'monthly'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => {
+                    setBillingPeriod('annually');
+                    trackEvent('select_billing_period', {
+                      billing_period: 'annually',
+                      source: 'subscribe_page',
+                    });
+                  }}
+                  className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    billingPeriod === 'annually'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Annual (Save 15%)
+                </button>
               </div>
             </div>
+            <p className="text-sm text-slate-500">Annual billing gives you the same features with a 15% savings.</p>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-14">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 items-stretch">
             {displayPlans.map((plan) => (
               <div
                 key={plan.name}
-                className="relative"
+                className="relative h-full"
               >
                 {/* Popular Badge */}
                 {plan.recommended && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                    <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
+                    <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm">
                       Most popular
                     </div>
                   </div>
                 )}
 
-                <div className={`bg-white border ${plan.recommended ? 'border-blue-600' : 'border-slate-200'} rounded-2xl p-6 shadow-sm`}>
-                  <div>
+                <div className={`relative overflow-hidden bg-white border ${plan.recommended ? 'border-blue-600 shadow-lg shadow-blue-100/60' : 'border-slate-200 shadow-sm'} rounded-2xl p-6 h-full flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-md`}>
+                  <div className={`absolute inset-x-0 top-0 h-1 ${plan.recommended ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+                  <div className="flex h-full flex-col">
                     {/* Plan Header */}
-                    <div className="text-center mb-8">
-                      <h3 className="text-xl font-semibold text-slate-900 mb-2">{plan.name}</h3>
+                    <div className="text-center mb-7">
+                      <h3 className="text-2xl font-semibold text-slate-900 mb-2">{plan.name}</h3>
                       <p className="text-sm text-slate-600">{plan.description}</p>
                       
                       {/* Pricing */}
                       <div className="mb-6">
-                        <div className="flex items-center justify-center space-x-2 mb-2">
-                          <span className="text-3xl font-semibold text-slate-900">
+                        <div className="flex items-end justify-center space-x-2 mb-2">
+                          <span className="text-4xl font-semibold text-slate-900 leading-none">
                             ₹{formatINR(calculateFinalAmount(plan.price, billingPeriod) / 100)}
                           </span>
-                          <span className="text-slate-500">{getPeriodText(billingPeriod)}</span>
+                          <span className="text-slate-500 pb-1">{getPeriodText(billingPeriod)}</span>
                         </div>
                         {billingPeriod === 'annually' && (
                           <div className="text-xs text-slate-500">
                             <span className="line-through">₹{formatINR(plan.price * 12)}</span>
                             <span className="text-green-600 font-semibold ml-2">Save 15%</span>
+                            <div className="mt-1 text-slate-500">
+                              Equivalent to ₹{formatINR(Math.round(plan.price * 0.85))}/month
+                            </div>
                           </div>
                         )}
                         <div className="text-xs text-slate-500 mt-1">
@@ -389,48 +398,58 @@ export default function SubscribePage() {
                     {/* Features */}
                     <div className="space-y-3 mb-6">
                       <h4 className="font-semibold text-slate-900 text-xs uppercase tracking-wide">Included features</h4>
-                      {plan.features.map((feature, featureIdx) => (
+                      {plan.features
+                        .slice(0, MAX_VISIBLE_FEATURES)
+                        .map((feature, featureIdx) => (
                         <div key={featureIdx} className="flex items-center gap-2">
                           <CheckIcon className="w-4 h-4 text-blue-600" />
                           <span className="text-sm text-slate-600">{feature}</span>
                         </div>
-                      ))}
+                        ))}
+                      {plan.features.length > MAX_VISIBLE_FEATURES && (
+                        <p className="text-sm font-semibold text-slate-500">
+                          +{plan.features.length - MAX_VISIBLE_FEATURES} more features
+                        </p>
+                      )}
                     </div>
 
-                    {/* Limitations */}
-                    {plan.limitations && plan.limitations.length > 0 && (
-                      <div className="space-y-3 mb-8">
-                        <h4 className="font-semibold text-slate-500 text-xs uppercase tracking-wide">Limitations</h4>
-                        {plan.limitations.map((limitation, limitationIdx) => (
-                          <div key={limitationIdx} className="flex items-center gap-2">
-                            <XMarkIcon className="w-4 h-4 text-slate-400" />
+                    {/* Limitations dropdown */}
+                    <details className="mb-4">
+                      <summary className="inline-flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
+                        <span>Show limitations</span>
+                        <span className="text-xs font-medium text-slate-500">View details</span>
+                      </summary>
+                      <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 space-y-2">
+                        {(plan.limitations && plan.limitations.length > 0 ? plan.limitations : ['No additional limitations']).map((limitation, limitationIdx) => (
+                          <div key={limitationIdx} className="flex items-start gap-2">
+                            <XMarkIcon className="mt-0.5 w-4 h-4 flex-shrink-0 text-slate-400" />
                             <span className="text-sm text-slate-500">{limitation}</span>
                           </div>
                         ))}
                       </div>
-                    )}
+                    </details>
 
                     {/* CTA Button */}
-                    <button
-                      onClick={() => {
-                        setSelectedPlan(plan.name);
-                        handleSubscribeWithValidation(plan.name, billingPeriod);
-                      }}
-                      disabled={loading === plan.name}
-                      className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
-                        loading === plan.name ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      <span>
-                        {loading === plan.name ? 'Processing...' : `Choose ${plan.name}`}
-                      </span>
-                      {loading !== plan.name && (
-                        <ArrowRightIcon className="w-4 h-4" />
-                      )}
-                    </button>
-                    
-                    <div className="mt-4 text-center">
-                      <p className="text-slate-500 text-xs">Cancel anytime • No setup fees</p>
+                    <div>
+                      <button
+                        onClick={() => {
+                          setSelectedPlan(plan.name);
+                          handleSubscribeWithValidation(plan.name, billingPeriod);
+                        }}
+                        disabled={loading === plan.name}
+                        className={`w-full font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                          plan.recommended
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-white border border-slate-300 text-slate-800 hover:border-slate-400'
+                        } ${loading === plan.name ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <span>{loading === plan.name ? 'Processing...' : `Choose ${plan.name}`}</span>
+                        {loading !== plan.name && <ArrowRightIcon className="w-4 h-4" />}
+                      </button>
+
+                      <div className="mt-3 text-center">
+                        <p className="text-slate-500 text-xs">Cancel anytime • No setup fees</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -438,50 +457,53 @@ export default function SubscribePage() {
             ))}
           </div>
 
-          {/* Sticky summary bar */}
-          <div className="sticky bottom-4 z-20 mb-32">
-            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-3 text-slate-900 font-semibold">
-                  <span>{selectedPlanData.name} · {billingPeriod === 'annually' ? 'Annual (15% off)' : 'Monthly'}</span>
-                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.deviceLimit} device{selectedPlanData.deviceLimit > 1 ? 's' : ''}</span>
-                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.storage}</span>
+          {/* Quick checkout summary */}
+          <div className="mb-8">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Selected plan</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-slate-900 font-semibold">
+                    <span>{selectedPlanData.name} · {billingPeriod === 'annually' ? 'Annual (15% off)' : 'Monthly'}</span>
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.deviceLimit} device{selectedPlanData.deviceLimit > 1 ? 's' : ''}</span>
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs">{selectedPlanData.storage}</span>
+                  </div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">₹{formatINR(calculateFinalAmount(selectedPlanData.price, billingPeriod) / 100)} <span className="text-sm font-medium text-slate-500">{billingPeriod === 'annually' ? '/year (paid upfront)' : '/month'}</span></div>
                 </div>
-                <div className="text-sm text-slate-600 mt-1">₹{formatINR(calculateFinalAmount(selectedPlanData.price, billingPeriod) / 100)} {billingPeriod === 'annually' ? '/year (paid upfront)' : '/month'}</div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => handleSubscribeWithValidation(selectedPlanData.name, billingPeriod)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors"
-                >
-                  Complete purchase
-                </button>
-                <button
-                  onClick={handleFreeTrial}
-                  className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:border-slate-300 transition-colors font-semibold"
-                >
-                  Start 1-month trial
-                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:min-w-[360px]">
+                  <button
+                    onClick={() => handleSubscribeWithValidation(selectedPlanData.name, billingPeriod)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors"
+                  >
+                    Complete purchase
+                  </button>
+                  <button
+                    onClick={handleFreeTrial}
+                    className="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:border-slate-300 transition-colors font-semibold"
+                  >
+                    Start 1-month trial
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Bottom Section */}
-          <div className="text-center">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-4xl mx-auto">
-              <h3 className="text-xl font-semibold text-slate-900 mb-3">Need help choosing?</h3>
-              <p className="text-slate-600 mb-6">
+          <div className="text-center mt-8">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-4xl mx-auto shadow-sm">
+              <h3 className="text-xl font-semibold text-white mb-3">Need help choosing?</h3>
+              <p className="text-slate-300 mb-6">
                 All plans include core loan operations. Primary differences are backup capabilities, device access, and support priority.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href={extensionContactUrl} className="bg-white border border-slate-200 text-slate-700 font-semibold px-6 py-2.5 rounded-lg hover:border-slate-300 transition-colors">
+                <Link href={extensionContactUrl} className="bg-slate-800 border border-slate-700 text-white font-semibold px-6 py-2.5 rounded-lg hover:border-slate-500 transition-colors">
                   Contact sales
                 </Link>
                 <Link href="/download" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors">
                   View installation guide
                 </Link>
               </div>
-              <p className="text-slate-500 text-sm mt-4">
+              <p className="text-slate-400 text-sm mt-4">
                 1-month free trial available • Secure payment via Razorpay
               </p>
             </div>

@@ -11,9 +11,9 @@ export default function Home() {
   return (
     <main>
       <HeroSection />
-      <FeaturesSection />
       <TrustSection />
       <HowToSetup />
+      <FeaturesSection />
       <RequirementsSection />
       <PricingSection />
       <FAQSection />

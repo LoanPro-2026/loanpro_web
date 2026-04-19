@@ -1312,6 +1312,13 @@ const ProfilePage = () => {
     return endDate.getTime() < today.getTime();
   };
 
+  const getRenewalCheckoutHref = () => {
+    const currentPlan = data?.subscription?.plan || 'Pro';
+    const normalizedPlan = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1).toLowerCase();
+    const currentBillingPeriod = data?.subscription?.billingPeriod === 'annually' ? 'annually' : 'monthly';
+    return `/checkout?plan=${encodeURIComponent(normalizedPlan)}&billingPeriod=${currentBillingPeriod}&context=renewal`;
+  };
+
   // Badge component
   const Badge = ({ text, color }: { text: string; color: string }) => (
     <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${color}`}>
@@ -1718,6 +1725,16 @@ const ProfilePage = () => {
                                 : `Your subscription expires on ${new Date(data?.subscription?.endDate || '').toLocaleDateString()}. Renew soon.`
                               }
                             </p>
+                            <Link
+                              href={getRenewalCheckoutHref()}
+                              className={`mt-3 inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                                isExpired()
+                                  ? 'bg-red-700 text-white hover:bg-red-800'
+                                  : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                              }`}
+                            >
+                              Renew in secure checkout
+                            </Link>
                           </div>
                         </div>
                       </div>
@@ -1728,18 +1745,18 @@ const ProfilePage = () => {
                       {needsRenewal() ? (
                         <>
                           <button 
-                            onClick={() => setRenewModalOpen(true)}
+                            onClick={() => router.push(getRenewalCheckoutHref())}
                             disabled={processing}
                             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {processing ? 'Processing...' : 'Renew Subscription'}
+                            {processing ? 'Processing...' : 'Renew Now'}
                           </button>
                           <button 
                             onClick={() => setUpgradeModalOpen(true)}
                             disabled={processing}
                             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {processing ? 'Processing...' : 'Upgrade Plan'}
+                            {processing ? 'Processing...' : 'Change Plan Instead'}
                           </button>
                         </>
                       ) : (

@@ -25,10 +25,10 @@ export const metadata: Metadata = {
   keywords: "loan management, finance, application",
   icons: {
     icon: [
-      { url: "/icon", type: "image/png", sizes: "64x64" },
+      { url: "/favicon.png", type: "image/png", sizes: "64x64" },
       { url: "/brand/loanpro-logo.png", type: "image/png" },
     ],
-    shortcut: "/icon",
+    shortcut: "/favicon.png",
     apple: "/brand/loanpro-logo.png",
   },
 };

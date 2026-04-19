@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Script from 'next/script';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { ArrowLeftIcon, CheckIcon, TagIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowPathIcon, CheckIcon, ExclamationTriangleIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ToastProvider';
 import { trackEvent } from '@/lib/googleAnalytics';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
@@ -61,7 +62,7 @@ function formatINR(amount: number) {
 export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
   const { showToast } = useToast();
 
   const initialPlan = searchParams.get('plan') || 'Pro';
@@ -74,6 +75,7 @@ export default function CheckoutPage() {
   const [loadingQuote, setLoadingQuote] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [paymentFailure, setPaymentFailure] = useState<string | null>(null);
 
   const plan = useMemo(() => (PLAN_COPY[initialPlan] ? initialPlan : 'Pro'), [initialPlan]);
   const billingPeriod: BillingPeriod = initialBillingPeriod;
@@ -139,8 +141,14 @@ export default function CheckoutPage() {
   };
 
   const handlePayment = async () => {
+    if (!isSignedIn) {
+      showToast('You are not signed in. Please sign in first to continue checkout.', 'error');
+      return;
+    }
+
     try {
       setProcessing(true);
+      setPaymentFailure(null);
       trackEvent('add_payment_info', {
         plan,
         billing_period: billingPeriod,
@@ -221,6 +229,7 @@ export default function CheckoutPage() {
               router.push('/profile');
             }, 1500);
           } catch (error) {
+            setPaymentFailure('Payment was completed but verification failed. Please retry once. If the amount was debited and this persists, contact support with your payment ID.');
             showToast(error || 'Payment verification failed', 'error');
           }
         },
@@ -243,12 +252,16 @@ export default function CheckoutPage() {
       const razorpay = new window.Razorpay(options);
       razorpay.on('payment.failed', function (failureResponse: any) {
         setProcessing(false);
-        showToast(failureResponse?.error?.description || 'Payment failed', 'error');
+        const failureDescription = failureResponse?.error?.description || 'Payment failed at bank or gateway.';
+        const failureCode = failureResponse?.error?.code ? ` (Code: ${failureResponse.error.code})` : '';
+        setPaymentFailure(`${failureDescription}${failureCode}`);
+        showToast(`${failureDescription}. You can retry safely.`, 'error');
       });
       razorpay.open();
       setProcessing(false);
     } catch (error) {
       setProcessing(false);
+      setPaymentFailure('Unable to start Razorpay checkout. Please retry in a moment.');
       showToast(error || 'Unable to start payment', 'error');
     }
   };
@@ -265,6 +278,19 @@ export default function CheckoutPage() {
             <ArrowLeftIcon className="h-4 w-4" />
             Back to plans
           </button>
+
+          {isSignedIn === false && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">You are not signed in.</p>
+              <p className="mt-1">
+                Please{' '}
+                <Link href="/sign-in" className="font-semibold underline underline-offset-2 hover:text-amber-900">
+                  sign in
+                </Link>{' '}
+                first to complete your purchase.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm space-y-6">
@@ -343,12 +369,48 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {paymentFailure && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-700" />
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-rose-900">Payment needs attention</p>
+                      <p className="text-sm text-rose-800">{paymentFailure}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={handlePayment}
+                          disabled={processing || isSignedIn === false}
+                          className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-60"
+                        >
+                          <ArrowPathIcon className="h-4 w-4" />
+                          Retry payment
+                        </button>
+                        <button
+                          onClick={() => router.push(checkoutContext === 'renewal' ? '/profile' : '/subscribe')}
+                          className="inline-flex items-center rounded-xl border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                        >
+                          {checkoutContext === 'renewal' ? 'Back to profile' : 'Back to plans'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handlePayment}
-                disabled={loadingQuote || processing || success}
+                disabled={loadingQuote || processing || success || isSignedIn === false}
                 className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
-                {success ? 'Payment complete' : processing ? 'Preparing payment...' : checkoutContext === 'renewal' ? 'Continue renewal payment' : 'Continue to secure payment'}
+                {success
+                  ? 'Payment complete'
+                  : processing
+                    ? 'Preparing payment...'
+                    : isSignedIn === false
+                      ? 'Sign in to continue'
+                      : checkoutContext === 'renewal'
+                        ? 'Continue renewal payment'
+                        : 'Continue to secure payment'}
               </button>
 
               <p className="text-xs leading-5 text-slate-500">
