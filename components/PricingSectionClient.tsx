@@ -2,9 +2,9 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
 import { CheckIcon } from '@heroicons/react/24/outline';
 import { trackEvent } from '@/lib/googleAnalytics';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 type BillingPeriod = 'monthly' | 'annually';
 
@@ -21,14 +21,17 @@ interface PricingPlan {
 
 interface PricingSectionClientProps {
   plans: PricingPlan[];
+  salesPhone: string;
+  salesCallEnabled: boolean;
 }
 
 function formatINR(value: number): string {
   return `₹${Math.round(value).toLocaleString('en-IN')}`;
 }
 
-export default function PricingSectionClient({ plans }: PricingSectionClientProps) {
+export default function PricingSectionClient({ plans, salesPhone, salesCallEnabled }: PricingSectionClientProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly');
+  const callHref = `tel:${salesPhone.replace(/\s+/g, '')}`;
 
   const computedPlans = useMemo(
     () =>
@@ -49,14 +52,66 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <div className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600">
-            Pricing
+            Plan guidance
           </div>
           <h2 className="mt-5 text-3xl sm:text-4xl font-semibold text-slate-900 font-display">
-            Simple, transparent pricing
+            Talk to an expert before choosing a plan
           </h2>
           <p className="mt-3 text-lg text-slate-600 max-w-3xl mx-auto">
-            All plans include core loan management features with unlimited records. Upgrade for mobile sync, cloud backup, and multi-device access.
+            We still show transparent pricing below, but most customers prefer a quick call first. Our team helps you pick the right plan based on your workflow, device count, and backup needs.
           </p>
+
+          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:p-5 max-w-3xl mx-auto">
+            <p className="text-sm sm:text-base text-blue-900 font-semibold">
+              Prefer to talk first? Get a recommendation and setup guidance before paying.
+            </p>
+            <div className="mt-4 flex flex-col sm:flex-row justify-center gap-3">
+              <a
+                href={callHref}
+                aria-disabled={!salesCallEnabled}
+                tabIndex={salesCallEnabled ? 0 : -1}
+                onClick={(event) => {
+                  if (!salesCallEnabled) {
+                    event.preventDefault();
+                    return;
+                  }
+                }}
+                onClickCapture={() =>
+                  {
+                    void trackFunnelEvent('agent_call_clicked', {
+                      source: 'pricing_section_top',
+                      billing_period: billingPeriod,
+                    });
+                  trackEvent('click_call_agent', {
+                    source: 'pricing_section_top',
+                    billing_period: billingPeriod,
+                  });
+                  }
+                }
+                className={`inline-flex items-center justify-center rounded-lg bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors ${salesCallEnabled ? 'hover:bg-blue-800' : 'opacity-50 cursor-not-allowed'}`}
+              >
+                Call Sales Agent
+              </a>
+              <Link
+                href="/support?inquiryType=pricing&source=pricing_top&funnelStage=consideration&message=I%20want%20help%20choosing%20the%20right%20LoanPro%20plan%20for%20my%20shop."
+                onClick={() =>
+                  {
+                    void trackFunnelEvent('pricing_discussion_clicked', {
+                      source: 'pricing_section_top',
+                      billing_period: billingPeriod,
+                    });
+                    trackEvent('click_contact_agent', {
+                      source: 'pricing_section_top',
+                      billing_period: billingPeriod,
+                    });
+                  }
+                }
+                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 font-semibold px-5 py-2.5 transition-colors"
+              >
+                Talk on Contact Form
+              </Link>
+            </div>
+          </div>
 
           <div className="mt-6 flex justify-center">
             <div className="border border-slate-200 bg-white rounded-lg p-1" role="tablist" aria-label="Billing period switcher">
@@ -99,20 +154,6 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
             </div>
           </div>
 
-          <div className="mt-6 flex justify-center">
-            <Link
-              href="/subscribe"
-              onClick={() =>
-                trackEvent('click_subscribe_cta', {
-                  source: 'pricing_section_header',
-                  billing_period: billingPeriod,
-                })
-              }
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors"
-            >
-              Start free trial
-            </Link>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -156,39 +197,41 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
                 ))}
               </div>
 
-              <div className="mt-8">
-                <SignedOut>
-                  <SignUpButton mode="modal">
-                    <button
-                      onClick={() =>
-                        trackEvent('click_signup_cta', {
-                          source: 'pricing_plan_card',
-                          plan: plan.name,
-                          billing_period: billingPeriod,
-                        })
-                      }
-                      className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors"
-                    >
-                      Get started
-                    </button>
-                  </SignUpButton>
-                </SignedOut>
-
-                <SignedIn>
-                  <Link
-                    href={`/subscribe?billingPeriod=${billingPeriod}`}
-                    onClick={() =>
-                      trackEvent('click_choose_plan', {
+              <div className="mt-8 space-y-2">
+                <Link
+                  href={`/support?inquiryType=pricing&source=pricing_card&funnelStage=consideration&message=I%20need%20help%20choosing%20the%20${encodeURIComponent(plan.name)}%20plan.%20Billing:%20${billingPeriod}.`}
+                  onClick={() =>
+                    {
+                      void trackFunnelEvent('pricing_discussion_clicked', {
                         source: 'pricing_plan_card',
                         plan: plan.name,
                         billing_period: billingPeriod,
-                      })
+                      });
+                      trackEvent('click_discuss_plan', {
+                        source: 'pricing_plan_card',
+                        plan: plan.name,
+                        billing_period: billingPeriod,
+                      });
                     }
-                    className="block w-full text-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors"
-                  >
-                    Choose plan
-                  </Link>
-                </SignedIn>
+                  }
+                  className="block w-full text-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 transition-colors"
+                >
+                  Discuss this plan
+                </Link>
+
+                <Link
+                  href={`/subscribe?billingPeriod=${billingPeriod}`}
+                  onClick={() =>
+                    trackEvent('click_subscribe_direct', {
+                      source: 'pricing_plan_card_secondary',
+                      plan: plan.name,
+                      billing_period: billingPeriod,
+                    })
+                  }
+                  className="block w-full text-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900 font-semibold py-2.5 transition-colors"
+                >
+                  Continue without consultation
+                </Link>
               </div>
             </div>
           ))}
@@ -197,7 +240,7 @@ export default function PricingSectionClient({ plans }: PricingSectionClientProp
         <div className="mt-12 text-center text-sm text-slate-600">
           Need a custom plan or volume licensing?{' '}
           <Link href="/support" className="text-blue-600 hover:text-blue-700 font-semibold">
-            Contact sales
+            Talk to sales
           </Link>
           .
         </div>

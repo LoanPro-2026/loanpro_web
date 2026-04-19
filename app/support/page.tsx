@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/googleAnalytics';
 import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
+import { getCurrentUtmParams, getVisitorId, trackFunnelEvent } from '@/lib/funnelTracking';
+import { fetchPublicSalesConfig, getFallbackSalesConfig, type PublicSalesConfig } from '@/lib/salesConfig';
 
 type InquiryType =
     | 'sales'
@@ -59,6 +61,7 @@ export default function SupportPage() {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [requestId, setRequestId] = useState('');
+    const [salesConfig, setSalesConfig] = useState<PublicSalesConfig>(getFallbackSalesConfig());
     const messageLength = formData.message.trim().length;
 
     useEffect(() => {
@@ -78,6 +81,16 @@ export default function SupportPage() {
             organization: organization || prev.organization,
             message: message || prev.message,
         }));
+
+        void trackFunnelEvent('support_form_opened', {
+            source: searchParams.get('source') || 'support_page',
+            inquiryType: inquiryType || 'sales',
+        });
+
+        void (async () => {
+            const config = await fetchPublicSalesConfig();
+            setSalesConfig(config);
+        })();
     }, [searchParams]);
 
     const isSubmitDisabled = useMemo(() => {
@@ -86,7 +99,6 @@ export default function SupportPage() {
             !formData.name.trim() ||
             !formData.email.trim() ||
             !formData.phone.trim() ||
-            !formData.organization.trim() ||
             messageLength < 10 ||
             !formData.consentAccepted
         );
@@ -110,7 +122,14 @@ export default function SupportPage() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    ...formData,
+                    source: searchParams.get('source') || 'support_page',
+                    funnelStage: searchParams.get('funnelStage') || 'consideration',
+                    pagePath: window.location.pathname,
+                    visitorId: getVisitorId(),
+                    utm: getCurrentUtmParams(),
+                })
             });
 
             const payload = await response.json();
@@ -130,6 +149,12 @@ export default function SupportPage() {
                 inquiry_type: formData.inquiryType,
                 source: 'support_page',
                 has_callback_window: Boolean(formData.preferredCallbackTime?.trim()),
+            });
+
+            await trackFunnelEvent('support_form_submitted', {
+                inquiryType: formData.inquiryType,
+                source: searchParams.get('source') || 'support_page',
+                hasPreferredCallbackTime: Boolean(formData.preferredCallbackTime?.trim()),
             });
 
             setFormData((prev) => ({
@@ -155,13 +180,20 @@ export default function SupportPage() {
         <div className="min-h-screen bg-slate-50 pt-24 pb-16">
             <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
-                    <h1 className="text-3xl font-semibold text-slate-900 mb-2">Contact Us</h1>
+                    <h1 className="text-3xl font-semibold text-slate-900 mb-2">Talk to a LoanPro agent</h1>
                     <p className="text-slate-600 mb-6">
-                        Need help buying, installing, or using LoanPro? Leave us your details and we will call you.
+                        Need help buying, installing, or using LoanPro? Leave your details and we will call you back. No pressure, just guidance.
                     </p>
 
+                    <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        Prefer immediate support?{' '}
+                        <a href={`tel:${salesConfig.salesPhone.replace(/\s+/g, '')}`} className="font-semibold text-blue-700 hover:text-blue-800">
+                            Call {salesConfig.salesPhone}
+                        </a>
+                    </div>
+
                     <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                        We usually respond very fast during our Monday to Saturday working hours.
+                        We usually respond very fast during our {salesConfig.salesHours}.
                     </div>
 
                     {error && (
@@ -216,13 +248,12 @@ export default function SupportPage() {
                                 <p className="mt-1 text-xs text-slate-500">Include country code for faster callback scheduling.</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Organization</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Organization (Optional)</label>
                                 <input
                                     type="text"
                                     value={formData.organization}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, organization: e.target.value }))}
                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
                                 />
                             </div>
                         </div>

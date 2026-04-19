@@ -22,11 +22,13 @@ import {
   CalendarIcon,
   EnvelopeIcon,
   ExclamationTriangleIcon,
-  PhoneIcon
+  PhoneIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import AdminTicketsTab from '@/components/AdminTicketsTab';
 import ContactLeadsTab from '@/components/ContactLeadsTab';
+import SalesSettingsTab from '@/components/SalesSettingsTab';
 import { useDialog } from '@/components/DialogProvider';
 import { toUserFriendlyToastError } from '@/lib/toastErrorMessage';
 
@@ -113,7 +115,7 @@ interface PaymentIncidentConfig {
   alertCooldownMinutes: number;
 }
 
-type TabType = 'dashboard' | 'users' | 'subscriptions' | 'pricing' | 'analytics' | 'tickets' | 'contact-leads' | 'cancellations' | 'incidents';
+type TabType = 'dashboard' | 'users' | 'subscriptions' | 'pricing' | 'analytics' | 'tickets' | 'contact-leads' | 'sales-settings' | 'cancellations' | 'incidents';
 
 const AdminDashboard = () => {
   const { user, isLoaded } = useUser();
@@ -765,7 +767,8 @@ const AdminDashboard = () => {
     { id: 'pricing' as TabType, name: 'Pricing', icon: CurrencyDollarIcon },
     { id: 'analytics' as TabType, name: 'Analytics', icon: ChartPieIcon },
     { id: 'tickets' as TabType, name: 'Support Tickets', icon: EnvelopeIcon },
-    { id: 'contact-leads' as TabType, name: 'Contact Leads', icon: PhoneIcon }
+    { id: 'contact-leads' as TabType, name: 'Contact Leads', icon: PhoneIcon },
+    { id: 'sales-settings' as TabType, name: 'Sales Settings', icon: Cog6ToothIcon }
   ];
 
   const StatCard = ({ label, value, icon: Icon, trend, color = 'blue' }: any) => {
@@ -1679,6 +1682,10 @@ const AdminDashboard = () => {
         {/* Contact Leads Tab */}
         {activeTab === 'contact-leads' && (
           <ContactLeadsTab />
+        )}
+
+        {activeTab === 'sales-settings' && (
+          <SalesSettingsTab />
         )}
       </div>
 

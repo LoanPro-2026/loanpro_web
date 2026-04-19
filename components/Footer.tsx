@@ -7,8 +7,22 @@ import {
     PhoneIcon,
     MapPinIcon
 } from '@heroicons/react/24/outline';
+import { connectToDatabase } from '@/lib/mongodb';
 
-const Footer = () => (
+const Footer = async () => {
+    let salesPhone = '+91 78988 85129';
+    let supportEmail = 'support@loanpro.tech';
+
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('admin_settings').findOne({ key: 'global' });
+        salesPhone = String(settings?.value?.salesPhone || salesPhone);
+        supportEmail = String(settings?.value?.supportEmail || supportEmail);
+    } catch {
+        // Keep fallback contacts if the DB cannot be read during rendering.
+    }
+
+    return (
     <footer className="bg-slate-950 text-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
@@ -27,14 +41,14 @@ const Footer = () => (
                     <div className="mt-6 space-y-3 text-sm text-slate-400">
                         <div className="flex items-center gap-3">
                             <EnvelopeIcon className="w-4 h-4 text-slate-500" />
-                            <a href="mailto:support@loanpro.tech" className="hover:text-white transition-colors">
-                                support@loanpro.tech
+                            <a href={`mailto:${supportEmail}`} className="hover:text-white transition-colors">
+                                {supportEmail}
                             </a>
                         </div>
                         <div className="flex items-center gap-3">
                             <PhoneIcon className="w-4 h-4 text-slate-500" />
-                            <a href="tel:+917898885129" className="hover:text-white transition-colors">
-                                +91 78988 85129
+                            <a href={`tel:${salesPhone.replace(/\s+/g, '')}`} className="hover:text-white transition-colors">
+                                {salesPhone}
                             </a>
                         </div>
                         <div className="flex items-center gap-3">
@@ -48,6 +62,7 @@ const Footer = () => (
                     <h3 className="text-sm font-semibold text-white">Product</h3>
                     <ul className="mt-4 space-y-3 text-sm text-slate-400">
                         <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
+                        <li><Link href="/#trust" className="hover:text-white transition-colors">Why trust LoanPro</Link></li>
                         <li><Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
                         <li><Link href="/download" className="hover:text-white transition-colors">Download</Link></li>
                         <li><Link href="/#faq" className="hover:text-white transition-colors">FAQs</Link></li>
@@ -80,14 +95,26 @@ const Footer = () => (
             </div>
 
             <div className="mt-10 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
-                <h3 className="text-lg font-semibold text-white">Ready to leave paper registers behind?</h3>
+                <h3 className="text-lg font-semibold text-white">Not ready to purchase yet? Talk to us first.</h3>
                 <p className="mt-2 text-sm text-slate-400">
-                    Start your 1-month trial today and see how easy it is to manage your shop.
+                    Most shop owners prefer a quick call before buying. We will understand your setup and suggest the right plan.
                 </p>
                 <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <Link
+                        href="/support?inquiryType=sales&message=I%20want%20to%20talk%20to%20an%20agent%20before%20purchasing."
+                        className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors"
+                    >
+                        Talk to agent
+                    </Link>
+                    <a
+                        href="tel:+917898885129"
+                        className="rounded-lg border border-slate-700 bg-slate-900 text-white font-semibold px-5 py-2.5 hover:border-slate-500 transition-colors"
+                    >
+                        Call now
+                    </a>
                     <SignedOut>
                         <SignUpButton mode="modal">
-                            <button className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors">
+                            <button className="rounded-lg border border-slate-700 bg-slate-900 text-white font-semibold px-5 py-2.5 hover:border-slate-500 transition-colors">
                                 Start free trial
                             </button>
                         </SignUpButton>
@@ -95,21 +122,16 @@ const Footer = () => (
                     <SignedIn>
                         <Link
                             href="/profile"
-                            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 transition-colors"
+                            className="rounded-lg border border-slate-700 bg-slate-900 text-white font-semibold px-5 py-2.5 hover:border-slate-500 transition-colors"
                         >
                             Go to dashboard
                         </Link>
                     </SignedIn>
-                    <Link
-                        href="/download"
-                        className="rounded-lg border border-slate-700 bg-slate-900 text-white font-semibold px-5 py-2.5 hover:border-slate-500 transition-colors"
-                    >
-                        Download app
-                    </Link>
                 </div>
             </div>
         </div>
     </footer>
-);
+    );
+};
 
 export default Footer; 

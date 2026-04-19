@@ -10,6 +10,11 @@ const DEFAULT_SETTINGS = {
   allowNewSignups: true,
   supportEmail: 'support@loanpro.tech',
   alertsEnabled: true,
+  salesPhone: '+91 78988 85129',
+  salesHours: 'Monday-Saturday, 10:00 AM to 7:00 PM IST',
+  salesCallEnabled: true,
+  salesWidgetEnabled: true,
+  salesDefaultMessage: 'I want to talk to an agent before choosing a plan.',
 };
 
 const DEFAULT_MONITORING_SETTINGS = {
@@ -139,7 +144,7 @@ export async function PATCH(request: NextRequest) {
     });
     const body = await request.json();
 
-    const allowedKeys = ['trialDays', 'maintenanceMode', 'allowNewSignups', 'supportEmail', 'alertsEnabled', 'monitoring'];
+    const allowedKeys = ['trialDays', 'maintenanceMode', 'allowNewSignups', 'supportEmail', 'alertsEnabled', 'salesPhone', 'salesHours', 'salesCallEnabled', 'salesWidgetEnabled', 'salesDefaultMessage', 'monitoring'];
     const extraKeys = Object.keys(body || {}).filter((key) => !allowedKeys.includes(key));
     if (extraKeys.length > 0) {
       return NextResponse.json({ success: false, error: `Unsupported fields: ${extraKeys.join(', ')}` }, { status: 400 });
@@ -151,6 +156,11 @@ export async function PATCH(request: NextRequest) {
       allowNewSignups: Boolean(body?.allowNewSignups ?? DEFAULT_SETTINGS.allowNewSignups),
       supportEmail: String(body?.supportEmail || DEFAULT_SETTINGS.supportEmail).trim(),
       alertsEnabled: Boolean(body?.alertsEnabled ?? DEFAULT_SETTINGS.alertsEnabled),
+      salesPhone: String(body?.salesPhone || DEFAULT_SETTINGS.salesPhone).trim(),
+      salesHours: String(body?.salesHours || DEFAULT_SETTINGS.salesHours).trim(),
+      salesCallEnabled: Boolean(body?.salesCallEnabled ?? DEFAULT_SETTINGS.salesCallEnabled),
+      salesWidgetEnabled: Boolean(body?.salesWidgetEnabled ?? DEFAULT_SETTINGS.salesWidgetEnabled),
+      salesDefaultMessage: String(body?.salesDefaultMessage || DEFAULT_SETTINGS.salesDefaultMessage).trim(),
     };
 
     const incomingMonitoring = body?.monitoring;
@@ -161,6 +171,19 @@ export async function PATCH(request: NextRequest) {
 
     if (!nextSettings.supportEmail || !nextSettings.supportEmail.includes('@')) {
       return NextResponse.json({ success: false, error: 'Valid supportEmail is required' }, { status: 400 });
+    }
+
+    const phoneDigits = nextSettings.salesPhone.replace(/\D/g, '');
+    if (!nextSettings.salesPhone || phoneDigits.length < 8) {
+      return NextResponse.json({ success: false, error: 'Valid salesPhone is required' }, { status: 400 });
+    }
+
+    if (!nextSettings.salesHours) {
+      return NextResponse.json({ success: false, error: 'salesHours is required' }, { status: 400 });
+    }
+
+    if (!nextSettings.salesDefaultMessage) {
+      return NextResponse.json({ success: false, error: 'salesDefaultMessage is required' }, { status: 400 });
     }
 
     const { db } = await connectToDatabase();

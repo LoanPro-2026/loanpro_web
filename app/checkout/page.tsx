@@ -7,6 +7,7 @@ import { useUser } from '@clerk/nextjs';
 import { ArrowLeftIcon, CheckIcon, TagIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/ToastProvider';
 import { trackEvent } from '@/lib/googleAnalytics';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 declare global {
   interface Window {
@@ -116,6 +117,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     trackEvent('view_checkout', {
+      plan,
+      billing_period: billingPeriod,
+      checkout_context: checkoutContext,
+    });
+
+    void trackFunnelEvent('checkout_started', {
       plan,
       billing_period: billingPeriod,
       checkout_context: checkoutContext,

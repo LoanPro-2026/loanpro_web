@@ -42,12 +42,42 @@ interface LeadStats {
   closed: number;
 }
 
+interface FunnelInsights {
+  windowDays: number;
+  events: {
+    pageViews: number;
+    widgetOpened: number;
+    supportFormOpened: number;
+    leadsSubmitted: number;
+    checkoutStarted: number;
+  };
+  leadSources: Array<{ source: string; count: number }>;
+  topLeadPages: Array<{ pagePath: string; count: number }>;
+  widgetLeads: number;
+  conversionRate: number;
+}
+
 const initialStats: LeadStats = {
   new: 0,
   called: 0,
   'follow-up': 0,
   converted: 0,
   closed: 0
+};
+
+const initialFunnelInsights: FunnelInsights = {
+  windowDays: 30,
+  events: {
+    pageViews: 0,
+    widgetOpened: 0,
+    supportFormOpened: 0,
+    leadsSubmitted: 0,
+    checkoutStarted: 0,
+  },
+  leadSources: [],
+  topLeadPages: [],
+  widgetLeads: 0,
+  conversionRate: 0,
 };
 
 const statusOptions: LeadStatus[] = ['new', 'called', 'follow-up', 'converted', 'closed'];
@@ -88,6 +118,7 @@ export default function ContactLeadsTab() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'today-followups' | 'high-priority'>('all');
+  const [funnelInsights, setFunnelInsights] = useState<FunnelInsights>(initialFunnelInsights);
 
   useEffect(() => {
     void fetchLeads();
@@ -114,6 +145,7 @@ export default function ContactLeadsTab() {
       const data = await response.json();
       setLeads(data.leads || []);
       setStats(data.stats || initialStats);
+      setFunnelInsights(data.funnelInsights || initialFunnelInsights);
     } catch (error) {
       console.error('Error fetching contact leads:', error);
     } finally {
@@ -267,6 +299,62 @@ export default function ContactLeadsTab() {
 
   return (
     <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-slate-500 text-sm">Funnel Page Views ({funnelInsights.windowDays}d)</p>
+          <p className="text-2xl font-semibold text-slate-900">{funnelInsights.events.pageViews}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-slate-500 text-sm">Widget Opens</p>
+          <p className="text-2xl font-semibold text-slate-900">{funnelInsights.events.widgetOpened}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-slate-500 text-sm">Leads Submitted</p>
+          <p className="text-2xl font-semibold text-slate-900">{funnelInsights.events.leadsSubmitted}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-slate-500 text-sm">Lead to Converted (%)</p>
+          <p className="text-2xl font-semibold text-slate-900">{funnelInsights.conversionRate}%</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-800">Top Lead Sources</h3>
+            <span className="text-xs text-slate-500">Widget leads: {funnelInsights.widgetLeads}</span>
+          </div>
+          {funnelInsights.leadSources.length === 0 ? (
+            <p className="text-sm text-slate-500">No source metadata available yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {funnelInsights.leadSources.map((item) => (
+                <div key={`${item.source}-${item.count}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <span className="text-sm text-slate-700">{item.source}</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-800 mb-3">Pages Driving Leads</h3>
+          {funnelInsights.topLeadPages.length === 0 ? (
+            <p className="text-sm text-slate-500">No page path data captured yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {funnelInsights.topLeadPages.map((item) => (
+                <div key={`${item.pagePath}-${item.count}`} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <span className="text-sm text-slate-700 truncate pr-2">{item.pagePath}</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
           <p className="text-slate-500 text-sm">New</p>

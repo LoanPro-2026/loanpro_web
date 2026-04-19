@@ -1,5 +1,6 @@
 import HeroSection from '../components/HeroSection';
 import FeaturesSection from '../components/FeaturesSection';
+import TrustSection from '../components/TrustSection';
 import RequirementsSection from '../components/RequirementsSection';
 import HowToSetup from '../components/HowToSetup';
 import PricingSection from '../components/PricingSection';
@@ -11,6 +12,7 @@ export default function Home() {
     <main>
       <HeroSection />
       <FeaturesSection />
+      <TrustSection />
       <HowToSetup />
       <RequirementsSection />
       <PricingSection />

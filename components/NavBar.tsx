@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { SignedIn, SignedOut, useUser, useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, useUser, useClerk, SignInButton } from '@clerk/nextjs';
 import { UserCircleIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const NavBar = () => {
@@ -38,6 +38,7 @@ const NavBar = () => {
 
   const navLinks = [
     { href: '/#features', label: 'Features' },
+    { href: '/#trust', label: 'Trust' },
     { href: '/#how-it-works', label: 'How it works' },
     { href: '/#pricing', label: 'Pricing' },
     { href: '/#faq', label: 'FAQs' },
@@ -184,11 +185,15 @@ const NavBar = () => {
                       Login
                     </button>
                   </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                      Get started
-                    </button>
-                  </SignUpButton>
+                  <Link
+                    href="/sign-up"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+                  >
+                    Get started
+                  </Link>
                 </div>
               </SignedOut>
 

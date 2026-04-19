@@ -5,6 +5,7 @@ import { getCorsHeaders, handleCorsPreFlight } from '@/lib/cors';
 import emailService from '@/services/emailService';
 import { logger } from '@/lib/logger';
 import { enforceRequestRateLimit, parseJsonRequest, toSafeErrorResponse } from '@/lib/apiSafety';
+import { connectToDatabase } from '@/lib/mongodb';
 
 export async function OPTIONS(req: NextRequest) {
   return handleCorsPreFlight(req);
@@ -54,8 +55,13 @@ export async function POST(req: NextRequest) {
     const preferredCallbackTime = typeof body.preferredCallbackTime === 'string' ? body.preferredCallbackTime.trim() : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone.trim() : '';
     const consentAccepted = body.consentAccepted === true;
+    const sourceHint = typeof body.source === 'string' ? body.source.trim().slice(0, 80) : 'website_unknown';
+    const funnelStage = typeof body.funnelStage === 'string' ? body.funnelStage.trim().slice(0, 60) : 'awareness';
+    const pagePath = typeof body.pagePath === 'string' ? body.pagePath.trim().slice(0, 200) : '';
+    const visitorId = typeof body.visitorId === 'string' ? body.visitorId.trim().slice(0, 120) : '';
+    const utm = body.utm && typeof body.utm === 'object' ? body.utm : {};
 
-    if (!name || !email || !phone || !organization || !inquiryType || !message) {
+    if (!name || !email || !phone || !inquiryType || !message) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400, headers: corsHeaders }
@@ -96,7 +102,7 @@ export async function POST(req: NextRequest) {
       name,
       email,
       phone,
-      organization,
+      organization: organization || 'Not provided',
       inquiryType,
       message,
       preferredCallbackTime: preferredCallbackTime || undefined,
@@ -105,17 +111,36 @@ export async function POST(req: NextRequest) {
       consentAt: new Date(),
       source: 'website_contact_form',
       status: 'new',
-      priority: 'normal'
+      priority: inquiryType === 'sales' || inquiryType === 'demo-request' ? 'high' : 'normal'
     });
 
     await contactRequest.save();
+
+    // Save funnel metadata separately to avoid modifying strict contact schema.
+    try {
+      const { db } = await connectToDatabase();
+      await db.collection('contact_request_meta').insertOne({
+        requestId: contactRequest.requestId,
+        sourceHint,
+        funnelStage,
+        pagePath,
+        visitorId,
+        utm,
+        createdAt: new Date(),
+      });
+    } catch (metaError) {
+      logger.warn('Failed to save contact request funnel metadata', 'CONTACT_REQUESTS', {
+        requestId: contactRequest.requestId,
+        error: metaError instanceof Error ? metaError.message : 'unknown',
+      });
+    }
 
     const emailData = {
       requestId: contactRequest.requestId,
       name,
       email,
       phone,
-      organization,
+      organization: organization || 'Not provided',
       inquiryType,
       message,
       preferredCallbackTime: preferredCallbackTime || undefined,

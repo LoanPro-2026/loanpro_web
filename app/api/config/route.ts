@@ -147,6 +147,46 @@ async function getConfigForPlan(plan: string, appVersion: string) {
   return baseConfig;
 }
 
+async function getPublicSalesConfig() {
+  const client = await clientPromise;
+  const db = client.db('AdminDB');
+  const settings = await db.collection('admin_settings').findOne({ key: 'global' });
+  const value = settings?.value || {};
+
+  return {
+    salesPhone: String(value?.salesPhone || '+91 78988 85129'),
+    salesHours: String(value?.salesHours || 'Monday-Saturday, 10:00 AM to 7:00 PM IST'),
+    salesCallEnabled: Boolean(value?.salesCallEnabled ?? true),
+    salesWidgetEnabled: Boolean(value?.salesWidgetEnabled ?? true),
+    salesDefaultMessage: String(value?.salesDefaultMessage || 'I want to talk to an agent before choosing a plan.'),
+    supportEmail: String(value?.supportEmail || 'support@loanpro.tech'),
+  };
+}
+
+export async function GET(request: Request) {
+  const corsHeaders = getCorsHeaders(request);
+
+  try {
+    const rateLimitResponse = enforceRequestRateLimit({
+      request,
+      scope: 'config-get',
+      limit: 120,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const salesConfig = await getPublicSalesConfig();
+
+    return NextResponse.json({
+      success: true,
+      salesConfig,
+    }, { headers: corsHeaders });
+  } catch (error) {
+    logger.error('Config GET API error', error, 'CONFIG_API');
+    return NextResponse.json({ success: false, error: 'Failed to get public config' }, { status: 500, headers: corsHeaders });
+  }
+}
+
 export function OPTIONS(req: Request) {
   const corsHeaders = getCorsHeaders(req);
   return new Response(null, { status: 204, headers: corsHeaders });

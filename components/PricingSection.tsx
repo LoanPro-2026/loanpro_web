@@ -61,10 +61,16 @@ const plans = [
 
 const PricingSection = async () => {
     let livePricing: Record<string, number> = {};
+        let salesPhone = '+91 78988 85129';
+        let salesCallEnabled = true;
 
     try {
         const { db } = await connectToDatabase();
         livePricing = await getEffectivePlanPricing(db);
+
+            const settings = await db.collection('admin_settings').findOne({ key: 'global' });
+            salesPhone = String(settings?.value?.salesPhone || salesPhone);
+            salesCallEnabled = Boolean(settings?.value?.salesCallEnabled ?? true);
     } catch {
         livePricing = {};
     }
@@ -80,7 +86,7 @@ const PricingSection = async () => {
         tone: plan.tone,
     }));
 
-    return <PricingSectionClient plans={displayPlans} />;
+    return <PricingSectionClient plans={displayPlans} salesPhone={salesPhone} salesCallEnabled={salesCallEnabled} />;
 };
 
 export default PricingSection; 

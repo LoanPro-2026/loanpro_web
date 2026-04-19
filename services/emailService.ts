@@ -155,6 +155,10 @@ class EmailService {
     };
   }
 
+  private getAdminSender() {
+    return { email: 'admin@loanpro.tech', name: 'LoanPro Admin' };
+  }
+
   /**
     * Send the initial ticket email to the support/help mailbox
    */
@@ -532,7 +536,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'admin@loanpro.tech', name: 'LoanPro Admin' },
+        sender: this.getAdminSender(),
         to: [{ email: data.email, name: data.name }],
         subject: `Thanks for contacting LoanPro (${data.requestId})`,
         htmlContent
@@ -590,7 +594,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro subscription is active',
         htmlContent
@@ -646,7 +650,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro subscription is renewed',
         htmlContent
@@ -702,7 +706,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro plan was upgraded',
         htmlContent
@@ -766,7 +770,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro subscription was cancelled',
         htmlContent
@@ -819,7 +823,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro refund is processed',
         htmlContent
@@ -855,7 +859,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Your LoanPro trial was cancelled',
         htmlContent
@@ -902,7 +906,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'A new device was added to your LoanPro account',
         htmlContent
@@ -949,7 +953,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'A device was updated on your LoanPro account',
         htmlContent
@@ -996,7 +1000,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'A device was removed from your LoanPro account',
         htmlContent
@@ -1043,7 +1047,7 @@ class EmailService {
       `;
 
       const sendSmtpEmail = {
-        sender: { email: 'noreply@loanpro.tech', name: 'LoanPro' },
+        sender: this.getAdminSender(),
         to: [{ email: data.userEmail, name: data.userName }],
         subject: 'Device switch requested for your LoanPro account',
         htmlContent

@@ -3,6 +3,7 @@ import { connectMongoose } from '@/lib/mongoose';
 import ContactRequest from '@/models/ContactRequest';
 import { enforceAdminAccess, getAdminErrorStatus } from '@/lib/adminAuth';
 import { getAdminCachedResponse, setAdminCachedResponse } from '@/lib/adminResponseCache';
+import { connectToDatabase } from '@/lib/mongodb';
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,7 +64,33 @@ export async function GET(req: NextRequest) {
             count: { $sum: 1 }
           }
         }
-      ])
+      ]),
+    ]);
+
+    const { db } = await connectToDatabase();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [eventCounts, sourceBreakdown, topPages, widgetLeadCount] = await Promise.all([
+      db.collection('sales_funnel_events').aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: { _id: '$eventName', count: { $sum: 1 } } }
+      ]).toArray(),
+      db.collection('contact_request_meta').aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: { _id: '$sourceHint', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 8 }
+      ]).toArray(),
+      db.collection('contact_request_meta').aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: { _id: '$pagePath', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 6 }
+      ]).toArray(),
+      db.collection('contact_request_meta').countDocuments({
+        createdAt: { $gte: thirtyDaysAgo },
+        sourceHint: 'talk_to_agent_widget'
+      })
     ]);
 
     const stats = {
@@ -80,10 +107,39 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    const eventMap = eventCounts.reduce<Record<string, number>>((acc, item) => {
+      acc[String(item._id)] = Number(item.count || 0);
+      return acc;
+    }, {});
+
+    const leadsInLast30Days = Number(sourceBreakdown.reduce((sum, item) => sum + Number(item.count || 0), 0));
+    const convertedLeads = Number(stats.converted || 0);
+    const conversionRate = leadsInLast30Days > 0
+      ? Number(((convertedLeads / leadsInLast30Days) * 100).toFixed(1))
+      : 0;
+
+    const funnelInsights = {
+      windowDays: 30,
+      events: {
+        pageViews: eventMap.page_view || 0,
+        widgetOpened: eventMap.agent_widget_opened || 0,
+        supportFormOpened: eventMap.support_form_opened || 0,
+        leadsSubmitted: (eventMap.lead_submitted || 0) + (eventMap.support_form_submitted || 0),
+        checkoutStarted: eventMap.checkout_started || 0,
+      },
+      leadSources: sourceBreakdown.map((item) => ({ source: item._id || 'unknown', count: item.count })),
+      topLeadPages: topPages
+        .filter((item) => item._id)
+        .map((item) => ({ pagePath: item._id, count: item.count })),
+      widgetLeads: widgetLeadCount,
+      conversionRate,
+    };
+
     const payload = {
       success: true,
       leads,
       stats,
+      funnelInsights,
       pagination: {
         page,
         limit,

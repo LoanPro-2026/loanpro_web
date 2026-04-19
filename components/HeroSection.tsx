@@ -2,8 +2,23 @@ import React from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignUpButton } from '@clerk/nextjs';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { connectToDatabase } from '@/lib/mongodb';
 
-const HeroSection = () => {
+const HeroSection = async () => {
+  let salesPhone = '+91 78988 85129';
+  let salesDefaultMessage = 'I want to talk to an agent before choosing a plan.';
+
+  try {
+    const { db } = await connectToDatabase();
+    const settings = await db.collection('admin_settings').findOne({ key: 'global' });
+    salesPhone = String(settings?.value?.salesPhone || salesPhone);
+    salesDefaultMessage = String(settings?.value?.salesDefaultMessage || salesDefaultMessage);
+  } catch {
+    // Keep defaults when the database is unavailable during static rendering.
+  }
+
+  const agentSupportHref = `/support?inquiryType=sales&source=hero_primary&funnelStage=awareness&message=${encodeURIComponent(salesDefaultMessage)}`;
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.08),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.08),transparent_40%)]"></div>
@@ -19,8 +34,14 @@ const HeroSection = () => {
             </h1>
 
             <p className="mt-5 text-lg text-slate-600 max-w-xl">
-              LoanPro is a simple Windows app for managing informal loans against gold and silver. Keep track of daily collections, cash flow, and use our Android app for quick customer photos. No complicated steps.
+              LoanPro is built for gold and silver lending businesses. If you are unsure about trust, setup, or what plan fits your shop, our team will guide you first and only then help you decide.
             </p>
+
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-2xl">
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Live onboarding help</div>
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Plan fit in 10 mins</div>
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">Hindi + English support</div>
+            </div>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <SignedOut>
@@ -51,7 +72,7 @@ const HeroSection = () => {
             </div>
 
             <div className="mt-6 text-sm text-slate-500">
-              Simple Windows desktop app with an Android app for capturing photos.
+              We can also schedule a callback and walkthrough in Hindi or English.
             </div>
           </div>
 
